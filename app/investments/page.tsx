@@ -27,13 +27,13 @@ export default function InvestmentsPage() {
   }
 
   async function load() {
-    const today = new Date().toISOString().split('T')[0]
     const [{ data: inv }, { data: snaps }, { data: rt }] = await Promise.all([
       supabase.from('investments').select('*').eq('is_active', true),
-      supabase.from('investment_snapshots').select('*').eq('snapshot_date', today),
+      supabase.from('investment_snapshots').select('*').order('snapshot_date', { ascending: false }),
       supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
     ])
     const enriched = (inv || []).map((i: Investment) => {
+      // Take the most recent snapshot for this investment
       const snap = (snaps || []).find((s: any) => s.investment_id === i.id)
       const costBasis = (i.avg_cost || 0) * (i.quantity || 0)
       const currentVal = snap?.total_value || costBasis

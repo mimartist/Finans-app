@@ -34,7 +34,7 @@ export default function Dashboard() {
       supabase.from('loans').select('*').eq('is_active', true),
       supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
       supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
-      supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', todayStr),
+      supabase.from('investment_snapshots').select('investment_id, total_value_try, snapshot_date').order('snapshot_date', { ascending: false }),
       supabase.from('recurring_payments').select('*').eq('period_year', year).eq('period_month', month).eq('is_paid', true),
       supabase.from('debt_records').select('*').eq('type', 'alacak').eq('is_settled', false),
     ])
@@ -49,7 +49,14 @@ export default function Dashboard() {
     setRecurring(recList)
     setAllAlacak(recAlacak || [])
     setRates(rt?.[0] || null)
-    setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
+    // For each investment_id, take the most recent snapshot (already ordered desc)
+    const seen = new Set<number>()
+    const latestSnaps = (snaps || []).filter((sn: any) => {
+      if (seen.has(sn.investment_id)) return false
+      seen.add(sn.investment_id)
+      return true
+    })
+    setInvestTotalTry(latestSnaps.reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
     setPaidThisMonth(paidList)
 
     // Build payment items with paid check
