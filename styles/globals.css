@@ -1,17 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg: #0a0c10;
-  --bg2: #111318;
-  --bg3: #181c24;
-  --bg4: #1e2330;
-  --border: rgba(255,255,255,0.07);
-  --border2: rgba(255,255,255,0.13);
-  --text: #e8eaf0;
-  --muted: #6b7280;
+  --bg: #f8f9fa;
+  --bg2: #ffffff;
+  --bg3: #ffffff;
+  --bg4: #f1f5f9;
+  --border: #e2e8f0;
+  --border2: #cbd5e1;
+  --text: #1a1a2e;
+  --muted: #64748b;
+  --accent: #0d9488;
+  --accent-light: rgba(13,148,136,0.08);
+  --accent-mid: rgba(13,148,136,0.15);
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.06);
 }
 
 * { box-sizing: border-box; }
@@ -19,15 +24,13 @@
 html, body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Sora', sans-serif;
+  font-family: 'Inter', -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 0px; }
 
-/* Safe area for notch phones */
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 20px); }
 .safe-top { padding-top: env(safe-area-inset-top, 0px); }
 
@@ -35,24 +38,34 @@ html, body {
 .card {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
 }
 
 .card-lg {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+}
+
+.card-accent {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  border-left: 3px solid var(--accent);
 }
 
 /* Mono font */
 .mono { font-family: 'JetBrains Mono', monospace; }
 
 /* Colored amounts */
-.amt-red    { color: #f87171; }
-.amt-green  { color: #4ade9a; }
-.amt-blue   { color: #6c8fff; }
-.amt-amber  { color: #f59e0b; }
-.amt-purple { color: #a78bfa; }
+.amt-red    { color: #dc2626; }
+.amt-green  { color: #059669; }
+.amt-blue   { color: #0d9488; }
+.amt-amber  { color: #d97706; }
+.amt-purple { color: #7c3aed; }
 .amt-muted  { color: var(--muted); }
 
 /* Progress bar */
@@ -68,9 +81,6 @@ html, body {
   transition: width 0.5s ease;
 }
 
-/* Bottom nav active */
-.nav-active { color: #6c8fff !important; }
-
 /* Pill badge */
 .badge {
   display: inline-block;
@@ -79,10 +89,72 @@ html, body {
   padding: 2px 10px;
   border-radius: 20px;
 }
-.badge-green { background: rgba(74,222,154,0.12); color: #4ade9a; border: 1px solid rgba(74,222,154,0.25); }
-.badge-red   { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
-.badge-blue  { background: rgba(108,143,255,0.12); color: #6c8fff; border: 1px solid rgba(108,143,255,0.25); }
-.badge-amber { background: rgba(245,158,11,0.12);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+.badge-green { background: rgba(5,150,105,0.08); color: #059669; border: 1px solid rgba(5,150,105,0.2); }
+.badge-red   { background: rgba(220,38,38,0.08); color: #dc2626; border: 1px solid rgba(220,38,38,0.2); }
+.badge-blue  { background: rgba(13,148,136,0.08); color: #0d9488; border: 1px solid rgba(13,148,136,0.2); }
+.badge-amber { background: rgba(217,119,6,0.08);  color: #d97706; border: 1px solid rgba(217,119,6,0.2); }
+
+/* Buttons */
+.btn-primary {
+  background: #0d9488;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: #0f766e; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-outline {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-danger {
+  background: rgba(220,38,38,0.08);
+  color: #dc2626;
+  border: 1px solid rgba(220,38,38,0.2);
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Form inputs */
+.input {
+  width: 100%;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  color: var(--text);
+  transition: border-color 0.15s;
+}
+.input:focus { border-color: var(--accent); }
+.input::placeholder { color: var(--muted); }
+
+select.input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
 
 /* Pulse dot */
 @keyframes pulse {
@@ -97,3 +169,42 @@ html, body {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* Desktop sidebar layout */
+@media (min-width: 768px) {
+  .app-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+  .app-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 40;
+    padding: 24px 0;
+  }
+  .app-main {
+    margin-left: 220px;
+    flex: 1;
+    max-width: 800px;
+    padding-bottom: 40px !important;
+  }
+  .bottom-nav-mobile { display: none !important; }
+}
+
+@media (max-width: 767px) {
+  .app-sidebar { display: none !important; }
+  .app-main { padding-bottom: 96px; }
+}
+
+/* Recharts overrides */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: var(--border);
+}
+.recharts-text { fill: var(--muted); font-size: 11px; }

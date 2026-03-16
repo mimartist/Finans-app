@@ -3,17 +3,17 @@ import '../styles/globals.css'
 
 export const metadata: Metadata = {
   title: 'Finans Asistan',
-  description: 'Kişisel finans ve varlık takip asistanı',
+  description: 'Kisisel finans ve varlik takip asistani',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'Finans',
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#0a0c10',
+  themeColor: '#f8f9fa',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body className="safe-top">
         {children}
