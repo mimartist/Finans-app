@@ -26,7 +26,8 @@ export default function RecurringPage() {
   useEffect(() => { load() }, [])
 
   const categories = ['tumu', ...Array.from(new Set(expenses.map(e => e.category)))]
-  const filtered = filter === 'tumu' ? expenses : expenses.filter(e => e.category === filter)
+  const filtered = (filter === 'tumu' ? expenses : expenses.filter(e => e.category === filter))
+    .sort((a, b) => (a.payment_day || 99) - (b.payment_day || 99))
   const total = filtered.reduce((s, e) => s + e.amount, 0)
   const totalAll = expenses.reduce((s, e) => s + e.amount, 0)
 
@@ -99,23 +100,31 @@ export default function RecurringPage() {
         <div className="flex flex-col gap-2 mx-4">
           {filtered.map((exp) => {
             const days = exp.payment_day ? daysUntil(exp.payment_day) : null
+            const isUrgent = days !== null && days <= 3
             const color = catColor[exp.category] || '#64748b'
+            const monthLabel = new Date().toLocaleDateString('tr-TR', { month: 'short' }).toUpperCase()
             return (
-              <div key={exp.id} className="card px-4 py-3 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0" style={{ background: 'var(--bg4)' }}>
-                  {catIcon[exp.category] || '📦'}
+              <div key={exp.id} className="card-accent px-4 py-3 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0"
+                  style={{ background: isUrgent ? 'rgba(220,38,38,0.08)' : 'var(--bg4)' }}>
+                  {exp.payment_day ? (
+                    <>
+                      <div className="text-[11px] font-bold leading-none" style={{ color: isUrgent ? '#dc2626' : 'var(--text)' }}>{exp.payment_day}</div>
+                      <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>{monthLabel}</div>
+                    </>
+                  ) : (
+                    <div className="text-base">{catIcon[exp.category] || '📦'}</div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{exp.name}</div>
                   <div className="text-[11px] mt-0.5 capitalize" style={{ color: 'var(--muted)' }}>
-                    {exp.category}{exp.subcategory ? ` · ${exp.subcategory}` : ''}{days !== null ? ` · ${daysUntilLabel(days)}` : ''}
+                    {catIcon[exp.category] || ''} {exp.category}{exp.subcategory ? ` · ${exp.subcategory}` : ''}
+                    {days !== null ? <span style={{ color: isUrgent ? '#dc2626' : 'var(--muted)' }}> · {daysUntilLabel(days)}</span> : ''}
                   </div>
                 </div>
                 <div className="text-right flex items-center gap-2">
-                  <div>
-                    <div className="mono text-sm font-semibold" style={{ color }}>{fmt(exp.amount, exp.currency)}</div>
-                    {exp.payment_day && <div className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>ayin {exp.payment_day}'i</div>}
-                  </div>
+                  <div className="mono text-sm font-semibold" style={{ color }}>{fmt(exp.amount, exp.currency)}</div>
                   <div className="flex gap-1">
                     <button onClick={() => openEdit(exp)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
                     <button onClick={() => setDeleteConfirm(exp.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
