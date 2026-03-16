@@ -4,32 +4,42 @@ import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, daysUntil, daysUntilLabel } from '@/lib/supabase'
 import type { Loan, CreditCard, CreditCardStatement, ExchangeRate } from '@/lib/supabase'
 
+const emptyLoan = {
+  name: '', bank: '', type: 'ihtiyac', currency: 'TRY', original_amount: '',
+  remaining_amount: '', monthly_payment: '', payment_day: '', total_installments: '',
+  paid_installments: '', interest_rate: '', start_date: '', end_date: '', collateral: '', notes: '',
+}
+
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([])
   const [cards, setCards] = useState<CreditCard[]>([])
   const [statements, setStatements] = useState<CreditCardStatement[]>([])
   const [eurTry, setEurTry] = useState<number>(38)
   const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editId, setEditId] = useState<number | null>(null)
+  const [form, setForm] = useState(emptyLoan)
+  const [saving, setSaving] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      const now = new Date()
-      const [{ data: lns }, { data: crd }, { data: stm }, { data: rates }] = await Promise.all([
-        supabase.from('loans').select('*').eq('is_active', true).order('monthly_payment', { ascending: false }),
-        supabase.from('credit_cards').select('*').eq('is_active', true),
-        supabase.from('credit_card_statements').select('*')
-          .eq('period_year', now.getFullYear())
-          .eq('period_month', now.getMonth() + 1),
-        supabase.from('exchange_rates').select('eur_try').order('date', { ascending: false }).limit(1),
-      ])
-      setLoans(lns || [])
-      setCards(crd || [])
-      setStatements(stm || [])
-      if (rates?.[0]?.eur_try) setEurTry(rates[0].eur_try)
-      setLoading(false)
-    }
-    load()
-  }, [])
+  async function load() {
+    const now = new Date()
+    const [{ data: lns }, { data: crd }, { data: stm }, { data: rates }] = await Promise.all([
+      supabase.from('loans').select('*').eq('is_active', true).order('monthly_payment', { ascending: false }),
+      supabase.from('credit_cards').select('*').eq('is_active', true),
+      supabase.from('credit_card_statements').select('*')
+        .eq('period_year', now.getFullYear())
+        .eq('period_month', now.getMonth() + 1),
+      supabase.from('exchange_rates').select('eur_try').order('date', { ascending: false }).limit(1),
+    ])
+    setLoans(lns || [])
+    setCards(crd || [])
+    setStatements(stm || [])
+    if (rates?.[0]?.eur_try) setEurTry(rates[0].eur_try)
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
 
   const toTry = (loan: Loan, amount: number) =>
     loan.currency === 'EUR' ? amount * eurTry : amount
@@ -49,14 +59,81 @@ export default function LoansPage() {
     return 'linear-gradient(90deg, #f87171, #f59e0b)'
   }
 
+  function openAdd() {
+    setEditId(null)
+    setForm(emptyLoan)
+    setShowForm(true)
+  }
+
+  function openEdit(l: Loan) {
+    setEditId(l.id)
+    setForm({
+      name: l.name, bank: l.bank, type: l.type, currency: l.currency,
+      original_amount: String(l.original_amount || ''), remaining_amount: String(l.remaining_amount || ''),
+      monthly_payment: String(l.monthly_payment || ''), payment_day: String(l.payment_day || ''),
+      total_installments: String(l.total_installments || ''), paid_installments: String(l.paid_installments || ''),
+      interest_rate: String(l.interest_rate || ''), start_date: l.start_date || '', end_date: l.end_date || '',
+      collateral: l.collateral || '', notes: l.notes || '',
+    })
+    setShowForm(true)
+  }
+
+  function closeForm() { setShowForm(false); setEditId(null); setForm(emptyLoan) }
+
+  async function handleSave() {
+    if (!form.name || !form.bank || !form.monthly_payment) return
+    setSaving(true)
+    const payload = {
+      name: form.name, bank: form.bank, type: form.type, currency: form.currency,
+      original_amount: parseFloat(form.original_amount) || 0,
+      remaining_amount: parseFloat(form.remaining_amount) || 0,
+      monthly_payment: parseFloat(form.monthly_payment) || 0,
+      payment_day: parseInt(form.payment_day) || null,
+      total_installments: parseInt(form.total_installments) || 0,
+      paid_installments: parseInt(form.paid_installments) || 0,
+      interest_rate: parseFloat(form.interest_rate) || 0,
+      start_date: form.start_date || null, end_date: form.end_date || null,
+      collateral: form.collateral || null, notes: form.notes || null,
+      is_active: true,
+    }
+    if (editId) {
+      await supabase.from('loans').update(payload).eq('id', editId)
+    } else {
+      await supabase.from('loans').insert(payload)
+    }
+    setSaving(false)
+    closeForm()
+    await load()
+  }
+
+  async function handleDelete(id: number) {
+    await supabase.from('loans').update({ is_active: false }).eq('id', id)
+    setDeleteConfirm(null)
+    await load()
+  }
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+  const inp = (label: string, key: string, type = 'text', placeholder = '') => (
+    <div>
+      <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>{label}</label>
+      <input value={(form as any)[key]} onChange={e => set(key, e.target.value)} placeholder={placeholder} type={type}
+        className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+        style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+    </div>
+  )
+
   if (loading) return <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>Yükleniyor...</div>
 
   return (
     <div className="pb-24 page-enter">
       {/* Header */}
-      <div className="px-5 pt-5 pb-3">
-        <div className="text-[11px] uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Modül</div>
-        <div className="text-lg font-semibold mt-0.5">Krediler & Kartlar</div>
+      <div className="flex justify-between items-center px-5 pt-5 pb-3">
+        <div>
+          <div className="text-[11px] uppercase tracking-widest" style={{ color: 'var(--muted)' }}>Modül</div>
+          <div className="text-lg font-semibold mt-0.5">Krediler & Kartlar</div>
+        </div>
+        <button onClick={openAdd} className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+          style={{ background: 'rgba(108,143,255,0.15)', color: '#6c8fff' }}>+</button>
       </div>
 
       {/* Özet */}
@@ -87,7 +164,7 @@ export default function LoansPage() {
       {loans.length === 0 && (
         <div className="mx-4 card p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
           Henüz kredi eklenmemiş.<br />
-          <span className="text-[12px]">Supabase → loans tablosundan ekleyebilirsin.</span>
+          <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: '#6c8fff' }}>+ Kredi Ekle</button>
         </div>
       )}
 
@@ -98,24 +175,32 @@ export default function LoansPage() {
           return (
             <div key={loan.id} className="card p-4">
               <div className="flex justify-between items-start mb-3">
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold">{loan.name}</div>
                   <div className="text-[11px] mt-0.5 uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
                     {loan.bank} · {loan.type}
                     {loan.collateral && ` · ${loan.collateral}`}
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="mono text-base font-medium amt-red">
-                    {fmt(loan.monthly_payment, loan.currency)}
-                    {loan.currency === 'EUR' && <span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(loan.monthly_payment * eurTry)})</span>}
-                    <span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>/ay</span>
-                  </div>
-                  {days !== null && (
-                    <div className="text-[11px] mt-0.5" style={{ color: days <= 3 ? '#f87171' : 'var(--muted)' }}>
-                      {daysUntilLabel(days)}
+                <div className="flex items-start gap-2">
+                  <div className="text-right">
+                    <div className="mono text-base font-medium amt-red">
+                      {fmt(loan.monthly_payment, loan.currency)}
+                      {loan.currency === 'EUR' && <span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(loan.monthly_payment * eurTry)})</span>}
+                      <span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>/ay</span>
                     </div>
-                  )}
+                    {days !== null && (
+                      <div className="text-[11px] mt-0.5" style={{ color: days <= 3 ? '#f87171' : 'var(--muted)' }}>
+                        {daysUntilLabel(days)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-1 ml-1">
+                    <button onClick={() => openEdit(loan)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs"
+                      style={{ background: 'var(--bg4)' }}>✏️</button>
+                    <button onClick={() => setDeleteConfirm(loan.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs"
+                      style={{ background: 'rgba(248,113,113,0.12)' }}>🗑️</button>
+                  </div>
                 </div>
               </div>
 
@@ -185,6 +270,89 @@ export default function LoansPage() {
           )
         })}
       </div>
+
+      {/* Delete confirmation */}
+      {deleteConfirm !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="card p-5 w-full max-w-sm">
+            <div className="text-sm font-semibold mb-2">Krediyi Sil</div>
+            <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu krediyi silmek istediginize emin misiniz?</div>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 rounded-xl text-sm font-medium"
+                style={{ background: 'var(--bg4)', color: 'var(--text)' }}>Iptal</button>
+              <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 py-2.5 rounded-xl text-sm font-medium"
+                style={{ background: 'rgba(248,113,113,0.2)', color: '#f87171' }}>Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Form */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="card w-full max-w-lg rounded-b-none p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-sm font-semibold">{editId ? 'Krediyi Duzenle' : 'Yeni Kredi'}</div>
+              <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+            </div>
+            <div className="flex flex-col gap-3">
+              {inp('Kredi Adi', 'name', 'text', 'Orn: Mercedes Kredi')}
+              <div className="flex gap-3">
+                {inp('Banka', 'bank', 'text', 'Orn: Garanti')}
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                  <select value={form.type} onChange={e => set('type', e.target.value)}
+                    className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                    style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                    <option value="ihtiyac">Ihtiyac</option>
+                    <option value="tasit">Tasit</option>
+                    <option value="konut">Konut</option>
+                    <option value="ticari">Ticari</option>
+                    <option value="diger">Diger</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                  <select value={form.currency} onChange={e => set('currency', e.target.value)}
+                    className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                    style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                    <option value="TRY">TRY</option>
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+                {inp('Faiz %', 'interest_rate', 'number', '0')}
+              </div>
+              <div className="flex gap-3">
+                {inp('Orijinal Tutar', 'original_amount', 'number', '0')}
+                {inp('Kalan Tutar', 'remaining_amount', 'number', '0')}
+              </div>
+              <div className="flex gap-3">
+                {inp('Aylik Odeme', 'monthly_payment', 'number', '0')}
+                {inp('Odeme Gunu', 'payment_day', 'number', '1-31')}
+              </div>
+              <div className="flex gap-3">
+                {inp('Toplam Taksit', 'total_installments', 'number', '0')}
+                {inp('Odenen Taksit', 'paid_installments', 'number', '0')}
+              </div>
+              <div className="flex gap-3">
+                {inp('Baslangic', 'start_date', 'date')}
+                {inp('Bitis', 'end_date', 'date')}
+              </div>
+              {inp('Teminat', 'collateral', 'text', 'Orn: Arac rehni')}
+              {inp('Notlar', 'notes', 'text')}
+            </div>
+            <button onClick={handleSave} disabled={saving || !form.name || !form.bank || !form.monthly_payment}
+              className="w-full mt-4 py-3 rounded-xl text-sm font-semibold"
+              style={{ background: 'linear-gradient(135deg, #6c8fff, #a78bfa)', color: '#fff',
+                opacity: saving || !form.name || !form.bank || !form.monthly_payment ? 0.4 : 1 }}>
+              {saving ? 'Kaydediliyor...' : editId ? 'Guncelle' : 'Ekle'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>
