@@ -12,18 +12,23 @@ export default function Dashboard() {
   const [rates, setRates] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const [investTotalTry, setInvestTotalTry] = useState(0)
+
   useEffect(() => {
     async function load() {
-      const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }] = await Promise.all([
+      const today = new Date().toISOString().split('T')[0]
+      const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }] = await Promise.all([
         supabase.from('accounts').select('*').eq('is_active', true),
         supabase.from('loans').select('*').eq('is_active', true),
         supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
         supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
+        supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', today),
       ])
       setAccounts(acc || [])
       setLoans(lns || [])
       setRecurring(rec || [])
       setRates(rt?.[0] || null)
+      setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
       setLoading(false)
     }
     load()
@@ -39,12 +44,20 @@ export default function Dashboard() {
     return sum
   }, 0)
 
-  const totalDebtTry = loans.reduce((sum, l) => sum + (l.remaining_amount || 0), 0)
-  const monthlyFixed = recurring.reduce((sum, r) => sum + r.amount, 0)
-  const monthlyLoans = loans.reduce((sum, l) => sum + l.monthly_payment, 0)
+  const totalAssetsTry = cashTry + investTotalTry
+
+  const toTry = (amount: number, currency: string) => {
+    if (currency === 'EUR') return amount * eurTry
+    if (currency === 'USD') return amount * usdTry
+    return amount
+  }
+
+  const totalDebtTry = loans.reduce((sum, l) => sum + toTry(l.remaining_amount || 0, l.currency), 0)
+  const monthlyFixed = recurring.reduce((sum, r) => sum + toTry(r.amount, r.currency), 0)
+  const monthlyLoans = loans.reduce((sum, l) => sum + toTry(l.monthly_payment, l.currency), 0)
   const monthlyTotal = monthlyFixed + monthlyLoans
-  const runwayMonths = monthlyTotal > 0 ? (cashTry / monthlyTotal).toFixed(1) : '∞'
-  const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 12) * 100)
+  const runwayMonths = monthlyTotal > 0 ? (totalAssetsTry / monthlyTotal).toFixed(1) : '∞'
+  const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
 
   // Bar chart - last 6 months estimated expenses
   const chartData = Array.from({ length: 6 }, (_, i) => {
@@ -101,10 +114,12 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mx-4 mb-4">
           {/* Net Worth */}
           <div className="card-lg p-5 md:col-span-2">
-            <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Nakit Varlik</div>
-            <div className="mono text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmt(cashTry)}</div>
-            <div className="text-[13px] mt-1.5" style={{ color: 'var(--muted)' }}>
-              Toplam borc: <span className="amt-red font-semibold">{fmt(totalDebtTry)}</span>
+            <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Varlik</div>
+            <div className="mono text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmt(totalAssetsTry)}</div>
+            <div className="text-[13px] mt-1.5 flex gap-3" style={{ color: 'var(--muted)' }}>
+              <span>Nakit: <span className="amt-blue font-semibold">{fmt(cashTry)}</span></span>
+              {investTotalTry > 0 && <span>Yatirim: <span className="amt-blue font-semibold">{fmt(investTotalTry)}</span></span>}
+              <span>Borc: <span className="amt-red font-semibold">{fmt(totalDebtTry)}</span></span>
             </div>
             {/* Currency pills */}
             <div className="flex gap-2 mt-4">
@@ -123,13 +138,13 @@ export default function Dashboard() {
           {/* Runway */}
           <div className="card p-4">
             <div className="text-[12px] font-medium uppercase tracking-wide mb-2" style={{ color: 'var(--muted)' }}>Runway</div>
-            <div className="mono text-2xl font-bold amt-blue">{runwayMonths} <span className="text-sm font-medium" style={{ color: 'var(--muted)' }}>ay</span></div>
+            <div className="mono text-2xl font-bold amt-blue">{runwayMonths} <span className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Ay</span></div>
             <div className="progress-wrap mt-3 mb-2">
-              <div className="progress-bar" style={{ width: `${runwayPct}%`, background: '#0d9488' }} />
+              <div className="progress-bar" style={{ width: `${runwayPct}%`, background: runwayPct > 50 ? '#059669' : runwayPct > 25 ? '#d97706' : '#dc2626' }} />
             </div>
             <div className="flex justify-between text-[11px]" style={{ color: 'var(--muted)' }}>
               <span>0</span>
-              <span>12 ay</span>
+              <span>24 ay</span>
             </div>
           </div>
         </div>
