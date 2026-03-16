@@ -73,16 +73,89 @@ export default function Dashboard() {
 
   const upcomingLoans = loans
     .filter(l => l.payment_day)
-    .map(l => ({ name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, type: 'kredi' as const }))
+    .map(l => ({ name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, type: 'kredi' as const, expenseId: null as number | null, loanId: l.id }))
 
   const upcomingRecurring = recurring
     .filter(r => r.payment_day && r.category !== 'nakit')
-    .map(r => ({ name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!, type: r.category as string }))
+    .map(r => ({ name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!, type: r.category as string, expenseId: r.id, loanId: null as number | null }))
 
   const allPayments = [...upcomingLoans, ...upcomingRecurring]
     .map(p => ({ ...p, days: daysUntil(p.day) }))
     .sort((a, b) => a.days - b.days)
     .slice(0, 6)
+
+  // Payment confirmation modal state
+  type PaymentItem = (typeof allPayments)[number]
+  const [payModal, setPayModal] = useState<PaymentItem | null>(null)
+  const [payAccountId, setPayAccountId] = useState<number | null>(null)
+  const [paying, setPaying] = useState(false)
+
+  async function handlePay() {
+    if (!payModal || !payAccountId) return
+    setPaying(true)
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    const today = now.toISOString().split('T')[0]
+
+    // 1) Insert payment record
+    if (payModal.expenseId) {
+      await supabase.from('recurring_payments').insert({
+        expense_id: payModal.expenseId,
+        period_year: year,
+        period_month: month,
+        amount: payModal.amount,
+        is_paid: true,
+        paid_date: today,
+      })
+    }
+
+    // 2) Deduct from selected account
+    const account = accounts.find(a => a.id === payAccountId)
+    if (account) {
+      // If account currency differs, convert amount to account currency
+      let deductAmount = payModal.amount
+      if (payModal.currency !== account.currency) {
+        const amountTry = toTry(payModal.amount, payModal.currency)
+        if (account.currency === 'EUR') deductAmount = amountTry / eurTry
+        else if (account.currency === 'USD') deductAmount = amountTry / usdTry
+        else deductAmount = amountTry
+      }
+      await supabase.from('accounts').update({ balance: account.balance - deductAmount }).eq('id', payAccountId)
+    }
+
+    // 3) If it's a loan, increment paid_installments
+    if (payModal.loanId) {
+      const loan = loans.find(l => l.id === payModal.loanId)
+      if (loan) {
+        await supabase.from('loans').update({
+          paid_installments: loan.paid_installments + 1,
+          remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount),
+        }).eq('id', payModal.loanId)
+      }
+    }
+
+    setPaying(false)
+    setPayModal(null)
+    setPayAccountId(null)
+
+    // 4) Refresh all data
+    setLoading(true)
+    const todayStr = new Date().toISOString().split('T')[0]
+    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }] = await Promise.all([
+      supabase.from('accounts').select('*').eq('is_active', true),
+      supabase.from('loans').select('*').eq('is_active', true),
+      supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
+      supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
+      supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', todayStr),
+    ])
+    setAccounts(acc || [])
+    setLoans(lns || [])
+    setRecurring(rec || [])
+    setRates(rt?.[0] || null)
+    setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
+    setLoading(false)
+  }
 
   const now = new Date()
   const hour = now.getHours()
@@ -207,16 +280,49 @@ export default function Dashboard() {
                     {daysUntilLabel(p.days)}
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="mono text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                    {fmt(p.amount, p.currency)}
-                    {p.currency === 'EUR' && <span className="text-[10px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(p.amount * eurTry)})</span>}
+                <div className="text-right flex items-center gap-2">
+                  <div>
+                    <div className="mono text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                      {fmt(p.amount, p.currency)}
+                      {p.currency === 'EUR' && <span className="text-[10px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(p.amount * eurTry)})</span>}
+                    </div>
                   </div>
+                  <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
+                    className="px-2 py-1 rounded-lg text-[10px] font-semibold flex-shrink-0"
+                    style={{ background: 'rgba(5,150,105,0.08)', color: '#059669', border: '1px solid rgba(5,150,105,0.2)' }}>
+                    Yapildi
+                  </button>
                 </div>
               </div>
             )
           })}
         </div>
+        {/* Pay confirmation modal */}
+        {payModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
+            <div className="card p-5 w-full max-w-sm">
+              <div className="text-sm font-semibold mb-1">Odeme Yap</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>
+                <span className="font-medium" style={{ color: 'var(--text)' }}>{payModal.name}</span> — {fmt(payModal.amount, payModal.currency)}
+                {payModal.currency === 'EUR' && <span> ({fmt(payModal.amount * eurTry)})</span>}
+              </div>
+              <div className="mb-4">
+                <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Hangi hesaptan?</label>
+                <select value={payAccountId || ''} onChange={e => setPayAccountId(Number(e.target.value))} className="input">
+                  {accounts.map(a => (
+                    <option key={a.id} value={a.id}>{a.name} — {fmt(a.balance, a.currency)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => { setPayModal(null); setPayAccountId(null) }} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={handlePay} disabled={paying || !payAccountId} className="btn-primary flex-1 py-2.5 text-sm">
+                  {paying ? 'Kaydediliyor...' : 'Onayla'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
