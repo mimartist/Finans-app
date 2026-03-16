@@ -1,14 +1,15 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, daysUntil, daysUntilLabel } from '@/lib/supabase'
 import type { Account, Loan, RecurringExpense, ExchangeRate } from '@/lib/supabase'
 
 type PaymentItem = {
-  name: string; amount: number; currency: string; day: number;
-  type: string; expenseId: number | null; loanId: number | null;
-  days: number; paid: boolean;
+  id: string
+  name: string; amount: number; currency: string; day: number
+  type: string; expenseId: number | null; loanId: number | null
+  days: number; paid: boolean; overdue: boolean
 }
 
 export default function Dashboard() {
@@ -18,10 +19,10 @@ export default function Dashboard() {
   const [rates, setRates] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(true)
   const [investTotalTry, setInvestTotalTry] = useState(0)
-  const [paidExpenseIds, setPaidExpenseIds] = useState<Set<number>>(new Set())
-  const [paidLoanIds, setPaidLoanIds] = useState<Set<number>>(new Set())
+  const [paidThisMonth, setPaidThisMonth] = useState<any[]>([])
+  const [payments, setPayments] = useState<PaymentItem[]>([])
 
-  async function loadAll() {
+  const loadAll = useCallback(async () => {
     const now = new Date()
     const todayStr = now.toISOString().split('T')[0]
     const year = now.getFullYear()
@@ -33,26 +34,60 @@ export default function Dashboard() {
       supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
       supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
       supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', todayStr),
-      supabase.from('recurring_payments').select('expense_id, loan_id').eq('period_year', year).eq('period_month', month).eq('is_paid', true),
+      supabase.from('recurring_payments').select('*').eq('period_year', year).eq('period_month', month).eq('is_paid', true),
     ])
-    setAccounts(acc || [])
-    setLoans(lns || [])
-    setRecurring(rec || [])
+
+    const accs = acc || []
+    const lnsList = lns || []
+    const recList = rec || []
+    const paidList = paid || []
+
+    setAccounts(accs)
+    setLoans(lnsList)
+    setRecurring(recList)
     setRates(rt?.[0] || null)
     setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
+    setPaidThisMonth(paidList)
 
-    const paidExp = new Set<number>()
-    const paidLn = new Set<number>()
-    ;(paid || []).forEach((p: any) => {
-      if (p.expense_id) paidExp.add(p.expense_id)
-      if (p.loan_id) paidLn.add(p.loan_id)
+    // Build payment items with paid check
+    const todayDay = now.getDate()
+
+    const loanItems: PaymentItem[] = lnsList
+      .filter(l => l.payment_day)
+      .map(l => {
+        const isPaid = paidList.some(p => p.loan_id === l.id || p.notes === `loan_${l.id}`)
+        const isOverdue = !isPaid && l.payment_day < todayDay
+        return {
+          id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency,
+          day: l.payment_day, type: 'kredi', expenseId: null, loanId: l.id,
+          days: daysUntil(l.payment_day), paid: isPaid, overdue: isOverdue,
+        }
+      })
+
+    const expItems: PaymentItem[] = recList
+      .filter(r => r.payment_day && r.category !== 'nakit')
+      .map(r => {
+        const isPaid = paidList.some(p => p.expense_id === r.id)
+        const isOverdue = !isPaid && r.payment_day! < todayDay
+        return {
+          id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency,
+          day: r.payment_day!, type: r.category, expenseId: r.id, loanId: null,
+          days: daysUntil(r.payment_day!), paid: isPaid, overdue: isOverdue,
+        }
+      })
+
+    const all = [...loanItems, ...expItems].sort((a, b) => {
+      // Unpaid first, then overdue, then by days
+      if (a.paid !== b.paid) return a.paid ? 1 : -1
+      if (a.overdue !== b.overdue) return a.overdue ? -1 : 1
+      return a.days - b.days
     })
-    setPaidExpenseIds(paidExp)
-    setPaidLoanIds(paidLn)
-    setLoading(false)
-  }
 
-  useEffect(() => { loadAll() }, [])
+    setPayments(all)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadAll() }, [loadAll])
 
   const eurTry = rates?.eur_try || 38
   const usdTry = rates?.usd_try || 35
@@ -80,48 +115,18 @@ export default function Dashboard() {
   }
 
   const totalDebtTry = loans.reduce((sum, l) => sum + toTry(l.remaining_amount || 0, l.currency), 0)
+  const monthlyTotalAll = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
+  const runwayMonths = monthlyTotalAll > 0 ? (totalAssetsTry / monthlyTotalAll).toFixed(1) : '∞'
+  const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
 
-  // Monthly totals (only UNPAID count toward remaining obligations)
-  const monthlyFixedAll = recurring.reduce((sum, r) => sum + toTry(r.amount, r.currency), 0)
-  const monthlyLoansAll = loans.reduce((sum, l) => sum + toTry(l.monthly_payment, l.currency), 0)
-  const monthlyTotalAll = monthlyFixedAll + monthlyLoansAll
-
-  // Build ALL payment items with paid status
-  const allLoanPayments = loans
-    .filter(l => l.payment_day)
-    .map(l => ({
-      name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day,
-      type: 'kredi', expenseId: null as number | null, loanId: l.id,
-      days: daysUntil(l.payment_day), paid: paidLoanIds.has(l.id),
-    }))
-
-  const allRecurringPayments = recurring
-    .filter(r => r.payment_day && r.category !== 'nakit')
-    .map(r => ({
-      name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!,
-      type: r.category, expenseId: r.id, loanId: null as number | null,
-      days: daysUntil(r.payment_day!), paid: paidExpenseIds.has(r.id),
-    }))
-
-  const allPayments: PaymentItem[] = [...allLoanPayments, ...allRecurringPayments]
-    .sort((a, b) => {
-      if (a.paid !== b.paid) return a.paid ? 1 : -1 // unpaid first
-      return a.days - b.days
-    })
-
-  const unpaidPayments = allPayments.filter(p => !p.paid)
-  const paidPayments = allPayments.filter(p => p.paid)
-
-  // Monthly summary calculations
-  const totalObligationTry = allPayments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
+  // Bu Ay Ozet
+  const unpaidPayments = payments.filter(p => !p.paid)
+  const paidPayments = payments.filter(p => p.paid)
+  const overduePayments = payments.filter(p => p.overdue)
+  const totalObligationTry = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
   const paidTotalTry = paidPayments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
   const remainingTotalTry = unpaidPayments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
   const paidPct = totalObligationTry > 0 ? Math.round((paidTotalTry / totalObligationTry) * 100) : 0
-
-  // Runway uses only unpaid remaining obligations
-  const monthlyUnpaid = remainingTotalTry > 0 ? remainingTotalTry : monthlyTotalAll
-  const runwayMonths = monthlyTotalAll > 0 ? (totalAssetsTry / monthlyTotalAll).toFixed(1) : '∞'
-  const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
 
   // Bar chart
   const chartData = Array.from({ length: 6 }, (_, i) => {
@@ -156,6 +161,7 @@ export default function Dashboard() {
     if (payModal.loanId) {
       await supabase.from('recurring_payments').insert({
         loan_id: payModal.loanId,
+        notes: `loan_${payModal.loanId}`,
         period_year: year, period_month: month,
         amount: payModal.amount, is_paid: true, paid_date: today,
       })
@@ -179,13 +185,19 @@ export default function Dashboard() {
         else deductAmount = amountTry
       }
       await supabase.from('accounts').update({ balance: account.balance - deductAmount }).eq('id', payAccountId)
+      // Instant local account update
+      setAccounts(prev => prev.map(a => a.id === payAccountId ? { ...a, balance: a.balance - deductAmount } : a))
     }
+
+    // Instant local state update — mark as paid without full reload
+    setPayments(prev => prev.map(p => p.id === payModal.id ? { ...p, paid: true, overdue: false } : p))
 
     setPaying(false)
     setPayModal(null)
     setPayAccountId(null)
-    setLoading(true)
-    await loadAll()
+
+    // Background reload for consistency (non-blocking)
+    loadAll()
   }
 
   const now2 = new Date()
@@ -201,42 +213,73 @@ export default function Dashboard() {
     )
   }
 
-  const renderPaymentItem = (p: PaymentItem, i: number) => {
-    const isUrgent = !p.paid && p.days <= 3
+  const renderPaymentItem = (p: PaymentItem) => {
+    const isUrgent = !p.paid && !p.overdue && p.days <= 3
+    // Determine left border + badge bg
+    let leftBorder = 'var(--accent)'
+    let badgeBg = 'var(--bg4)'
+    let badgeColor = 'var(--muted)'
+    if (p.paid) { leftBorder = '#4ade9a'; badgeBg = 'rgba(74,222,154,0.08)'; badgeColor = '#059669' }
+    else if (p.overdue) { leftBorder = '#f59e0b'; badgeBg = 'rgba(245,158,11,0.08)'; badgeColor = '#d97706' }
+    else if (isUrgent) { leftBorder = '#dc2626'; badgeBg = 'rgba(220,38,38,0.08)'; badgeColor = '#dc2626' }
+
     return (
-      <div key={`${p.expenseId || p.loanId}-${p.type}-${i}`}
+      <div key={p.id}
         className="px-4 py-3 flex items-center gap-3"
         style={{
-          background: 'var(--bg3)', borderRadius: 12, boxShadow: 'var(--shadow)',
+          background: p.paid ? 'rgba(74,222,154,0.03)' : 'var(--bg3)',
+          borderRadius: 12, boxShadow: 'var(--shadow)',
           border: '1px solid var(--border)',
-          borderLeft: p.paid ? '3px solid #059669' : '3px solid var(--accent)',
-          opacity: p.paid ? 0.7 : 1,
+          borderLeft: `3px solid ${leftBorder}`,
         }}>
-        <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0"
-          style={{ background: p.paid ? 'rgba(5,150,105,0.08)' : isUrgent ? 'rgba(220,38,38,0.08)' : 'var(--bg4)' }}>
+        {/* Date badge / checkmark */}
+        <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0" style={{ background: badgeBg }}>
           {p.paid ? (
-            <div className="text-base" style={{ color: '#059669' }}>✓</div>
+            <div className="text-lg" style={{ color: '#4ade9a' }}>✓</div>
           ) : (
             <>
-              <div className="text-[10px] font-bold" style={{ color: isUrgent ? '#dc2626' : 'var(--muted)' }}>{p.day}</div>
+              <div className="text-[11px] font-bold leading-none" style={{ color: badgeColor }}>{p.day}</div>
               <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>{monthLabel}</div>
             </>
           )}
         </div>
+
+        {/* Name + status */}
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate" style={{ color: 'var(--text)', textDecoration: p.paid ? 'line-through' : 'none' }}>{p.name}</div>
-          <div className="text-[11px] mt-0.5" style={{ color: p.paid ? '#059669' : isUrgent ? '#dc2626' : 'var(--muted)' }}>
-            {p.paid ? 'Odendi' : daysUntilLabel(p.days)}
+          <div className="text-sm font-medium truncate" style={{
+            color: p.paid ? 'var(--muted)' : 'var(--text)',
+            textDecoration: p.paid ? 'line-through' : 'none',
+          }}>{p.name}</div>
+          <div className="text-[11px] mt-0.5" style={{
+            color: p.paid ? '#059669' : p.overdue ? '#d97706' : isUrgent ? '#dc2626' : 'var(--muted)',
+          }}>
+            {p.paid ? 'Odendi' : p.overdue ? 'Gecmis - Odendi?' : daysUntilLabel(p.days)}
           </div>
         </div>
+
+        {/* Amount + action */}
         <div className="text-right flex items-center gap-2">
           <div>
-            <div className="mono text-sm font-semibold" style={{ color: p.paid ? 'var(--muted)' : 'var(--text)', textDecoration: p.paid ? 'line-through' : 'none' }}>
+            <div className="mono text-sm font-semibold" style={{
+              color: p.paid ? '#4ade9a' : 'var(--text)',
+              textDecoration: p.paid ? 'line-through' : 'none',
+            }}>
               {fmt(p.amount, p.currency)}
               {!p.paid && p.currency === 'EUR' && <span className="text-[10px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(p.amount * eurTry)})</span>}
             </div>
           </div>
-          {!p.paid && (
+          {p.paid ? (
+            <span className="px-2 py-1 rounded-lg text-[10px] font-semibold"
+              style={{ background: 'rgba(74,222,154,0.1)', color: '#059669' }}>
+              Odendi
+            </span>
+          ) : p.overdue ? (
+            <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
+              className="px-2 py-1 rounded-lg text-[10px] font-semibold flex-shrink-0"
+              style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', border: '1px solid rgba(245,158,11,0.3)' }}>
+              Onayla
+            </button>
+          ) : (
             <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
               className="px-2 py-1 rounded-lg text-[10px] font-semibold flex-shrink-0"
               style={{ background: 'rgba(5,150,105,0.08)', color: '#059669', border: '1px solid rgba(5,150,105,0.2)' }}>
@@ -305,8 +348,7 @@ export default function Dashboard() {
               <div className="progress-bar" style={{ width: `${runwayPct}%`, background: runwayPct > 50 ? '#059669' : runwayPct > 25 ? '#d97706' : '#dc2626' }} />
             </div>
             <div className="flex justify-between text-[11px]" style={{ color: 'var(--muted)' }}>
-              <span>0</span>
-              <span>24 ay</span>
+              <span>0</span><span>24 ay</span>
             </div>
             <div className="text-[10px] mt-2" style={{ color: 'var(--muted)' }}>Tum varliklarinla kac ay idare edebilirsin</div>
           </div>
@@ -347,13 +389,16 @@ export default function Dashboard() {
           </div>
           <div className="flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
             <span>%{paidPct} tamamlandi</span>
-            <span>{paidPayments.length}/{allPayments.length} odeme</span>
+            <span>{paidPayments.length}/{payments.length} odeme tamamlandi</span>
           </div>
         </div>
 
-        {/* Upcoming Payments */}
+        {/* Bekleyen Odemeler */}
         <div className="px-5 mb-2">
-          <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Bekleyen Odemeler</div>
+          <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+            Bekleyen Odemeler
+            {overduePayments.length > 0 && <span style={{ color: '#d97706' }}> · {overduePayments.length} gecmis</span>}
+          </div>
         </div>
         {unpaidPayments.length === 0 ? (
           <div className="mx-4 card p-4 text-center text-sm" style={{ color: '#059669' }}>
@@ -361,20 +406,20 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="flex flex-col gap-2 mx-4">
-            {unpaidPayments.map((p, i) => renderPaymentItem(p, i))}
+            {unpaidPayments.map(p => renderPaymentItem(p))}
           </div>
         )}
 
-        {/* Completed Payments */}
+        {/* Tamamlanan Odemeler */}
         {paidPayments.length > 0 && (
           <>
             <div className="px-5 mt-4 mb-2 flex items-center gap-2">
               <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: '#059669' }}>Tamamlanan Odemeler</div>
-              <div className="flex-1 h-px" style={{ background: 'rgba(5,150,105,0.2)' }} />
+              <div className="flex-1 h-px" style={{ background: 'rgba(74,222,154,0.3)' }} />
               <div className="text-[10px] font-medium" style={{ color: '#059669' }}>{paidPayments.length} odeme</div>
             </div>
             <div className="flex flex-col gap-2 mx-4">
-              {paidPayments.map((p, i) => renderPaymentItem(p, i))}
+              {paidPayments.map(p => renderPaymentItem(p))}
             </div>
           </>
         )}
@@ -383,10 +428,13 @@ export default function Dashboard() {
         {payModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="card p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-1">Odeme Yap</div>
+              <div className="text-sm font-semibold mb-1">
+                {payModal.overdue ? 'Gecmis Odemeyi Onayla' : 'Odeme Yap'}
+              </div>
               <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>
                 <span className="font-medium" style={{ color: 'var(--text)' }}>{payModal.name}</span> — {fmt(payModal.amount, payModal.currency)}
                 {payModal.currency === 'EUR' && <span> ({fmt(payModal.amount * eurTry)})</span>}
+                {payModal.overdue && <div className="text-[11px] mt-1" style={{ color: '#d97706' }}>Bu odemenin vadesi gecmis (ayin {payModal.day}'i)</div>}
               </div>
               <div className="mb-4">
                 <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Hangi hesaptan?</label>
