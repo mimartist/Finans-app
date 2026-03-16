@@ -94,8 +94,9 @@ export default function Dashboard() {
 
   useEffect(() => { loadAll() }, [loadAll])
 
-  const eurTry = rates?.eur_try || 38
-  const usdTry = rates?.usd_try || 35
+  const eurTry = rates?.eur_try || 0
+  const usdTry = rates?.usd_try || 0
+  const ratesToday = rates?.date === new Date().toISOString().split('T')[0]
 
   const cashTry = accounts.reduce((sum, a) => {
     if (a.currency === 'TRY') return sum + a.balance
@@ -330,6 +331,16 @@ export default function Dashboard() {
               style={{ background: '#0d9488' }}>AK</div>
           </div>
         </div>
+
+        {/* Rate warning */}
+        {!ratesToday && (
+          <div className="mx-4 mb-3 px-4 py-2.5 rounded-lg flex items-center gap-2 text-[12px]"
+            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#d97706' }}>
+            <span>Doviz kuru guncel degil</span>
+            <button onClick={async () => { setLoading(true); await fetch('/api/update-rates'); await loadAll() }}
+              className="ml-auto font-semibold underline">Guncelle</button>
+          </div>
+        )}
 
         {/* Summary Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mx-4 mb-4">

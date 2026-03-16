@@ -28,8 +28,8 @@ export default function AccountsPage() {
 
   useEffect(() => { load() }, [])
 
-  const eurTry = rates?.eur_try || 38
-  const usdTry = rates?.usd_try || 35
+  const eurTry = rates?.eur_try || 0
+  const usdTry = rates?.usd_try || 0
   const toTry = (a: Account) => {
     if (a.currency === 'EUR') return a.balance * eurTry
     if (a.currency === 'USD') return a.balance * usdTry

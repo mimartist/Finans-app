@@ -14,7 +14,7 @@ export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([])
   const [cards, setCards] = useState<CreditCard[]>([])
   const [statements, setStatements] = useState<CreditCardStatement[]>([])
-  const [eurTry, setEurTry] = useState<number>(38)
+  const [eurTry, setEurTry] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)

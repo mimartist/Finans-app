@@ -25,8 +25,8 @@ export default function DebtsPage() {
   const [payAmount, setPayAmount] = useState('')
   const [paying, setPaying] = useState(false)
 
-  const [eurTry, setEurTry] = useState(41.5)
-  const [usdTry, setUsdTry] = useState(38.2)
+  const [eurTry, setEurTry] = useState(0)
+  const [usdTry, setUsdTry] = useState(0)
 
   async function load() {
     const [{ data }, { data: rt }] = await Promise.all([

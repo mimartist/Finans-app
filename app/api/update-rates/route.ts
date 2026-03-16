@@ -6,6 +6,8 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     let usd_try = 0
@@ -18,30 +20,36 @@ export async function GET() {
     try {
       const tcmbRes = await fetch('https://www.tcmb.gov.tr/kurlar/today.xml', {
         headers: { 'User-Agent': 'Mozilla/5.0' },
-        next: { revalidate: 0 },
+        cache: 'no-store',
       })
-      const xml = await tcmbRes.text()
+      if (!tcmbRes.ok) {
+        console.error('TCMB HTTP error:', tcmbRes.status)
+      } else {
+        const xml = await tcmbRes.text()
+        console.log('TCMB XML length:', xml.length)
 
-      // Parse USD ForexSelling
-      const usdMatch = xml.match(/<Currency[^>]*Kod="USD"[^>]*>[\s\S]*?<ForexSelling>([\d.,]+)<\/ForexSelling>/)
-      if (usdMatch) usd_try = parseFloat(usdMatch[1].replace(',', '.'))
+        const usdMatch = xml.match(/<Currency[^>]*Kod="USD"[^>]*>[\s\S]*?<ForexSelling>([\d.,]+)<\/ForexSelling>/)
+        if (usdMatch) usd_try = parseFloat(usdMatch[1].replace(',', '.'))
 
-      // Parse EUR ForexSelling
-      const eurMatch = xml.match(/<Currency[^>]*Kod="EUR"[^>]*>[\s\S]*?<ForexSelling>([\d.,]+)<\/ForexSelling>/)
-      if (eurMatch) eur_try = parseFloat(eurMatch[1].replace(',', '.'))
+        const eurMatch = xml.match(/<Currency[^>]*Kod="EUR"[^>]*>[\s\S]*?<ForexSelling>([\d.,]+)<\/ForexSelling>/)
+        if (eurMatch) eur_try = parseFloat(eurMatch[1].replace(',', '.'))
+
+        console.log('TCMB parsed — USD/TRY:', usd_try, 'EUR/TRY:', eur_try)
+      }
     } catch (e) {
       console.error('TCMB fetch failed:', e)
     }
 
     // 2) Gold price (XAU/USD -> gram TRY)
     try {
-      const goldRes = await fetch('https://api.gold-api.com/price/XAU', { next: { revalidate: 0 } })
+      const goldRes = await fetch('https://api.gold-api.com/price/XAU', { cache: 'no-store' })
       if (goldRes.ok) {
         const goldData = await goldRes.json()
         const xauUsd = goldData.price || 0
         if (xauUsd > 0 && usd_try > 0) {
-          gold_try = (xauUsd * usd_try) / 31.1035 // troy ounce to gram
+          gold_try = (xauUsd * usd_try) / 31.1035
         }
+        console.log('Gold XAU/USD:', xauUsd, '-> gram TRY:', gold_try)
       }
     } catch (e) {
       console.error('Gold API fetch failed:', e)
@@ -51,20 +59,22 @@ export async function GET() {
     try {
       const cryptoRes = await fetch(
         'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd',
-        { next: { revalidate: 0 } }
+        { cache: 'no-store' }
       )
       if (cryptoRes.ok) {
         const cryptoData = await cryptoRes.json()
         btc_usd = cryptoData.bitcoin?.usd || 0
         eth_usd = cryptoData.ethereum?.usd || 0
+        console.log('CoinGecko — BTC:', btc_usd, 'ETH:', eth_usd)
       }
     } catch (e) {
       console.error('CoinGecko fetch failed:', e)
     }
 
-    // Validate we got at least USD/TRY
+    // Validate we got at least one rate
     if (usd_try === 0 && eur_try === 0) {
-      return NextResponse.json({ error: 'Kur verisi alinamadi' }, { status: 502 })
+      console.error('No rates fetched from any source')
+      return NextResponse.json({ error: 'Kur verisi alinamadi — TCMB erisim hatasi' }, { status: 502 })
     }
 
     const today = new Date().toISOString().split('T')[0]
@@ -78,19 +88,24 @@ export async function GET() {
       eth_usd: Math.round(eth_usd * 100) / 100,
     }
 
-    // Upsert into exchange_rates (update if today exists, insert otherwise)
-    const { error } = await supabase
-      .from('exchange_rates')
-      .upsert(rates, { onConflict: 'date' })
+    console.log('Saving rates to supabase:', rates)
 
-    if (error) {
-      // If upsert with onConflict fails (no unique constraint), try delete+insert
-      await supabase.from('exchange_rates').delete().eq('date', today)
-      await supabase.from('exchange_rates').insert(rates)
+    // Try delete + insert (most reliable approach)
+    const { error: delError } = await supabase.from('exchange_rates').delete().eq('date', today)
+    if (delError) console.log('Delete (expected if no row):', delError.message)
+
+    const { data: inserted, error: insError } = await supabase.from('exchange_rates').insert(rates).select()
+
+    if (insError) {
+      console.error('Supabase insert FAILED:', insError)
+      return NextResponse.json({ error: 'DB kayit hatasi: ' + insError.message, rates }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, rates })
+    console.log('Supabase insert SUCCESS:', inserted)
+
+    return NextResponse.json({ success: true, rates, saved: inserted })
   } catch (e: any) {
+    console.error('Unhandled error:', e)
     return NextResponse.json({ error: e.message || 'Bilinmeyen hata' }, { status: 500 })
   }
 }
