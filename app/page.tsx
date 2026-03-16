@@ -187,12 +187,16 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mx-4 mb-4">
           {/* Net Worth */}
           <div className="card-lg p-5 md:col-span-2">
-            <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Varlik</div>
-            <div className="mono text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmt(totalAssetsTry)}</div>
-            <div className="text-[13px] mt-1.5 flex gap-3" style={{ color: 'var(--muted)' }}>
-              <span>Nakit: <span className="amt-blue font-semibold">{fmt(cashTry)}</span></span>
-              {investTotalTry > 0 && <span>Yatirim: <span className="amt-blue font-semibold">{fmt(investTotalTry)}</span></span>}
-              <span>Borc: <span className="amt-red font-semibold">{fmt(totalDebtTry)}</span></span>
+            <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Banka Hesaplari</div>
+            <div className="mono text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmt(cashTry)}</div>
+            <div className="text-[11px] mt-1" style={{ color: 'var(--muted)' }}>Banka hesaplari toplami · Yatirimlar haric</div>
+            {investTotalTry > 0 && (
+              <div className="text-[13px] mt-2" style={{ color: 'var(--text)' }}>
+                Yatirimlar dahil: <span className="mono font-bold amt-blue">{fmt(totalAssetsTry)}</span>
+              </div>
+            )}
+            <div className="text-[13px] mt-1" style={{ color: 'var(--muted)' }}>
+              Toplam borc: <span className="amt-red font-semibold">{fmt(totalDebtTry)}</span>
             </div>
             {/* Currency pills */}
             <div className="flex gap-2 mt-4">
