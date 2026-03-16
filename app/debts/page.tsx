@@ -4,10 +4,12 @@ import BottomNav from '@/components/BottomNav'
 import { supabase, fmt } from '@/lib/supabase'
 import type { DebtRecord } from '@/lib/supabase'
 
+const freqLabels: Record<string, string> = { aylik: 'Aylik', haftalik: 'Haftalik', '2haftada1': '2 Haftada 1', duzensiz: 'Duzensiz' }
+
 const emptyForm = {
   person_name: '', type: 'alacak' as 'alacak' | 'verecek', amount: '', currency: 'TRY',
   description: '', transaction_date: '', due_date: '', notes: '',
-  is_recurring: false, total_amount: '', paid_amount: '',
+  is_recurring: false, frequency: 'aylik', expected_day: '', total_amount: '', paid_amount: '',
 }
 
 export default function DebtsPage() {
@@ -44,6 +46,8 @@ export default function DebtsPage() {
       description: d.description || '', transaction_date: d.transaction_date || '',
       due_date: d.due_date || '', notes: d.notes || '',
       is_recurring: d.is_recurring || false,
+      frequency: d.frequency || 'aylik',
+      expected_day: String(d.expected_day || ''),
       total_amount: String(d.total_amount || ''),
       paid_amount: String(d.paid_amount || ''),
     })
@@ -61,35 +65,24 @@ export default function DebtsPage() {
       currency: form.currency,
       description: form.description || null,
       transaction_date: form.transaction_date || new Date().toISOString().split('T')[0],
-      due_date: form.due_date || null,
+      due_date: form.is_recurring ? null : (form.due_date || null),
       notes: form.notes || null,
       is_settled: false,
       is_recurring: form.is_recurring || false,
+      frequency: form.is_recurring ? form.frequency : null,
+      expected_day: form.is_recurring ? (parseInt(form.expected_day) || null) : null,
       total_amount: form.is_recurring ? (parseFloat(form.total_amount) || null) : null,
       paid_amount: form.is_recurring ? (parseFloat(form.paid_amount) || 0) : null,
     }
 
     if (editId) {
       const { error } = await supabase.from('debt_records').update(payload).eq('id', editId)
-      if (error) {
-        alert('Hata: ' + error.message)
-        console.error('Update error:', error)
-        setSaving(false)
-        return
-      }
-      // Update local state
+      if (error) { alert('Hata: ' + error.message); setSaving(false); return }
       setDebts(prev => prev.map(d => d.id === editId ? { ...d, ...payload, id: editId } : d))
     } else {
       const { data, error } = await supabase.from('debt_records').insert(payload).select()
-      if (error) {
-        alert('Hata: ' + error.message)
-        console.error('Insert error:', error)
-        setSaving(false)
-        return
-      }
-      if (data?.[0]) {
-        setDebts(prev => [...prev, data[0]])
-      }
+      if (error) { alert('Hata: ' + error.message); setSaving(false); return }
+      if (data?.[0]) setDebts(prev => [...prev, data[0]])
     }
 
     setSaving(false)
@@ -116,13 +109,14 @@ export default function DebtsPage() {
     const newPaid = (payModal.paid_amount || 0) + amt
     const newRemaining = payModal.amount - amt
     const isSettled = newRemaining <= 0
+
     const { error } = await supabase.from('debt_records').update({
       amount: Math.max(0, newRemaining),
       paid_amount: newPaid,
       is_settled: isSettled,
     }).eq('id', payModal.id)
     if (error) { alert('Hata: ' + error.message); setPaying(false); return }
-    // Update local state
+
     if (isSettled) {
       setDebts(prev => prev.filter(d => d.id !== payModal.id))
     } else {
@@ -194,9 +188,12 @@ export default function DebtsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <div className="text-sm font-semibold">{d.person_name}</div>
-                        {d.is_recurring && <span className="badge badge-blue">Taksitli</span>}
+                        {d.is_recurring && <span className="badge badge-blue">🔄 {freqLabels[d.frequency || 'aylik'] || 'Duzenli'}</span>}
                       </div>
                       {d.description && <div className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--muted)' }}>{d.description}</div>}
+                      {d.is_recurring && d.expected_day && (
+                        <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>Her ayin {d.expected_day}'i</div>
+                      )}
                     </div>
                     <div className="flex items-start gap-2">
                       <div className="text-right">
@@ -205,7 +202,7 @@ export default function DebtsPage() {
                       </div>
                       <div className="flex flex-col gap-1 ml-1">
                         <button onClick={() => { setPayModal(d); setPayAmount('') }} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs"
-                          title="Taksit Al/Ver" style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}>💰</button>
+                          title={d.type === 'alacak' ? 'Tahsilat Al' : 'Taksit Ver'} style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}>💰</button>
                         <button onClick={() => handleSettle(d.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" title="Tamami odendi" style={{ background: 'rgba(5,150,105,0.08)' }}>✅</button>
                         <button onClick={() => openEdit(d)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
                         <button onClick={() => setDeleteConfirm(d.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
@@ -213,7 +210,6 @@ export default function DebtsPage() {
                     </div>
                   </div>
 
-                  {/* Installment tracking */}
                   {hasParts && (
                     <div className="mb-2">
                       <div className="progress-wrap mb-1.5">
@@ -234,7 +230,7 @@ export default function DebtsPage() {
                         <span>{new Date(d.transaction_date).toLocaleDateString('tr-TR')}</span>
                       </div>
                     )}
-                    {d.due_date && (
+                    {d.due_date && !d.is_recurring && (
                       <div className="flex justify-between text-[11px]">
                         <span style={{ color: 'var(--muted)' }}>Vade</span>
                         <span style={{ color: overdue ? '#dc2626' : 'var(--text)' }}>{new Date(d.due_date).toLocaleDateString('tr-TR')}{overdue && ' Gecikmis'}</span>
@@ -267,16 +263,18 @@ export default function DebtsPage() {
           </div>
         )}
 
-        {/* Partial payment modal */}
+        {/* Partial payment / Tahsilat modal */}
         {payModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="card p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-1">Taksit {payModal.type === 'alacak' ? 'Al' : 'Ver'}</div>
+              <div className="text-sm font-semibold mb-1">{payModal.type === 'alacak' ? 'Tahsilat Al' : 'Taksit Ver'}</div>
               <div className="text-[13px] mb-3" style={{ color: 'var(--muted)' }}>
                 <span className="font-medium" style={{ color: 'var(--text)' }}>{payModal.person_name}</span> — Kalan: {fmt(payModal.amount, payModal.currency)}
               </div>
               <div className="mb-4">
-                <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Odeme Tutari</label>
+                <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>
+                  {payModal.type === 'alacak' ? 'Tahsilat Tutari' : 'Odeme Tutari'}
+                </label>
                 <input value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder="0" type="number" className="input mono" />
               </div>
               <div className="flex gap-2">
@@ -316,25 +314,51 @@ export default function DebtsPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kalan Tutar</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tutar (kalan)</label>
                   <input value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" type="number" className="input mono" />
                 </div>
+
+                {/* Recurring toggle */}
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={form.is_recurring} onChange={e => set('is_recurring', e.target.checked)} className="w-4 h-4 rounded accent-[#0d9488]" />
-                  <span style={{ color: 'var(--muted)' }}>Taksitli odeme</span>
+                  <span style={{ color: 'var(--muted)' }}>Duzenli / Tekrar eden odeme</span>
                 </label>
-                {form.is_recurring && (
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Toplam Tutar</label>
-                      <input value={form.total_amount} onChange={e => set('total_amount', e.target.value)} placeholder="0" type="number" className="input mono" />
+
+                {form.is_recurring ? (
+                  <>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Siklik</label>
+                        <select value={form.frequency} onChange={e => set('frequency', e.target.value)} className="input">
+                          <option value="aylik">Aylik</option>
+                          <option value="haftalik">Haftalik</option>
+                          <option value="2haftada1">2 Haftada 1</option>
+                          <option value="duzensiz">Duzensiz</option>
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ayin kacinda?</label>
+                        <input value={form.expected_day} onChange={e => set('expected_day', e.target.value)} placeholder="1-31" type="number" min="1" max="31" className="input" />
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Odenen Tutar</label>
-                      <input value={form.paid_amount} onChange={e => set('paid_amount', e.target.value)} placeholder="0" type="number" className="input mono" />
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Toplam tutar (opsiyonel)</label>
+                        <input value={form.total_amount} onChange={e => set('total_amount', e.target.value)} placeholder="0" type="number" className="input mono" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Odenen tutar</label>
+                        <input value={form.paid_amount} onChange={e => set('paid_amount', e.target.value)} placeholder="0" type="number" className="input mono" />
+                      </div>
                     </div>
+                  </>
+                ) : (
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Vade Tarihi</label>
+                    <input value={form.due_date} onChange={e => set('due_date', e.target.value)} type="date" className="input" />
                   </div>
                 )}
+
                 <div>
                   <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Aciklama</label>
                   <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="Opsiyonel" className="input" />
@@ -345,13 +369,9 @@ export default function DebtsPage() {
                     <input value={form.transaction_date} onChange={e => set('transaction_date', e.target.value)} type="date" className="input" />
                   </div>
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Vade Tarihi</label>
-                    <input value={form.due_date} onChange={e => set('due_date', e.target.value)} type="date" className="input" />
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Not</label>
+                    <input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Opsiyonel" className="input" />
                   </div>
-                </div>
-                <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Not</label>
-                  <input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Opsiyonel" className="input" />
                 </div>
               </div>
               <button onClick={handleSave} disabled={saving || !form.person_name || !form.amount}

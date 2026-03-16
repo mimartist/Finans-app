@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, daysUntil, daysUntilLabel } from '@/lib/supabase'
-import type { Account, Loan, RecurringExpense, ExchangeRate } from '@/lib/supabase'
+import type { Account, Loan, RecurringExpense, ExchangeRate, DebtRecord } from '@/lib/supabase'
 
 type PaymentItem = {
   id: string
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [investTotalTry, setInvestTotalTry] = useState(0)
   const [paidThisMonth, setPaidThisMonth] = useState<any[]>([])
   const [payments, setPayments] = useState<PaymentItem[]>([])
+  const [recurringAlacak, setRecurringAlacak] = useState<DebtRecord[]>([])
 
   const loadAll = useCallback(async () => {
     const now = new Date()
@@ -28,13 +29,14 @@ export default function Dashboard() {
     const year = now.getFullYear()
     const month = now.getMonth() + 1
 
-    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: paid }] = await Promise.all([
+    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: paid }, { data: recAlacak }] = await Promise.all([
       supabase.from('accounts').select('*').eq('is_active', true),
       supabase.from('loans').select('*').eq('is_active', true),
       supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
       supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
       supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', todayStr),
       supabase.from('recurring_payments').select('*').eq('period_year', year).eq('period_month', month).eq('is_paid', true),
+      supabase.from('debt_records').select('*').eq('type', 'alacak').eq('is_recurring', true).eq('is_settled', false),
     ])
 
     const accs = acc || []
@@ -45,6 +47,7 @@ export default function Dashboard() {
     setAccounts(accs)
     setLoans(lnsList)
     setRecurring(recList)
+    setRecurringAlacak(recAlacak || [])
     setRates(rt?.[0] || null)
     setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
     setPaidThisMonth(paidList)
@@ -118,7 +121,9 @@ export default function Dashboard() {
 
   const totalDebtTry = loans.reduce((sum, l) => sum + toTry(l.remaining_amount || 0, l.currency), 0)
   const monthlyTotalAll = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
-  const runwayMonths = monthlyTotalAll > 0 ? (totalAssetsTry / monthlyTotalAll).toFixed(1) : '∞'
+  const monthlyIncome = recurringAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+  const netMonthlyObligation = Math.max(0, monthlyTotalAll - monthlyIncome)
+  const runwayMonths = netMonthlyObligation > 0 ? (totalAssetsTry / netMonthlyObligation).toFixed(1) : '∞'
   const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
 
   // Bu Ay Ozet
@@ -362,7 +367,9 @@ export default function Dashboard() {
             <div className="flex justify-between text-[11px]" style={{ color: 'var(--muted)' }}>
               <span>0</span><span>24 ay</span>
             </div>
-            <div className="text-[10px] mt-2" style={{ color: 'var(--muted)' }}>Tum varliklarinla kac ay idare edebilirsin</div>
+            <div className="text-[10px] mt-2" style={{ color: 'var(--muted)' }}>
+              {monthlyIncome > 0 ? 'Varliklar / (giderler - gelirler)' : 'Tum varliklarinla kac ay idare edebilirsin'}
+            </div>
           </div>
         </div>
 
@@ -432,6 +439,41 @@ export default function Dashboard() {
             </div>
             <div className="flex flex-col gap-2 mx-4">
               {paidPayments.map(p => renderPaymentItem(p))}
+            </div>
+          </>
+        )}
+
+        {/* Bekleyen Gelirler (Recurring Alacak) */}
+        {recurringAlacak.length > 0 && (
+          <>
+            <div className="px-5 mt-4 mb-2 flex items-center gap-2">
+              <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: '#0d9488' }}>Bekleyen Gelirler</div>
+              <div className="flex-1 h-px" style={{ background: 'rgba(13,148,136,0.2)' }} />
+              <div className="text-[10px] font-medium" style={{ color: '#0d9488' }}>+{fmt(monthlyIncome)}/ay</div>
+            </div>
+            <div className="flex flex-col gap-2 mx-4">
+              {recurringAlacak.map(d => (
+                <div key={d.id} className="px-4 py-3 flex items-center gap-3"
+                  style={{ background: 'var(--bg3)', borderRadius: 12, boxShadow: 'var(--shadow)', border: '1px solid var(--border)', borderLeft: '3px solid #0d9488' }}>
+                  <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0" style={{ background: 'rgba(13,148,136,0.08)' }}>
+                    {d.expected_day ? (
+                      <>
+                        <div className="text-[11px] font-bold leading-none" style={{ color: '#0d9488' }}>{d.expected_day}</div>
+                        <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>{monthLabel}</div>
+                      </>
+                    ) : (
+                      <div className="text-base">🔄</div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{d.person_name}</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                      {d.frequency === 'aylik' ? 'Aylik' : d.frequency === 'haftalik' ? 'Haftalik' : d.frequency === '2haftada1' ? '2 Haftada 1' : 'Duzenli'} gelir
+                    </div>
+                  </div>
+                  <div className="mono text-sm font-semibold amt-green">+{fmt(d.amount, d.currency)}</div>
+                </div>
+              ))}
             </div>
           </>
         )}

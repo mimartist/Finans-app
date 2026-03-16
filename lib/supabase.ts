@@ -86,6 +86,8 @@ export type DebtRecord = {
   is_settled: boolean
   notes?: string
   is_recurring?: boolean
+  frequency?: string
+  expected_day?: number
   total_amount?: number
   paid_amount?: number
 }
