@@ -8,7 +8,7 @@ import type { Account, Loan, RecurringExpense, ExchangeRate } from '@/lib/supaba
 type PaymentItem = {
   id: string
   name: string; amount: number; currency: string; day: number
-  type: string; expenseId: number | null; loanId: number | null
+  type: string; source: 'loan' | 'recurring'; sourceId: number
   days: number; paid: boolean; overdue: boolean
 }
 
@@ -55,11 +55,13 @@ export default function Dashboard() {
     const loanItems: PaymentItem[] = lnsList
       .filter(l => l.payment_day)
       .map(l => {
-        const isPaid = paidList.some(p => p.loan_id === l.id || p.notes === `loan_${l.id}`)
+        const isPaid = paidList.some(p =>
+          p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id)
+        )
         const isOverdue = !isPaid && l.payment_day < todayDay
         return {
           id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency,
-          day: l.payment_day, type: 'kredi', expenseId: null, loanId: l.id,
+          day: l.payment_day, type: 'kredi', source: 'loan' as const, sourceId: l.id,
           days: daysUntil(l.payment_day), paid: isPaid, overdue: isOverdue,
         }
       })
@@ -71,7 +73,7 @@ export default function Dashboard() {
         const isOverdue = !isPaid && r.payment_day! < todayDay
         return {
           id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency,
-          day: r.payment_day!, type: r.category, expenseId: r.id, loanId: null,
+          day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id,
           days: daysUntil(r.payment_day!), paid: isPaid, overdue: isOverdue,
         }
       })
@@ -148,33 +150,40 @@ export default function Dashboard() {
     const year = now.getFullYear()
     const month = now.getMonth() + 1
     const today = now.toISOString().split('T')[0]
+    // For overdue items, use the actual payment day as paid_date context
+    const paidDate = today
 
-    // Insert payment record
-    if (payModal.expenseId) {
-      await supabase.from('recurring_payments').insert({
-        expense_id: payModal.expenseId,
+    if (payModal.source === 'recurring') {
+      // Insert recurring expense payment
+      const { error } = await supabase.from('recurring_payments').insert({
+        expense_id: payModal.sourceId,
         period_year: year, period_month: month,
-        amount: payModal.amount, is_paid: true, paid_date: today,
+        amount: payModal.amount, is_paid: true, paid_date: paidDate,
       })
+      if (error) { alert('Hata: ' + error.message); setPaying(false); return }
     }
 
-    if (payModal.loanId) {
-      await supabase.from('recurring_payments').insert({
-        loan_id: payModal.loanId,
-        notes: `loan_${payModal.loanId}`,
+    if (payModal.source === 'loan') {
+      // Insert loan payment with notes identifier
+      const { error } = await supabase.from('recurring_payments').insert({
+        expense_id: null,
+        notes: `loan_${payModal.sourceId}`,
         period_year: year, period_month: month,
-        amount: payModal.amount, is_paid: true, paid_date: today,
+        amount: payModal.amount, is_paid: true, paid_date: paidDate,
       })
-      const loan = loans.find(l => l.id === payModal.loanId)
+      if (error) { alert('Hata: ' + error.message); setPaying(false); return }
+
+      // Update loan installments
+      const loan = loans.find(l => l.id === payModal.sourceId)
       if (loan) {
         await supabase.from('loans').update({
           paid_installments: loan.paid_installments + 1,
           remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount),
-        }).eq('id', payModal.loanId)
+        }).eq('id', payModal.sourceId)
       }
     }
 
-    // Deduct from account
+    // Deduct from selected account
     const account = accounts.find(a => a.id === payAccountId)
     if (account) {
       let deductAmount = payModal.amount
@@ -185,18 +194,21 @@ export default function Dashboard() {
         else deductAmount = amountTry
       }
       await supabase.from('accounts').update({ balance: account.balance - deductAmount }).eq('id', payAccountId)
-      // Instant local account update
       setAccounts(prev => prev.map(a => a.id === payAccountId ? { ...a, balance: a.balance - deductAmount } : a))
     }
 
-    // Instant local state update — mark as paid without full reload
-    setPayments(prev => prev.map(p => p.id === payModal.id ? { ...p, paid: true, overdue: false } : p))
+    // Instant local state: mark as paid by matching source + sourceId
+    setPayments(prev => prev.map(p =>
+      p.source === payModal.source && p.sourceId === payModal.sourceId
+        ? { ...p, paid: true, overdue: false }
+        : p
+    ))
 
     setPaying(false)
     setPayModal(null)
     setPayAccountId(null)
 
-    // Background reload for consistency (non-blocking)
+    // Background reload for DB consistency
     loadAll()
   }
 
