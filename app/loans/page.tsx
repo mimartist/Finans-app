@@ -2,34 +2,40 @@
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, daysUntil, daysUntilLabel } from '@/lib/supabase'
-import type { Loan, CreditCard, CreditCardStatement } from '@/lib/supabase'
+import type { Loan, CreditCard, CreditCardStatement, ExchangeRate } from '@/lib/supabase'
 
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([])
   const [cards, setCards] = useState<CreditCard[]>([])
   const [statements, setStatements] = useState<CreditCardStatement[]>([])
+  const [eurTry, setEurTry] = useState<number>(38)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
       const now = new Date()
-      const [{ data: lns }, { data: crd }, { data: stm }] = await Promise.all([
+      const [{ data: lns }, { data: crd }, { data: stm }, { data: rates }] = await Promise.all([
         supabase.from('loans').select('*').eq('is_active', true).order('monthly_payment', { ascending: false }),
         supabase.from('credit_cards').select('*').eq('is_active', true),
         supabase.from('credit_card_statements').select('*')
           .eq('period_year', now.getFullYear())
           .eq('period_month', now.getMonth() + 1),
+        supabase.from('exchange_rates').select('eur_try').order('date', { ascending: false }).limit(1),
       ])
       setLoans(lns || [])
       setCards(crd || [])
       setStatements(stm || [])
+      if (rates?.[0]?.eur_try) setEurTry(rates[0].eur_try)
       setLoading(false)
     }
     load()
   }, [])
 
-  const totalMonthly = loans.reduce((s, l) => s + l.monthly_payment, 0)
-  const totalRemaining = loans.reduce((s, l) => s + (l.remaining_amount || 0), 0)
+  const toTry = (loan: Loan, amount: number) =>
+    loan.currency === 'EUR' ? amount * eurTry : amount
+
+  const totalMonthly = loans.reduce((s, l) => s + toTry(l, l.monthly_payment), 0)
+  const totalRemaining = loans.reduce((s, l) => s + toTry(l, l.remaining_amount || 0), 0)
   const totalKK = statements.reduce((s, st) => s + (st.total_amount || 0), 0)
 
   const progressPct = (loan: Loan) => {
@@ -67,6 +73,12 @@ export default function LoansPage() {
         </div>
       </div>
 
+      {loans.some(l => l.currency === 'EUR') && (
+        <div className="mx-4 mb-3 text-[11px] text-right" style={{ color: 'var(--muted)' }}>
+          EUR/TRY kuru: {eurTry.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </div>
+      )}
+
       {/* Krediler */}
       <div className="px-5 pb-2 text-[11px] uppercase tracking-widest font-semibold" style={{ color: 'var(--muted)' }}>
         Aktif Krediler
@@ -94,7 +106,10 @@ export default function LoansPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="mono text-base font-medium amt-red">{fmt(loan.monthly_payment)}<span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>/ay</span></div>
+                  <div className="mono text-base font-medium amt-red">{fmt(loan.monthly_payment, loan.currency)}<span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>/ay</span></div>
+                  {loan.currency === 'EUR' && (
+                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>≈ {fmt(loan.monthly_payment * eurTry)}</div>
+                  )}
                   {days !== null && (
                     <div className="text-[11px] mt-0.5" style={{ color: days <= 3 ? '#f87171' : 'var(--muted)' }}>
                       {daysUntilLabel(days)}
@@ -108,7 +123,9 @@ export default function LoansPage() {
               </div>
 
               <div className="flex justify-between text-[11px]" style={{ color: 'var(--muted)' }}>
-                <span>Kalan: <span className="amt-red font-medium">{fmt(loan.remaining_amount || 0)}</span></span>
+                <span>Kalan: <span className="amt-red font-medium">{fmt(loan.remaining_amount || 0, loan.currency)}</span>
+                  {loan.currency === 'EUR' && <span style={{ color: 'var(--muted)' }}> ≈ {fmt((loan.remaining_amount || 0) * eurTry)}</span>}
+                </span>
                 {loan.total_installments > 0 && (
                   <span style={{ color: pct >= 75 ? '#4ade9a' : 'var(--muted)' }}>
                     {loan.paid_installments}/{loan.total_installments} taksit
