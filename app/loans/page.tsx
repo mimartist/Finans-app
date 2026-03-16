@@ -106,10 +106,11 @@ export default function LoansPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="mono text-base font-medium amt-red">{fmt(loan.monthly_payment, loan.currency)}<span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>/ay</span></div>
-                  {loan.currency === 'EUR' && (
-                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>≈ {fmt(loan.monthly_payment * eurTry)}</div>
-                  )}
+                  <div className="mono text-base font-medium amt-red">
+                    {fmt(loan.monthly_payment, loan.currency)}
+                    {loan.currency === 'EUR' && <span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(loan.monthly_payment * eurTry)})</span>}
+                    <span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>/ay</span>
+                  </div>
                   {days !== null && (
                     <div className="text-[11px] mt-0.5" style={{ color: days <= 3 ? '#f87171' : 'var(--muted)' }}>
                       {daysUntilLabel(days)}
@@ -124,7 +125,7 @@ export default function LoansPage() {
 
               <div className="flex justify-between text-[11px]" style={{ color: 'var(--muted)' }}>
                 <span>Kalan: <span className="amt-red font-medium">{fmt(loan.remaining_amount || 0, loan.currency)}</span>
-                  {loan.currency === 'EUR' && <span style={{ color: 'var(--muted)' }}> ≈ {fmt((loan.remaining_amount || 0) * eurTry)}</span>}
+                  {loan.currency === 'EUR' && <span> ({fmt((loan.remaining_amount || 0) * eurTry)})</span>}
                 </span>
                 {loan.total_installments > 0 && (
                   <span style={{ color: pct >= 75 ? '#4ade9a' : 'var(--muted)' }}>
