@@ -21,7 +21,7 @@ export default function Dashboard() {
   const [investTotalTry, setInvestTotalTry] = useState(0)
   const [paidThisMonth, setPaidThisMonth] = useState<any[]>([])
   const [payments, setPayments] = useState<PaymentItem[]>([])
-  const [recurringAlacak, setRecurringAlacak] = useState<DebtRecord[]>([])
+  const [allAlacak, setAllAlacak] = useState<DebtRecord[]>([])
 
   const loadAll = useCallback(async () => {
     const now = new Date()
@@ -36,7 +36,7 @@ export default function Dashboard() {
       supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
       supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', todayStr),
       supabase.from('recurring_payments').select('*').eq('period_year', year).eq('period_month', month).eq('is_paid', true),
-      supabase.from('debt_records').select('*').eq('type', 'alacak').eq('is_recurring', true).eq('is_settled', false),
+      supabase.from('debt_records').select('*').eq('type', 'alacak').eq('is_settled', false),
     ])
 
     const accs = acc || []
@@ -47,7 +47,7 @@ export default function Dashboard() {
     setAccounts(accs)
     setLoans(lnsList)
     setRecurring(recList)
-    setRecurringAlacak(recAlacak || [])
+    setAllAlacak(recAlacak || [])
     setRates(rt?.[0] || null)
     setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
     setPaidThisMonth(paidList)
@@ -98,14 +98,15 @@ export default function Dashboard() {
   const usdTry = rates?.usd_try || 0
   const ratesToday = rates?.date === new Date().toISOString().split('T')[0]
 
-  const cashTry = accounts.reduce((sum, a) => {
-    if (a.currency === 'TRY') return sum + a.balance
-    if (a.currency === 'EUR') return sum + a.balance * eurTry
-    if (a.currency === 'USD') return sum + a.balance * usdTry
-    return sum
-  }, 0)
+  const toTry = (amount: number, currency: string) => {
+    if (currency === 'EUR') return amount * eurTry
+    if (currency === 'USD') return amount * usdTry
+    return amount
+  }
 
-  const totalAssetsTry = cashTry + investTotalTry
+  const cashTry = accounts.reduce((sum, a) => sum + toTry(a.balance, a.currency), 0)
+  const alacakTry = allAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+  const totalAssetsTry = cashTry + investTotalTry + alacakTry
 
   const tryTotal = accounts.filter(a => a.currency === 'TRY').reduce((s, a) => s + a.balance, 0)
   const eurTotal = accounts.filter(a => a.currency === 'EUR' && a.type !== 'kripto').reduce((s, a) => s + a.balance, 0)
@@ -114,14 +115,9 @@ export default function Dashboard() {
   const kriptoTotal = kriptoAccounts.reduce((s, a) => s + a.balance, 0)
   const kriptoCurrency = kriptoAccounts[0]?.currency || 'EUR'
 
-  const toTry = (amount: number, currency: string) => {
-    if (currency === 'EUR') return amount * eurTry
-    if (currency === 'USD') return amount * usdTry
-    return amount
-  }
-
   const totalDebtTry = loans.reduce((sum, l) => sum + toTry(l.remaining_amount || 0, l.currency), 0)
   const monthlyTotalAll = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
+  const recurringAlacak = allAlacak.filter(d => d.is_recurring)
   const monthlyIncome = recurringAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
   const netMonthlyObligation = Math.max(0, monthlyTotalAll - monthlyIncome)
   const runwayMonths = netMonthlyObligation > 0 ? (totalAssetsTry / netMonthlyObligation).toFixed(1) : '∞'
@@ -347,11 +343,31 @@ export default function Dashboard() {
           <div className="card-lg p-5 md:col-span-2">
             <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Varlik</div>
             <div className="mono text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmt(totalAssetsTry)}</div>
-            <div className="text-[11px] mt-1" style={{ color: 'var(--muted)' }}>Toplam Varlik (yatirimlar dahil)</div>
-            <div className="flex gap-4 mt-2 text-[13px]" style={{ color: 'var(--muted)' }}>
-              <span>Nakit: <span className="amt-blue font-semibold">{fmt(cashTry)}</span></span>
-              {investTotalTry > 0 && <span>Yatirim: <span className="amt-blue font-semibold">{fmt(investTotalTry)}</span></span>}
-              <span>Borc: <span className="amt-red font-semibold">{fmt(totalDebtTry)}</span></span>
+            <div className="flex flex-col gap-1 mt-2 text-[12px]" style={{ color: 'var(--muted)' }}>
+              <div className="flex justify-between">
+                <span>Nakit</span>
+                <span className="mono font-semibold amt-blue">{fmt(cashTry)}</span>
+              </div>
+              {investTotalTry > 0 && (
+                <div className="flex justify-between">
+                  <span>Yatirimlar</span>
+                  <span className="mono font-semibold amt-blue">{fmt(investTotalTry)}</span>
+                </div>
+              )}
+              {alacakTry > 0 && (
+                <div className="flex justify-between">
+                  <span>Alacaklar <span className="text-[10px]">(beklenen)</span></span>
+                  <span className="mono font-semibold amt-green">{fmt(alacakTry)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span>Borc</span>
+                <span className="mono font-semibold amt-red">-{fmt(totalDebtTry)}</span>
+              </div>
+              <div className="flex justify-between pt-1 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text)' }}>TOPLAM</span>
+                <span className="mono font-bold" style={{ color: 'var(--text)' }}>{fmt(totalAssetsTry)}</span>
+              </div>
             </div>
             <div className="flex gap-2 mt-4">
               {[
