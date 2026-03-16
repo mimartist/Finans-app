@@ -51,13 +51,14 @@ export default function Dashboard() {
   // Yaklaşan ödemeler (7 gün içindeki)
   const upcomingLoans = loans
     .filter(l => l.payment_day)
-    .map(l => ({ name: l.name, amount: l.monthly_payment, day: l.payment_day, color: '#f87171', icon: '🏦' }))
+    .map(l => ({ name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, color: '#f87171', icon: '🏦' }))
 
   const upcomingRecurring = recurring
     .filter(r => r.payment_day && r.category !== 'nakit')
     .map(r => ({
       name: r.name,
       amount: r.amount,
+      currency: r.currency,
       day: r.payment_day!,
       color: r.category === 'kredi' ? '#6c8fff' : r.category === 'personel' ? '#a78bfa' : '#f59e0b',
       icon: r.category === 'fatura' ? '📄' : r.category === 'aidat' ? '🏢' : r.category === 'personel' ? '👤' : '💳'
@@ -198,7 +199,10 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="text-right">
-              <div className="mono text-sm font-medium" style={{ color: p.color }}>{fmt(p.amount)}</div>
+              <div className="mono text-sm font-medium" style={{ color: p.color }}>
+                {fmt(p.amount, p.currency)}
+                {p.currency === 'EUR' && <span className="text-[10px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(p.amount * eurTry)})</span>}
+              </div>
               <div className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>ayın {p.day}'i</div>
             </div>
           </div>
