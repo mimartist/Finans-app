@@ -177,6 +177,13 @@ export default function LoansPage() {
                     <span>Bitis: {new Date(loan.end_date).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}</span>
                   )}
                 </div>
+                {loan.paid_installments > 0 && (
+                  <div className="text-[10px] mt-1.5" style={{ color: 'var(--muted)' }}>
+                    Toplam Odenen: <span className="amt-green font-semibold">{fmt(loan.paid_installments * loan.monthly_payment, loan.currency)}</span>
+                    {loan.currency === 'EUR' && <span> ({fmt(loan.paid_installments * loan.monthly_payment * eurTry)})</span>}
+                    <span> · {loan.paid_installments} taksit</span>
+                  </div>
+                )}
               </div>
             )
           })}
