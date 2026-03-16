@@ -55,26 +55,58 @@ export default function DebtsPage() {
     if (!form.person_name || !form.amount) return
     setSaving(true)
     const payload: any = {
-      person_name: form.person_name, type: form.type,
-      amount: parseFloat(form.amount) || 0, currency: form.currency,
+      person_name: form.person_name,
+      type: form.type,
+      amount: parseFloat(form.amount) || 0,
+      currency: form.currency,
       description: form.description || null,
-      transaction_date: form.transaction_date || null, due_date: form.due_date || null,
-      notes: form.notes || null, is_settled: false,
-      is_recurring: form.is_recurring,
+      transaction_date: form.transaction_date || new Date().toISOString().split('T')[0],
+      due_date: form.due_date || null,
+      notes: form.notes || null,
+      is_settled: false,
+      is_recurring: form.is_recurring || false,
       total_amount: form.is_recurring ? (parseFloat(form.total_amount) || null) : null,
       paid_amount: form.is_recurring ? (parseFloat(form.paid_amount) || 0) : null,
     }
-    if (editId) { await supabase.from('debt_records').update(payload).eq('id', editId) }
-    else { await supabase.from('debt_records').insert(payload) }
-    setSaving(false); closeForm(); await load()
+
+    if (editId) {
+      const { error } = await supabase.from('debt_records').update(payload).eq('id', editId)
+      if (error) {
+        alert('Hata: ' + error.message)
+        console.error('Update error:', error)
+        setSaving(false)
+        return
+      }
+      // Update local state
+      setDebts(prev => prev.map(d => d.id === editId ? { ...d, ...payload, id: editId } : d))
+    } else {
+      const { data, error } = await supabase.from('debt_records').insert(payload).select()
+      if (error) {
+        alert('Hata: ' + error.message)
+        console.error('Insert error:', error)
+        setSaving(false)
+        return
+      }
+      if (data?.[0]) {
+        setDebts(prev => [...prev, data[0]])
+      }
+    }
+
+    setSaving(false)
+    closeForm()
   }
 
   async function handleSettle(id: number) {
-    await supabase.from('debt_records').update({ is_settled: true }).eq('id', id); await load()
+    const { error } = await supabase.from('debt_records').update({ is_settled: true }).eq('id', id)
+    if (error) { alert('Hata: ' + error.message); return }
+    setDebts(prev => prev.filter(d => d.id !== id))
   }
 
   async function handleDelete(id: number) {
-    await supabase.from('debt_records').delete().eq('id', id); setDeleteConfirm(null); await load()
+    const { error } = await supabase.from('debt_records').delete().eq('id', id)
+    if (error) { alert('Hata: ' + error.message); return }
+    setDebts(prev => prev.filter(d => d.id !== id))
+    setDeleteConfirm(null)
   }
 
   async function handlePartialPay() {
@@ -84,12 +116,19 @@ export default function DebtsPage() {
     const newPaid = (payModal.paid_amount || 0) + amt
     const newRemaining = payModal.amount - amt
     const isSettled = newRemaining <= 0
-    await supabase.from('debt_records').update({
+    const { error } = await supabase.from('debt_records').update({
       amount: Math.max(0, newRemaining),
       paid_amount: newPaid,
       is_settled: isSettled,
     }).eq('id', payModal.id)
-    setPaying(false); setPayModal(null); setPayAmount(''); await load()
+    if (error) { alert('Hata: ' + error.message); setPaying(false); return }
+    // Update local state
+    if (isSettled) {
+      setDebts(prev => prev.filter(d => d.id !== payModal.id))
+    } else {
+      setDebts(prev => prev.map(d => d.id === payModal.id ? { ...d, amount: Math.max(0, newRemaining), paid_amount: newPaid } : d))
+    }
+    setPaying(false); setPayModal(null); setPayAmount('')
   }
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
