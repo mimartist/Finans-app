@@ -11,28 +11,42 @@ export default function Dashboard() {
   const [recurring, setRecurring] = useState<RecurringExpense[]>([])
   const [rates, setRates] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(true)
-
   const [investTotalTry, setInvestTotalTry] = useState(0)
+  const [paidExpenseIds, setPaidExpenseIds] = useState<Set<number>>(new Set())
+  const [paidLoanIds, setPaidLoanIds] = useState<Set<number>>(new Set())
 
-  useEffect(() => {
-    async function load() {
-      const today = new Date().toISOString().split('T')[0]
-      const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }] = await Promise.all([
-        supabase.from('accounts').select('*').eq('is_active', true),
-        supabase.from('loans').select('*').eq('is_active', true),
-        supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
-        supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
-        supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', today),
-      ])
-      setAccounts(acc || [])
-      setLoans(lns || [])
-      setRecurring(rec || [])
-      setRates(rt?.[0] || null)
-      setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
-      setLoading(false)
-    }
-    load()
-  }, [])
+  async function loadAll() {
+    const now = new Date()
+    const todayStr = now.toISOString().split('T')[0]
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+
+    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: paid }] = await Promise.all([
+      supabase.from('accounts').select('*').eq('is_active', true),
+      supabase.from('loans').select('*').eq('is_active', true),
+      supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
+      supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
+      supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', todayStr),
+      supabase.from('recurring_payments').select('expense_id, loan_id').eq('period_year', year).eq('period_month', month).eq('is_paid', true),
+    ])
+    setAccounts(acc || [])
+    setLoans(lns || [])
+    setRecurring(rec || [])
+    setRates(rt?.[0] || null)
+    setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
+
+    const paidExp = new Set<number>()
+    const paidLn = new Set<number>()
+    ;(paid || []).forEach((p: any) => {
+      if (p.expense_id) paidExp.add(p.expense_id)
+      if (p.loan_id) paidLn.add(p.loan_id)
+    })
+    setPaidExpenseIds(paidExp)
+    setPaidLoanIds(paidLn)
+    setLoading(false)
+  }
+
+  useEffect(() => { loadAll() }, [])
 
   const eurTry = rates?.eur_try || 38
   const usdTry = rates?.usd_try || 35
@@ -59,32 +73,29 @@ export default function Dashboard() {
   const runwayMonths = monthlyTotal > 0 ? (totalAssetsTry / monthlyTotal).toFixed(1) : '∞'
   const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
 
-  // Bar chart - last 6 months estimated expenses
+  // Bar chart
   const chartData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date()
     d.setMonth(d.getMonth() - (5 - i))
-    return {
-      name: d.toLocaleDateString('tr-TR', { month: 'short' }),
-      tutar: Math.round(monthlyTotal * (0.85 + Math.random() * 0.3)),
-    }
+    return { name: d.toLocaleDateString('tr-TR', { month: 'short' }), tutar: Math.round(monthlyTotal * (0.85 + Math.random() * 0.3)) }
   })
-  // Make current month exact
   if (chartData.length > 0) chartData[chartData.length - 1].tutar = Math.round(monthlyTotal)
 
+  // Build upcoming payments, filtering out already-paid items
   const upcomingLoans = loans
-    .filter(l => l.payment_day)
+    .filter(l => l.payment_day && !paidLoanIds.has(l.id))
     .map(l => ({ name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, type: 'kredi' as const, expenseId: null as number | null, loanId: l.id }))
 
   const upcomingRecurring = recurring
-    .filter(r => r.payment_day && r.category !== 'nakit')
+    .filter(r => r.payment_day && r.category !== 'nakit' && !paidExpenseIds.has(r.id))
     .map(r => ({ name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!, type: r.category as string, expenseId: r.id, loanId: null as number | null }))
 
   const allPayments = [...upcomingLoans, ...upcomingRecurring]
     .map(p => ({ ...p, days: daysUntil(p.day) }))
     .sort((a, b) => a.days - b.days)
-    .slice(0, 6)
+    .slice(0, 8)
 
-  // Payment confirmation modal state
+  // Payment modal
   type PaymentItem = (typeof allPayments)[number]
   const [payModal, setPayModal] = useState<PaymentItem | null>(null)
   const [payAccountId, setPayAccountId] = useState<number | null>(null)
@@ -98,7 +109,7 @@ export default function Dashboard() {
     const month = now.getMonth() + 1
     const today = now.toISOString().split('T')[0]
 
-    // 1) Insert payment record
+    // 1) Insert payment record for recurring expense
     if (payModal.expenseId) {
       await supabase.from('recurring_payments').insert({
         expense_id: payModal.expenseId,
@@ -110,10 +121,30 @@ export default function Dashboard() {
       })
     }
 
-    // 2) Deduct from selected account
+    // 2) Insert payment record for loan
+    if (payModal.loanId) {
+      await supabase.from('recurring_payments').insert({
+        loan_id: payModal.loanId,
+        period_year: year,
+        period_month: month,
+        amount: payModal.amount,
+        is_paid: true,
+        paid_date: today,
+      })
+
+      // Update loan: increment paid_installments, decrease remaining
+      const loan = loans.find(l => l.id === payModal.loanId)
+      if (loan) {
+        await supabase.from('loans').update({
+          paid_installments: loan.paid_installments + 1,
+          remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount),
+        }).eq('id', payModal.loanId)
+      }
+    }
+
+    // 3) Deduct from selected account
     const account = accounts.find(a => a.id === payAccountId)
     if (account) {
-      // If account currency differs, convert amount to account currency
       let deductAmount = payModal.amount
       if (payModal.currency !== account.currency) {
         const amountTry = toTry(payModal.amount, payModal.currency)
@@ -124,41 +155,17 @@ export default function Dashboard() {
       await supabase.from('accounts').update({ balance: account.balance - deductAmount }).eq('id', payAccountId)
     }
 
-    // 3) If it's a loan, increment paid_installments
-    if (payModal.loanId) {
-      const loan = loans.find(l => l.id === payModal.loanId)
-      if (loan) {
-        await supabase.from('loans').update({
-          paid_installments: loan.paid_installments + 1,
-          remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount),
-        }).eq('id', payModal.loanId)
-      }
-    }
-
     setPaying(false)
     setPayModal(null)
     setPayAccountId(null)
 
-    // 4) Refresh all data
+    // 4) Refresh all data (paid items will be filtered out)
     setLoading(true)
-    const todayStr = new Date().toISOString().split('T')[0]
-    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }] = await Promise.all([
-      supabase.from('accounts').select('*').eq('is_active', true),
-      supabase.from('loans').select('*').eq('is_active', true),
-      supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
-      supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
-      supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', todayStr),
-    ])
-    setAccounts(acc || [])
-    setLoans(lns || [])
-    setRecurring(rec || [])
-    setRates(rt?.[0] || null)
-    setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
-    setLoading(false)
+    await loadAll()
   }
 
-  const now = new Date()
-  const hour = now.getHours()
+  const now2 = new Date()
+  const hour = now2.getHours()
   const greeting = hour < 12 ? 'Gunaydin' : hour < 18 ? 'Iyi gunler' : 'Iyi aksamlar'
 
   if (loading) {
@@ -183,18 +190,7 @@ export default function Dashboard() {
             <button onClick={async () => {
               setLoading(true)
               await fetch('/api/update-rates')
-              const todayStr = new Date().toISOString().split('T')[0]
-              const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }] = await Promise.all([
-                supabase.from('accounts').select('*').eq('is_active', true),
-                supabase.from('loans').select('*').eq('is_active', true),
-                supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
-                supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
-                supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', todayStr),
-              ])
-              setAccounts(acc || []); setLoans(lns || []); setRecurring(rec || [])
-              setRates(rt?.[0] || null)
-              setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
-              setLoading(false)
+              await loadAll()
             }} className="w-9 h-9 rounded-lg flex items-center justify-center text-base"
               style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}
               title="Kurlari Guncelle">↻</button>
@@ -293,46 +289,58 @@ export default function Dashboard() {
         </div>
 
         {/* Upcoming Bills */}
-        <div className="px-5 mb-2">
+        <div className="px-5 mb-2 flex justify-between items-center">
           <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Yaklasan Odemeler</div>
+          {(paidExpenseIds.size > 0 || paidLoanIds.size > 0) && (
+            <div className="text-[10px] font-medium" style={{ color: '#059669' }}>
+              {paidExpenseIds.size + paidLoanIds.size} odeme yapildi bu ay
+            </div>
+          )}
         </div>
-        <div className="flex flex-col gap-2 mx-4">
-          {allPayments.map((p, i) => {
-            const isUrgent = p.days <= 3
-            return (
-              <div key={i} className="card-accent px-4 py-3 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0"
-                  style={{ background: isUrgent ? 'rgba(220,38,38,0.08)' : 'var(--bg4)' }}>
-                  <div className="text-[10px] font-bold" style={{ color: isUrgent ? '#dc2626' : 'var(--muted)' }}>
-                    {p.day}
-                  </div>
-                  <div className="text-[8px] uppercase" style={{ color: 'var(--muted)' }}>
-                    {new Date().toLocaleDateString('tr-TR', { month: 'short' })}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{p.name}</div>
-                  <div className="text-[11px] mt-0.5" style={{ color: isUrgent ? '#dc2626' : 'var(--muted)' }}>
-                    {daysUntilLabel(p.days)}
-                  </div>
-                </div>
-                <div className="text-right flex items-center gap-2">
-                  <div>
-                    <div className="mono text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                      {fmt(p.amount, p.currency)}
-                      {p.currency === 'EUR' && <span className="text-[10px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(p.amount * eurTry)})</span>}
+        {allPayments.length === 0 ? (
+          <div className="mx-4 card p-4 text-center text-sm" style={{ color: 'var(--muted)' }}>
+            Tum odemeler yapildi bu ay
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 mx-4">
+            {allPayments.map((p, i) => {
+              const isUrgent = p.days <= 3
+              return (
+                <div key={i} className="card-accent px-4 py-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0"
+                    style={{ background: isUrgent ? 'rgba(220,38,38,0.08)' : 'var(--bg4)' }}>
+                    <div className="text-[10px] font-bold" style={{ color: isUrgent ? '#dc2626' : 'var(--muted)' }}>
+                      {p.day}
+                    </div>
+                    <div className="text-[8px] uppercase" style={{ color: 'var(--muted)' }}>
+                      {new Date().toLocaleDateString('tr-TR', { month: 'short' })}
                     </div>
                   </div>
-                  <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
-                    className="px-2 py-1 rounded-lg text-[10px] font-semibold flex-shrink-0"
-                    style={{ background: 'rgba(5,150,105,0.08)', color: '#059669', border: '1px solid rgba(5,150,105,0.2)' }}>
-                    Yapildi
-                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{p.name}</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: isUrgent ? '#dc2626' : 'var(--muted)' }}>
+                      {daysUntilLabel(p.days)}
+                    </div>
+                  </div>
+                  <div className="text-right flex items-center gap-2">
+                    <div>
+                      <div className="mono text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                        {fmt(p.amount, p.currency)}
+                        {p.currency === 'EUR' && <span className="text-[10px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(p.amount * eurTry)})</span>}
+                      </div>
+                    </div>
+                    <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
+                      className="px-2 py-1 rounded-lg text-[10px] font-semibold flex-shrink-0"
+                      style={{ background: 'rgba(5,150,105,0.08)', color: '#059669', border: '1px solid rgba(5,150,105,0.2)' }}>
+                      Yapildi
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
+
         {/* Pay confirmation modal */}
         {payModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
