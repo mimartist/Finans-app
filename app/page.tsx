@@ -51,6 +51,7 @@ export default function Dashboard() {
   const eurTry = rates?.eur_try || 38
   const usdTry = rates?.usd_try || 35
 
+  // All accounts converted to TRY (TL + EUR + USD + kripto EUR)
   const cashTry = accounts.reduce((sum, a) => {
     if (a.currency === 'TRY') return sum + a.balance
     if (a.currency === 'EUR') return sum + a.balance * eurTry
@@ -59,6 +60,14 @@ export default function Dashboard() {
   }, 0)
 
   const totalAssetsTry = cashTry + investTotalTry
+
+  // Grouped totals for pills
+  const tryTotal = accounts.filter(a => a.currency === 'TRY').reduce((s, a) => s + a.balance, 0)
+  const eurTotal = accounts.filter(a => a.currency === 'EUR' && a.type !== 'kripto').reduce((s, a) => s + a.balance, 0)
+  const usdTotal = accounts.filter(a => a.currency === 'USD').reduce((s, a) => s + a.balance, 0)
+  const kriptoAccounts = accounts.filter(a => a.type === 'kripto')
+  const kriptoTotal = kriptoAccounts.reduce((s, a) => s + a.balance, 0)
+  const kriptoCurrency = kriptoAccounts[0]?.currency || 'EUR'
 
   const toTry = (amount: number, currency: string) => {
     if (currency === 'EUR') return amount * eurTry
@@ -203,41 +212,31 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mx-4 mb-4">
           {/* Net Worth */}
           <div className="card-lg p-5 md:col-span-2">
-            <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Banka Hesaplari</div>
-            <div className="mono text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmt(cashTry)}</div>
-            <div className="text-[11px] mt-1" style={{ color: 'var(--muted)' }}>Banka hesaplari toplami · Yatirimlar haric</div>
-            {investTotalTry > 0 && (
-              <div className="text-[13px] mt-2" style={{ color: 'var(--text)' }}>
-                Yatirimlar dahil: <span className="mono font-bold amt-blue">{fmt(totalAssetsTry)}</span>
-              </div>
-            )}
-            <div className="text-[13px] mt-1" style={{ color: 'var(--muted)' }}>
-              Toplam borc: <span className="amt-red font-semibold">{fmt(totalDebtTry)}</span>
+            <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Varlik</div>
+            <div className="mono text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmt(totalAssetsTry)}</div>
+            <div className="text-[11px] mt-1" style={{ color: 'var(--muted)' }}>
+              Toplam Varlik (yatirimlar dahil)
+            </div>
+            <div className="flex gap-4 mt-2 text-[13px]" style={{ color: 'var(--muted)' }}>
+              <span>Nakit: <span className="amt-blue font-semibold">{fmt(cashTry)}</span></span>
+              {investTotalTry > 0 && <span>Yatirim: <span className="amt-blue font-semibold">{fmt(investTotalTry)}</span></span>}
+              <span>Borc: <span className="amt-red font-semibold">{fmt(totalDebtTry)}</span></span>
             </div>
             {/* Currency pills */}
-            {(() => {
-              const tryTotal = accounts.filter(a => a.currency === 'TRY').reduce((s, a) => s + a.balance, 0)
-              const eurTotal = accounts.filter(a => a.currency === 'EUR').reduce((s, a) => s + a.balance, 0)
-              const usdTotal = accounts.filter(a => a.currency === 'USD').reduce((s, a) => s + a.balance, 0)
-              const kriptoTotal = accounts.filter(a => a.type === 'kripto').reduce((s, a) => s + a.balance, 0)
-              const pills = [
+            <div className="flex gap-2 mt-4">
+              {[
                 { key: 'TRY', icon: '🇹🇷', value: fmt(tryTotal), label: 'Toplam TL', total: tryTotal },
                 { key: 'EUR', icon: '🇪🇺', value: fmt(eurTotal, 'EUR'), label: 'Toplam EUR', total: eurTotal },
                 { key: 'USD', icon: '🇺🇸', value: fmt(usdTotal, 'USD'), label: 'Toplam USD', total: usdTotal },
-                { key: 'KRP', icon: '₿', value: fmt(kriptoTotal, 'EUR'), label: 'Kripto', total: kriptoTotal },
-              ]
-              return (
-                <div className="flex gap-2 mt-4">
-                  {pills.map(p => (
-                    <div key={p.key} className="flex-1 rounded-lg p-2.5" style={{ background: 'var(--bg4)', opacity: p.total === 0 ? 0.4 : 1 }}>
-                      <div className="text-xs mb-1" style={{ color: 'var(--muted)' }}>{p.icon}</div>
-                      <div className="mono text-sm font-semibold amt-blue">{p.value}</div>
-                      <div className="text-[10px] uppercase tracking-wide mt-0.5" style={{ color: 'var(--muted)' }}>{p.label}</div>
-                    </div>
-                  ))}
+                { key: 'KRP', icon: '₿', value: fmt(kriptoTotal, kriptoCurrency), label: 'Kripto', total: kriptoTotal },
+              ].map(p => (
+                <div key={p.key} className="flex-1 rounded-lg p-2.5" style={{ background: 'var(--bg4)', opacity: p.total === 0 ? 0.4 : 1 }}>
+                  <div className="text-xs mb-1" style={{ color: 'var(--muted)' }}>{p.icon}</div>
+                  <div className="mono text-sm font-semibold amt-blue">{p.value}</div>
+                  <div className="text-[10px] uppercase tracking-wide mt-0.5" style={{ color: 'var(--muted)' }}>{p.label}</div>
                 </div>
-              )
-            })()}
+              ))}
+            </div>
           </div>
 
           {/* Runway */}
@@ -251,6 +250,7 @@ export default function Dashboard() {
               <span>0</span>
               <span>24 ay</span>
             </div>
+            <div className="text-[10px] mt-2" style={{ color: 'var(--muted)' }}>Tum varliklarinla kac ay idare edebilirsin</div>
           </div>
         </div>
 
