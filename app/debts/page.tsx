@@ -25,16 +25,32 @@ export default function DebtsPage() {
   const [payAmount, setPayAmount] = useState('')
   const [paying, setPaying] = useState(false)
 
+  const [eurTry, setEurTry] = useState(41.5)
+  const [usdTry, setUsdTry] = useState(38.2)
+
   async function load() {
-    const { data } = await supabase.from('debt_records').select('*').eq('is_settled', false).order('due_date', { nullsFirst: false })
-    setDebts(data || []); setLoading(false)
+    const [{ data }, { data: rt }] = await Promise.all([
+      supabase.from('debt_records').select('*').eq('is_settled', false).order('due_date', { nullsFirst: false }),
+      supabase.from('exchange_rates').select('eur_try, usd_try').order('date', { ascending: false }).limit(1),
+    ])
+    setDebts(data || [])
+    if (rt?.[0]?.eur_try) setEurTry(rt[0].eur_try)
+    if (rt?.[0]?.usd_try) setUsdTry(rt[0].usd_try)
+    setLoading(false)
   }
   useEffect(() => { load() }, [])
 
+  const toTry = (amount: number, currency: string) => {
+    if (currency === 'EUR') return amount * eurTry
+    if (currency === 'USD') return amount * usdTry
+    return amount
+  }
+
   const alacaklar = debts.filter(d => d.type === 'alacak')
   const verecekler = debts.filter(d => d.type === 'verecek')
-  const totalAlacak = alacaklar.reduce((s, d) => s + d.amount, 0)
-  const totalVerecek = verecekler.reduce((s, d) => s + d.amount, 0)
+  const totalAlacak = alacaklar.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+  const totalVerecek = verecekler.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+  const hasMultiCurrency = debts.some(d => d.currency !== 'TRY')
   const shown = tab === 'alacak' ? alacaklar : verecekler
   const isOverdue = (due?: string) => due ? new Date(due) < new Date() : false
 
@@ -145,12 +161,12 @@ export default function DebtsPage() {
           <div className="flex-1 card p-3 cursor-pointer" style={{ borderColor: tab === 'alacak' ? '#059669' : 'var(--border)' }} onClick={() => setTab('alacak')}>
             <div className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Alacak</div>
             <div className="mono text-base font-bold amt-green">{fmt(totalAlacak)}</div>
-            <div className="text-[10px] mt-1 amt-green">{alacaklar.length} kisi</div>
+            <div className="text-[10px] mt-1 amt-green">{alacaklar.length} kisi{hasMultiCurrency ? ' · kur dahil' : ''}</div>
           </div>
           <div className="flex-1 card p-3 cursor-pointer" style={{ borderColor: tab === 'verecek' ? '#dc2626' : 'var(--border)' }} onClick={() => setTab('verecek')}>
             <div className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Verecek</div>
             <div className="mono text-base font-bold amt-red">{fmt(totalVerecek)}</div>
-            <div className="text-[10px] mt-1 amt-red">{verecekler.length} kisi</div>
+            <div className="text-[10px] mt-1 amt-red">{verecekler.length} kisi{hasMultiCurrency ? ' · kur dahil' : ''}</div>
           </div>
         </div>
 
@@ -198,6 +214,9 @@ export default function DebtsPage() {
                     <div className="flex items-start gap-2">
                       <div className="text-right">
                         <div className="mono text-base font-bold" style={{ color }}>{fmt(remaining, d.currency)}</div>
+                        {d.currency !== 'TRY' && (
+                          <div className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>({fmt(toTry(remaining, d.currency))})</div>
+                        )}
                         <div className={`badge mt-1 ${d.type === 'alacak' ? 'badge-green' : 'badge-red'}`}>{d.type}</div>
                       </div>
                       <div className="flex flex-col gap-1 ml-1">
@@ -216,7 +235,9 @@ export default function DebtsPage() {
                         <div className="progress-bar" style={{ width: `${paidPct}%`, background: d.type === 'alacak' ? '#059669' : '#dc2626' }} />
                       </div>
                       <div className="flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
-                        <span>Toplam: <span className="font-semibold" style={{ color: 'var(--text)' }}>{fmt(totalAmt, d.currency)}</span></span>
+                        <span>Toplam: <span className="font-semibold" style={{ color: 'var(--text)' }}>{fmt(totalAmt, d.currency)}</span>
+                          {d.currency !== 'TRY' && <span> ({fmt(toTry(totalAmt, d.currency))})</span>}
+                        </span>
                         <span>Odenen: <span className="amt-green font-semibold">{fmt(paidAmt, d.currency)}</span></span>
                         <span>Kalan: <span className="font-semibold" style={{ color }}>{fmt(remaining, d.currency)}</span></span>
                       </div>
