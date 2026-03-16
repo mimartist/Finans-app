@@ -199,17 +199,29 @@ export default function Dashboard() {
               Toplam borc: <span className="amt-red font-semibold">{fmt(totalDebtTry)}</span>
             </div>
             {/* Currency pills */}
-            <div className="flex gap-2 mt-4">
-              {accounts.slice(0, 4).map((a) => (
-                <div key={a.id} className="flex-1 rounded-lg p-2.5" style={{ background: 'var(--bg4)' }}>
-                  <div className="text-xs mb-1" style={{ color: 'var(--muted)' }}>
-                    {a.currency === 'TRY' ? '🇹🇷' : a.currency === 'EUR' ? '🇪🇺' : a.currency === 'USD' ? '🇺🇸' : '₿'}
-                  </div>
-                  <div className="mono text-sm font-semibold amt-blue">{fmt(a.balance, a.currency)}</div>
-                  <div className="text-[10px] uppercase tracking-wide mt-0.5" style={{ color: 'var(--muted)' }}>{a.bank || a.name}</div>
+            {(() => {
+              const tryTotal = accounts.filter(a => a.currency === 'TRY').reduce((s, a) => s + a.balance, 0)
+              const eurTotal = accounts.filter(a => a.currency === 'EUR').reduce((s, a) => s + a.balance, 0)
+              const usdTotal = accounts.filter(a => a.currency === 'USD').reduce((s, a) => s + a.balance, 0)
+              const kriptoTotal = accounts.filter(a => a.type === 'kripto').reduce((s, a) => s + a.balance, 0)
+              const pills = [
+                { key: 'TRY', icon: '🇹🇷', value: fmt(tryTotal), label: 'Toplam TL', total: tryTotal },
+                { key: 'EUR', icon: '🇪🇺', value: fmt(eurTotal, 'EUR'), label: 'Toplam EUR', total: eurTotal },
+                { key: 'USD', icon: '🇺🇸', value: fmt(usdTotal, 'USD'), label: 'Toplam USD', total: usdTotal },
+                { key: 'KRP', icon: '₿', value: fmt(kriptoTotal, 'EUR'), label: 'Kripto', total: kriptoTotal },
+              ]
+              return (
+                <div className="flex gap-2 mt-4">
+                  {pills.map(p => (
+                    <div key={p.key} className="flex-1 rounded-lg p-2.5" style={{ background: 'var(--bg4)', opacity: p.total === 0 ? 0.4 : 1 }}>
+                      <div className="text-xs mb-1" style={{ color: 'var(--muted)' }}>{p.icon}</div>
+                      <div className="mono text-sm font-semibold amt-blue">{p.value}</div>
+                      <div className="text-[10px] uppercase tracking-wide mt-0.5" style={{ color: 'var(--muted)' }}>{p.label}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )
+            })()}
           </div>
 
           {/* Runway */}
