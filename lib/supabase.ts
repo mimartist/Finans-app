@@ -85,6 +85,9 @@ export type DebtRecord = {
   due_date?: string
   is_settled: boolean
   notes?: string
+  is_recurring?: boolean
+  total_amount?: number
+  paid_amount?: number
 }
 
 export type Investment = {
