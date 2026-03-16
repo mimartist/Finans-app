@@ -179,8 +179,28 @@ export default function Dashboard() {
             <div className="text-[12px] font-medium" style={{ color: 'var(--muted)' }}>{greeting}</div>
             <div className="text-xl font-bold mt-0.5" style={{ color: 'var(--text)' }}>Atakan Bey</div>
           </div>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
-            style={{ background: '#0d9488' }}>AK</div>
+          <div className="flex items-center gap-2">
+            <button onClick={async () => {
+              setLoading(true)
+              await fetch('/api/update-rates')
+              const todayStr = new Date().toISOString().split('T')[0]
+              const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }] = await Promise.all([
+                supabase.from('accounts').select('*').eq('is_active', true),
+                supabase.from('loans').select('*').eq('is_active', true),
+                supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
+                supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
+                supabase.from('investment_snapshots').select('total_value_try').eq('snapshot_date', todayStr),
+              ])
+              setAccounts(acc || []); setLoans(lns || []); setRecurring(rec || [])
+              setRates(rt?.[0] || null)
+              setInvestTotalTry((snaps || []).reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
+              setLoading(false)
+            }} className="w-9 h-9 rounded-lg flex items-center justify-center text-base"
+              style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}
+              title="Kurlari Guncelle">↻</button>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
+              style={{ background: '#0d9488' }}>AK</div>
+          </div>
         </div>
 
         {/* Summary Grid */}

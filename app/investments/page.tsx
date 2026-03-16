@@ -17,6 +17,14 @@ export default function InvestmentsPage() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+  const [updatingRates, setUpdatingRates] = useState(false)
+
+  async function updateRates() {
+    setUpdatingRates(true)
+    await fetch('/api/update-rates')
+    await load()
+    setUpdatingRates(false)
+  }
 
   async function load() {
     const today = new Date().toISOString().split('T')[0]
@@ -75,7 +83,14 @@ export default function InvestmentsPage() {
             <div className="text-[12px] font-medium" style={{ color: 'var(--muted)' }}>Modul</div>
             <div className="text-xl font-bold mt-0.5">Yatirimlar</div>
           </div>
-          <button onClick={openAdd} className="btn-primary px-4 py-2 text-sm">+ Ekle</button>
+          <div className="flex gap-2">
+            <button onClick={updateRates} disabled={updatingRates}
+              className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5"
+              style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: updatingRates ? 'var(--muted)' : 'var(--accent)' }}>
+              {updatingRates ? '↻ ...' : '↻ Kurlari Guncelle'}
+            </button>
+            <button onClick={openAdd} className="btn-primary px-4 py-2 text-sm">+ Ekle</button>
+          </div>
         </div>
 
         <div className="mx-4 mb-4 card-lg p-5">
