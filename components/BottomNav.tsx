@@ -3,11 +3,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const navItems = [
-  { href: '/',            icon: '◉',  label: 'Dashboard'  },
-  { href: '/loans',       icon: '🏦', label: 'Krediler'   },
-  { href: '/recurring',   icon: '📅', label: 'Giderler'   },
-  { href: '/debts',       icon: '🤝', label: 'Alacak'     },
-  { href: '/investments', icon: '📈', label: 'Yatırım'    },
+  { href: '/',            icon: '◉',  label: 'Ana'       },
+  { href: '/accounts',    icon: '🏦', label: 'Hesaplar'  },
+  { href: '/loans',       icon: '💳', label: 'Krediler'  },
+  { href: '/recurring',   icon: '📅', label: 'Giderler'  },
+  { href: '/debts',       icon: '🤝', label: 'Alacak'    },
+  { href: '/investments', icon: '📈', label: 'Yatırım'   },
 ]
 
 export default function BottomNav() {
@@ -27,9 +28,9 @@ export default function BottomNav() {
               className="flex-1 flex flex-col items-center gap-1 pt-3 pb-2"
               style={{ opacity: active ? 1 : 0.4, textDecoration: 'none' }}
             >
-              <span style={{ fontSize: 20 }}>{item.icon}</span>
+              <span style={{ fontSize: 17 }}>{item.icon}</span>
               <span
-                className="text-[10px] font-medium tracking-wide"
+                className="text-[9px] font-medium tracking-wide"
                 style={{ color: active ? '#6c8fff' : 'var(--text)' }}
               >
                 {item.label}
