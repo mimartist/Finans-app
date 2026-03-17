@@ -28,6 +28,7 @@ export default function LoansPage() {
   const [form, setForm] = useState(emptyLoan)
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+  const [paidLoans, setPaidLoans] = useState<any[]>([])
 
   // Credit card transaction state
   const [txFormCardId, setTxFormCardId] = useState<number | null>(null)
@@ -39,14 +40,16 @@ export default function LoansPage() {
 
   async function load() {
     const now = new Date()
-    const [{ data: lns }, { data: crd }, { data: stm }, { data: rates }, { data: txs }] = await Promise.all([
+    const [{ data: lns }, { data: crd }, { data: stm }, { data: rates }, { data: txs }, { data: paidThisMonth }] = await Promise.all([
       supabase.from('loans').select('*').eq('is_active', true).order('monthly_payment', { ascending: false }),
       supabase.from('credit_cards').select('*').eq('is_active', true),
       supabase.from('credit_card_statements').select('*').eq('period_year', now.getFullYear()).eq('period_month', now.getMonth() + 1),
       supabase.from('exchange_rates').select('eur_try').order('date', { ascending: false }).limit(1),
       supabase.from('credit_card_transactions').select('*').order('transaction_date', { ascending: false }),
+      supabase.from('recurring_payments').select('*').eq('period_year', now.getFullYear()).eq('period_month', now.getMonth() + 1).eq('is_paid', true),
     ])
     setLoans(lns || []); setCards(crd || []); setStatements(stm || []); setTransactions(txs || [])
+    setPaidLoans(paidThisMonth || [])
     if (rates?.[0]?.eur_try) setEurTry(rates[0].eur_try)
     setLoading(false)
   }
@@ -236,21 +239,22 @@ export default function LoansPage() {
           </div>
         )}
 
-        <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Aktif Krediler</div></div>
-
         {loans.length === 0 && (
-          <div className="mx-4 card p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
+          <div className="mx-4 card p-6 text-center text-sm mb-4" style={{ color: 'var(--muted)' }}>
             Henuz kredi eklenmemis.<br />
             <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>+ Kredi Ekle</button>
           </div>
         )}
 
-        <div className="flex flex-col gap-2 mx-4 mb-4">
-          {loans.map((loan) => {
+        {(() => {
+          const unpaidLoans = loans.filter(l => !paidLoans.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id)))
+          const paidLoansList = loans.filter(l => paidLoans.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id)))
+
+          const renderLoanCard = (loan: Loan, isPaid: boolean) => {
             const pct = progressPct(loan)
             const days = loan.payment_day ? daysUntil(loan.payment_day) : null
             return (
-              <div key={loan.id} className="card p-4">
+              <div key={loan.id} className="card p-4" style={{ borderLeft: isPaid ? '3px solid #4ade9a' : undefined }}>
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold">{loan.name}</div>
@@ -260,14 +264,16 @@ export default function LoansPage() {
                   </div>
                   <div className="flex items-start gap-2">
                     <div className="text-right">
-                      <div className="mono text-base font-bold amt-red">
+                      <div className={isPaid ? 'mono text-base font-bold' : 'mono text-base font-bold amt-red'} style={isPaid ? { color: '#4ade9a' } : undefined}>
                         {fmt(loan.monthly_payment, loan.currency)}
                         {loan.currency === 'EUR' && <span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(loan.monthly_payment * eurTry)})</span>}
                         <span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>/ay</span>
                       </div>
-                      {days !== null && (
+                      {isPaid ? (
+                        <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Bu ay odendi</div>
+                      ) : days !== null ? (
                         <div className="text-[11px] mt-0.5" style={{ color: days <= 3 ? '#dc2626' : 'var(--muted)' }}>{daysUntilLabel(days)}</div>
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex gap-1 ml-1">
                       <button onClick={() => openEdit(loan)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
@@ -298,8 +304,33 @@ export default function LoansPage() {
                 )}
               </div>
             )
-          })}
-        </div>
+          }
+
+          return (
+            <>
+              {unpaidLoans.length > 0 && (
+                <>
+                  <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Bekleyen Krediler</div></div>
+                  <div className="flex flex-col gap-2 mx-4 mb-4">
+                    {unpaidLoans.map(l => renderLoanCard(l, false))}
+                  </div>
+                </>
+              )}
+              {paidLoansList.length > 0 && (
+                <>
+                  <div className="px-5 mb-2 flex items-center gap-2">
+                    <div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: '#059669' }}>Odenen Krediler</div>
+                    <div className="flex-1 h-px" style={{ background: 'rgba(74,222,154,0.3)' }} />
+                    <div className="text-[10px] font-medium" style={{ color: '#059669' }}>{paidLoansList.length} odeme</div>
+                  </div>
+                  <div className="flex flex-col gap-2 mx-4 mb-4">
+                    {paidLoansList.map(l => renderLoanCard(l, true))}
+                  </div>
+                </>
+              )}
+            </>
+          )
+        })()}
 
         <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Kredi Kartlari</div></div>
 
@@ -316,13 +347,18 @@ export default function LoansPage() {
             const days = card.due_day ? daysUntil(card.due_day) : null
             const cardTxs = transactions.filter(t => t.card_id === card.id).slice(0, 5)
             const isExpanded = expandedCards.has(card.id)
+            const isCardPaid = stmt?.is_paid === true
             return (
-              <div key={card.id} className="card">
+              <div key={card.id} className="card" style={isCardPaid ? { borderLeft: '3px solid #4ade9a' } : undefined}>
                 <div className="px-4 py-3 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-light)' }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" />
-                    </svg>
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: isCardPaid ? 'rgba(74,222,154,0.08)' : 'var(--accent-light)' }}>
+                    {isCardPaid ? (
+                      <span className="text-lg" style={{ color: '#4ade9a' }}>✓</span>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" />
+                      </svg>
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium">{card.name}</div>
@@ -331,8 +367,12 @@ export default function LoansPage() {
                   <div className="text-right">
                     {stmt ? (
                       <>
-                        <div className="mono text-sm font-semibold amt-amber">{fmt(stmt.total_amount)}</div>
-                        <div className="text-[11px] mt-0.5" style={{ color: days && days <= 3 ? '#dc2626' : 'var(--muted)' }}>{days !== null ? daysUntilLabel(days) : ''}</div>
+                        <div className={isCardPaid ? 'mono text-sm font-semibold' : 'mono text-sm font-semibold amt-amber'} style={isCardPaid ? { color: '#4ade9a' } : undefined}>{fmt(stmt.total_amount)}</div>
+                        {isCardPaid ? (
+                          <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Odendi</div>
+                        ) : (
+                          <div className="text-[11px] mt-0.5" style={{ color: days && days <= 3 ? '#dc2626' : 'var(--muted)' }}>{days !== null ? daysUntilLabel(days) : ''}</div>
+                        )}
                       </>
                     ) : (
                       <div className="text-[11px]" style={{ color: 'var(--muted)' }}>ekstre girilmedi</div>
