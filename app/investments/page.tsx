@@ -31,6 +31,7 @@ export default function InvestmentsPage() {
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [updatingRates, setUpdatingRates] = useState(false)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
 
   // Inline price update
   const [priceEditId, setPriceEditId] = useState<number | null>(null)
@@ -229,7 +230,7 @@ export default function InvestmentsPage() {
             <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>+ Yatirim Ekle</button>
           </div>
         ) : (
-          <div className="flex flex-col gap-3 mx-4">
+          <div className="flex flex-col gap-1.5 mx-4">
             {investments.map((inv) => {
               const costBasis = inv.cost_basis || 0
               const currentVal = inv.total_value || 0
@@ -241,111 +242,141 @@ export default function InvestmentsPage() {
               const unitLabel = inv.type === 'altin' ? 'gr' : 'adet'
               const canUpdatePrice = ['hisse', 'fon', 'altin'].includes(inv.type)
               const isEditingPrice = priceEditId === inv.id
+              const isExpanded = expandedId === inv.id
 
               return (
-                <div key={inv.id} className="card p-4">
-                  {/* Header */}
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="text-lg">{typeIcon[inv.type] || '📦'}</div>
-                      <div>
-                        <div className="text-sm font-bold">{inv.symbol || inv.name}</div>
-                        <div className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-                          {inv.type} · {inv.platform || '—'}
+                <div key={inv.id}>
+                  {/* Compact row */}
+                  <div
+                    onClick={() => setExpandedId(isExpanded ? null : inv.id)}
+                    className="px-3 py-2.5 flex items-center gap-3 cursor-pointer"
+                    style={{
+                      background: 'var(--bg3)',
+                      borderRadius: isExpanded ? '12px 12px 0 0' : 12,
+                      border: '1px solid var(--border)',
+                      borderLeft: `3px solid ${pnlColor}`,
+                      borderBottom: isExpanded ? '1px solid var(--border)' : undefined,
+                    }}>
+                    <div className="text-base flex-shrink-0" style={{ width: 24, textAlign: 'center' }}>{typeIcon[inv.type] || '📦'}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-semibold truncate">{inv.symbol || inv.name}</div>
+                      <div className="text-[10px] mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
+                        <span>{inv.type} · {inv.platform || '—'}</span>
+                        <span>·</span>
+                        <span>{inv.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} {unitLabel}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-right">
+                        <div className="mono text-[13px] font-bold amt-blue">{fmt(currentVal, inv.currency)}</div>
+                        <div className="mono text-[10px] font-medium flex items-center justify-end gap-0.5" style={{ color: pnlColor }}>
+                          {isProfit ? '+' : ''}{pnlPct.toFixed(1)}% {isProfit ? '↑' : isLoss ? '↓' : ''}
                         </div>
                       </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <button onClick={() => openEdit(inv)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
-                      <button onClick={() => setDeleteConfirm(inv.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
+                      <span className="text-[12px]" style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>›</span>
                     </div>
                   </div>
 
-                  {/* Quantity */}
-                  <div className="text-[12px] mb-3" style={{ color: 'var(--muted)' }}>
-                    <span className="mono font-semibold" style={{ color: 'var(--text)' }}>
-                      {inv.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 3 })}
-                    </span> {unitLabel}
-                  </div>
-
-                  {/* Price rows */}
-                  <div className="flex flex-col gap-1.5 text-[12px] mb-3 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <div className="flex justify-between">
-                      <span style={{ color: 'var(--muted)' }}>Maliyet fiyati</span>
-                      <span className="mono font-medium">{fmtPrice(inv.avg_cost || 0, inv.currency)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span style={{ color: 'var(--muted)' }}>Guncel fiyat</span>
-                      <div className="flex items-center gap-2">
-                        {isEditingPrice ? (
-                          <div className="flex items-center gap-1">
-                            <input
-                              value={priceInput}
-                              onChange={e => setPriceInput(e.target.value)}
-                              type="number"
-                              step="any"
-                              className="input mono text-right"
-                              style={{ width: 100, padding: '2px 6px', fontSize: 12 }}
-                              autoFocus
-                              onKeyDown={e => { if (e.key === 'Enter') handlePriceUpdate(inv); if (e.key === 'Escape') { setPriceEditId(null); setPriceInput('') } }}
-                            />
-                            <button onClick={() => handlePriceUpdate(inv)} disabled={priceSaving}
-                              className="text-[10px] font-semibold px-2 py-1 rounded"
-                              style={{ background: 'rgba(13,148,136,0.1)', color: '#0d9488' }}>
-                              {priceSaving ? '...' : '✓'}
-                            </button>
-                            <button onClick={() => { setPriceEditId(null); setPriceInput('') }}
-                              className="text-[10px] px-1.5 py-1 rounded"
-                              style={{ background: 'var(--bg4)', color: 'var(--muted)' }}>✕</button>
-                          </div>
-                        ) : (
-                          <>
-                            <span className="mono font-medium" style={{ color: inv.latest_price ? 'var(--text)' : 'var(--muted)' }}>
-                              {inv.latest_price ? fmtPrice(inv.latest_price, inv.currency) : '—'}
-                            </span>
-                            {canUpdatePrice && (
-                              <button onClick={() => { setPriceEditId(inv.id); setPriceInput(inv.latest_price ? String(inv.latest_price) : '') }}
-                                className="text-[10px] font-medium px-2 py-0.5 rounded"
-                                style={{ background: 'rgba(13,148,136,0.08)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.2)' }}>
-                                Guncelle
-                              </button>
+                  {/* Expanded detail */}
+                  {isExpanded && (
+                    <div className="px-4 py-3" style={{
+                      background: 'var(--bg3)',
+                      borderRadius: '0 0 12px 12px',
+                      border: '1px solid var(--border)',
+                      borderTop: 'none',
+                      borderLeft: `3px solid ${pnlColor}`,
+                    }}>
+                      {/* Price rows */}
+                      <div className="flex flex-col gap-1.5 text-[12px] mb-3 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
+                        <div className="flex justify-between">
+                          <span style={{ color: 'var(--muted)' }}>Maliyet fiyati</span>
+                          <span className="mono font-medium">{fmtPrice(inv.avg_cost || 0, inv.currency)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span style={{ color: 'var(--muted)' }}>Guncel fiyat</span>
+                          <div className="flex items-center gap-2">
+                            {isEditingPrice ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  value={priceInput}
+                                  onChange={e => setPriceInput(e.target.value)}
+                                  type="number"
+                                  step="any"
+                                  className="input mono text-right"
+                                  style={{ width: 100, padding: '2px 6px', fontSize: 12 }}
+                                  autoFocus
+                                  onClick={e => e.stopPropagation()}
+                                  onKeyDown={e => { if (e.key === 'Enter') handlePriceUpdate(inv); if (e.key === 'Escape') { setPriceEditId(null); setPriceInput('') } }}
+                                />
+                                <button onClick={(e) => { e.stopPropagation(); handlePriceUpdate(inv) }} disabled={priceSaving}
+                                  className="text-[10px] font-semibold px-2 py-1 rounded"
+                                  style={{ background: 'rgba(13,148,136,0.1)', color: '#0d9488' }}>
+                                  {priceSaving ? '...' : '✓'}
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); setPriceEditId(null); setPriceInput('') }}
+                                  className="text-[10px] px-1.5 py-1 rounded"
+                                  style={{ background: 'var(--bg4)', color: 'var(--muted)' }}>✕</button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="mono font-medium" style={{ color: inv.latest_price ? 'var(--text)' : 'var(--muted)' }}>
+                                  {inv.latest_price ? fmtPrice(inv.latest_price, inv.currency) : '—'}
+                                </span>
+                                {canUpdatePrice && (
+                                  <button onClick={(e) => { e.stopPropagation(); setPriceEditId(inv.id); setPriceInput(inv.latest_price ? String(inv.latest_price) : '') }}
+                                    className="text-[10px] font-medium px-2 py-0.5 rounded"
+                                    style={{ background: 'rgba(13,148,136,0.08)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.2)' }}>
+                                    Guncelle
+                                  </button>
+                                )}
+                              </>
                             )}
-                          </>
+                          </div>
+                        </div>
+                        {inv.snapshot_date && (
+                          <div className="text-[10px] text-right" style={{ color: 'var(--muted)' }}>
+                            Son guncelleme: {new Date(inv.snapshot_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </div>
                         )}
                       </div>
-                    </div>
-                    {inv.snapshot_date && (
-                      <div className="text-[10px] text-right" style={{ color: 'var(--muted)' }}>
-                        Son guncelleme: {new Date(inv.snapshot_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Totals */}
-                  <div className="flex flex-col gap-1.5 text-[12px]">
-                    <div className="flex justify-between">
-                      <span style={{ color: 'var(--muted)' }}>Maliyet</span>
-                      <span className="mono font-semibold">{fmt(costBasis, inv.currency)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span style={{ color: 'var(--muted)' }}>Guncel</span>
-                      <span className="mono font-semibold amt-blue">{fmt(currentVal, inv.currency)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span style={{ color: 'var(--muted)' }}>K/Z</span>
-                      <span className="mono font-semibold flex items-center gap-1" style={{ color: pnlColor }}>
-                        {isProfit ? '+' : ''}{fmt(pnl, inv.currency)}
-                        <span className="text-[10px]">({isProfit ? '+' : ''}{pnlPct.toFixed(1)}%)</span>
-                        <span>{isProfit ? '↑' : isLoss ? '↓' : ''}</span>
-                      </span>
-                    </div>
-                    {inv.currency !== 'TRY' && inv.total_value_try && (
-                      <div className="flex justify-between text-[11px] mt-1 pt-1" style={{ borderTop: '1px solid var(--border)' }}>
-                        <span style={{ color: 'var(--muted)' }}>TRY Deger</span>
-                        <span className="mono font-semibold">{fmt(inv.total_value_try)}</span>
+                      {/* Totals */}
+                      <div className="flex flex-col gap-1.5 text-[12px] mb-3">
+                        <div className="flex justify-between">
+                          <span style={{ color: 'var(--muted)' }}>Maliyet</span>
+                          <span className="mono font-semibold">{fmt(costBasis, inv.currency)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span style={{ color: 'var(--muted)' }}>Guncel</span>
+                          <span className="mono font-semibold amt-blue">{fmt(currentVal, inv.currency)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span style={{ color: 'var(--muted)' }}>K/Z</span>
+                          <span className="mono font-semibold flex items-center gap-1" style={{ color: pnlColor }}>
+                            {isProfit ? '+' : ''}{fmt(pnl, inv.currency)}
+                            <span className="text-[10px]">({isProfit ? '+' : ''}{pnlPct.toFixed(1)}%)</span>
+                            <span>{isProfit ? '↑' : isLoss ? '↓' : ''}</span>
+                          </span>
+                        </div>
+                        {inv.currency !== 'TRY' && inv.total_value_try && (
+                          <div className="flex justify-between text-[11px] mt-1 pt-1" style={{ borderTop: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--muted)' }}>TRY Deger</span>
+                            <span className="mono font-semibold">{fmt(inv.total_value_try)}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2">
+                        <button onClick={(e) => { e.stopPropagation(); openEdit(inv) }}
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-xs"
+                          style={{ background: 'var(--bg4)' }}>✏️</button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(inv.id) }}
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-xs"
+                          style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
