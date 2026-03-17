@@ -4,9 +4,22 @@ import BottomNav from '@/components/BottomNav'
 import { supabase, fmt } from '@/lib/supabase'
 import type { Investment, ExchangeRate } from '@/lib/supabase'
 
-type InvestmentWithSnapshot = Investment & { latest_price?: number; total_value?: number; total_value_try?: number; pnl_pct?: number }
+type InvestmentWithSnapshot = Investment & {
+  latest_price?: number
+  total_value?: number
+  total_value_try?: number
+  cost_basis?: number
+  pnl?: number
+  pnl_pct?: number
+  snapshot_date?: string
+}
 
 const emptyForm = { name: '', type: 'hisse', symbol: '', quantity: '', avg_cost: '', currency: 'TRY', platform: '' }
+
+function fmtPrice(amount: number, currency = 'TRY'): string {
+  const prefix = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : '₺'
+  return prefix + amount.toLocaleString('tr-TR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+}
 
 export default function InvestmentsPage() {
   const [investments, setInvestments] = useState<InvestmentWithSnapshot[]>([])
@@ -18,6 +31,11 @@ export default function InvestmentsPage() {
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [updatingRates, setUpdatingRates] = useState(false)
+
+  // Inline price update
+  const [priceEditId, setPriceEditId] = useState<number | null>(null)
+  const [priceInput, setPriceInput] = useState('')
+  const [priceSaving, setPriceSaving] = useState(false)
 
   async function updateRates() {
     setUpdatingRates(true)
@@ -32,21 +50,55 @@ export default function InvestmentsPage() {
       supabase.from('investment_snapshots').select('*').order('snapshot_date', { ascending: false }),
       supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
     ])
+
+    const currentRates = rt?.[0] || null
+
     const enriched = (inv || []).map((i: Investment) => {
-      // Take the most recent snapshot for this investment
       const snap = (snaps || []).find((s: any) => s.investment_id === i.id)
       const costBasis = (i.avg_cost || 0) * (i.quantity || 0)
       const currentVal = snap?.total_value || costBasis
-      const pnl = costBasis > 0 ? ((currentVal - costBasis) / costBasis) * 100 : 0
-      return { ...i, latest_price: snap?.price, total_value: snap?.total_value || costBasis, total_value_try: snap?.total_value_try, pnl_pct: pnl }
+      const pnl = currentVal - costBasis
+      const pnlPct = costBasis > 0 ? (pnl / costBasis) * 100 : 0
+
+      // Calculate TRY value
+      let totalValueTry = snap?.total_value_try
+      if (!totalValueTry && currentRates) {
+        if (i.currency === 'EUR') totalValueTry = currentVal * (currentRates.eur_try || 1)
+        else if (i.currency === 'USD') totalValueTry = currentVal * (currentRates.usd_try || 1)
+        else totalValueTry = currentVal
+      }
+
+      return {
+        ...i,
+        latest_price: snap?.price,
+        total_value: currentVal,
+        total_value_try: totalValueTry || currentVal,
+        cost_basis: costBasis,
+        pnl,
+        pnl_pct: pnlPct,
+        snapshot_date: snap?.snapshot_date,
+      }
     })
-    setInvestments(enriched); setRates(rt?.[0] || null); setLoading(false)
+
+    setInvestments(enriched)
+    setRates(currentRates)
+    setLoading(false)
   }
+
   useEffect(() => { load() }, [])
 
-  const totalTry = investments.reduce((s, i) => s + (i.total_value_try || i.total_value || 0), 0)
+  // Portfolio totals
+  const totalCostTry = investments.reduce((s, i) => {
+    const cost = i.cost_basis || 0
+    if (i.currency === 'EUR' && rates) return s + cost * rates.eur_try
+    if (i.currency === 'USD' && rates) return s + cost * rates.usd_try
+    return s + cost
+  }, 0)
+  const totalValueTry = investments.reduce((s, i) => s + (i.total_value_try || 0), 0)
+  const totalPnl = totalValueTry - totalCostTry
+  const totalPnlPct = totalCostTry > 0 ? (totalPnl / totalCostTry) * 100 : 0
+
   const typeIcon: Record<string, string> = { hisse: '📊', fon: '📁', altin: '🥇', doviz: '💱', kripto: '₿', diger: '📦' }
-  const typeColor: Record<string, string> = { hisse: '#0d9488', fon: '#7c3aed', altin: '#d97706', doviz: '#059669', kripto: '#d97706', diger: '#64748b' }
 
   function openAdd() { setEditId(null); setForm(emptyForm); setShowForm(true) }
   function openEdit(inv: InvestmentWithSnapshot) {
@@ -68,6 +120,38 @@ export default function InvestmentsPage() {
   async function handleDelete(id: number) {
     await supabase.from('investments').update({ is_active: false }).eq('id', id)
     setDeleteConfirm(null); await load()
+  }
+
+  async function handlePriceUpdate(inv: InvestmentWithSnapshot) {
+    const newPrice = parseFloat(priceInput)
+    if (!newPrice || newPrice <= 0) return
+    setPriceSaving(true)
+
+    const totalValue = inv.quantity * newPrice
+    let totalValueTry = totalValue
+    if (rates) {
+      if (inv.currency === 'EUR') totalValueTry = totalValue * rates.eur_try
+      else if (inv.currency === 'USD') totalValueTry = totalValue * rates.usd_try
+    }
+
+    const today = new Date().toISOString().split('T')[0]
+
+    // Delete existing snapshot for today, then insert new
+    await supabase.from('investment_snapshots').delete()
+      .eq('investment_id', inv.id).eq('snapshot_date', today)
+
+    await supabase.from('investment_snapshots').insert({
+      investment_id: inv.id,
+      snapshot_date: today,
+      price: newPrice,
+      total_value: Math.round(totalValue * 100) / 100,
+      total_value_try: Math.round(totalValueTry * 100) / 100,
+    })
+
+    setPriceSaving(false)
+    setPriceEditId(null)
+    setPriceInput('')
+    await load()
   }
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -93,14 +177,33 @@ export default function InvestmentsPage() {
           </div>
         </div>
 
+        {/* Portfolio Summary */}
         <div className="mx-4 mb-4 card-lg p-5">
           <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Portfoy</div>
-          <div className="mono text-3xl font-bold amt-blue">{fmt(totalTry)}</div>
+          <div className="mono text-3xl font-bold amt-blue">{fmt(totalValueTry)}</div>
           {rates && (
             <div className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-              € {Math.round(totalTry / rates.eur_try).toLocaleString('tr-TR')} · $ {Math.round(totalTry / rates.usd_try).toLocaleString('tr-TR')}
+              € {Math.round(totalValueTry / rates.eur_try).toLocaleString('tr-TR')} · $ {Math.round(totalValueTry / rates.usd_try).toLocaleString('tr-TR')}
             </div>
           )}
+          <div className="flex flex-col gap-1.5 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+            <div className="flex justify-between text-[12px]">
+              <span style={{ color: 'var(--muted)' }}>Toplam Maliyet</span>
+              <span className="mono font-semibold">{fmt(totalCostTry)}</span>
+            </div>
+            <div className="flex justify-between text-[12px]">
+              <span style={{ color: 'var(--muted)' }}>Guncel Deger</span>
+              <span className="mono font-semibold amt-blue">{fmt(totalValueTry)}</span>
+            </div>
+            <div className="flex justify-between text-[12px]">
+              <span style={{ color: 'var(--muted)' }}>Toplam K/Z</span>
+              <span className="mono font-semibold flex items-center gap-1" style={{ color: totalPnl >= 0 ? '#059669' : '#dc2626' }}>
+                {totalPnl >= 0 ? '+' : ''}{fmt(totalPnl)}
+                <span className="text-[10px]">({totalPnl >= 0 ? '+' : ''}{totalPnlPct.toFixed(1)}%)</span>
+                <span>{totalPnl > 0 ? '↑' : totalPnl < 0 ? '↓' : ''}</span>
+              </span>
+            </div>
+          </div>
         </div>
 
         {rates && (
@@ -126,32 +229,122 @@ export default function InvestmentsPage() {
             <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>+ Yatirim Ekle</button>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 mx-4">
+          <div className="flex flex-col gap-3 mx-4">
             {investments.map((inv) => {
-              const color = typeColor[inv.type] || '#64748b'
-              const pnlPositive = (inv.pnl_pct || 0) >= 0
+              const costBasis = inv.cost_basis || 0
+              const currentVal = inv.total_value || 0
+              const pnl = inv.pnl || 0
+              const pnlPct = inv.pnl_pct || 0
+              const isProfit = pnl > 0
+              const isLoss = pnl < 0
+              const pnlColor = isProfit ? '#059669' : isLoss ? '#dc2626' : 'var(--muted)'
+              const unitLabel = inv.type === 'altin' ? 'gr' : 'adet'
+              const canUpdatePrice = ['hisse', 'fon', 'altin'].includes(inv.type)
+              const isEditingPrice = priceEditId === inv.id
+
               return (
-                <div key={inv.id} className="card px-4 py-3 flex items-center gap-3">
-                  <div className="text-lg w-8 text-center">{typeIcon[inv.type] || '📦'}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold">{inv.symbol || inv.name}</div>
-                    <div className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--muted)' }}>
-                      {inv.name} · {inv.quantity} {inv.type === 'altin' ? 'gr' : 'adet'}{inv.platform && ` · ${inv.platform}`}
-                    </div>
-                  </div>
-                  <div className="text-right flex items-center gap-2">
-                    <div>
-                      <div className="mono text-sm font-semibold" style={{ color }}>{fmt(inv.total_value || 0, inv.currency)}</div>
-                      {inv.pnl_pct !== undefined && (
-                        <div className={`text-[11px] mt-0.5 ${pnlPositive ? 'amt-green' : 'amt-red'}`}>
-                          {pnlPositive ? '+' : ''}{inv.pnl_pct.toFixed(1)}%
+                <div key={inv.id} className="card p-4">
+                  {/* Header */}
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="text-lg">{typeIcon[inv.type] || '📦'}</div>
+                      <div>
+                        <div className="text-sm font-bold">{inv.symbol || inv.name}</div>
+                        <div className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+                          {inv.type} · {inv.platform || '—'}
                         </div>
-                      )}
+                      </div>
                     </div>
                     <div className="flex gap-1">
                       <button onClick={() => openEdit(inv)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
                       <button onClick={() => setDeleteConfirm(inv.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
                     </div>
+                  </div>
+
+                  {/* Quantity */}
+                  <div className="text-[12px] mb-3" style={{ color: 'var(--muted)' }}>
+                    <span className="mono font-semibold" style={{ color: 'var(--text)' }}>
+                      {inv.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 3 })}
+                    </span> {unitLabel}
+                  </div>
+
+                  {/* Price rows */}
+                  <div className="flex flex-col gap-1.5 text-[12px] mb-3 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--muted)' }}>Maliyet fiyati</span>
+                      <span className="mono font-medium">{fmtPrice(inv.avg_cost || 0, inv.currency)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span style={{ color: 'var(--muted)' }}>Guncel fiyat</span>
+                      <div className="flex items-center gap-2">
+                        {isEditingPrice ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              value={priceInput}
+                              onChange={e => setPriceInput(e.target.value)}
+                              type="number"
+                              step="any"
+                              className="input mono text-right"
+                              style={{ width: 100, padding: '2px 6px', fontSize: 12 }}
+                              autoFocus
+                              onKeyDown={e => { if (e.key === 'Enter') handlePriceUpdate(inv); if (e.key === 'Escape') { setPriceEditId(null); setPriceInput('') } }}
+                            />
+                            <button onClick={() => handlePriceUpdate(inv)} disabled={priceSaving}
+                              className="text-[10px] font-semibold px-2 py-1 rounded"
+                              style={{ background: 'rgba(13,148,136,0.1)', color: '#0d9488' }}>
+                              {priceSaving ? '...' : '✓'}
+                            </button>
+                            <button onClick={() => { setPriceEditId(null); setPriceInput('') }}
+                              className="text-[10px] px-1.5 py-1 rounded"
+                              style={{ background: 'var(--bg4)', color: 'var(--muted)' }}>✕</button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="mono font-medium" style={{ color: inv.latest_price ? 'var(--text)' : 'var(--muted)' }}>
+                              {inv.latest_price ? fmtPrice(inv.latest_price, inv.currency) : '—'}
+                            </span>
+                            {canUpdatePrice && (
+                              <button onClick={() => { setPriceEditId(inv.id); setPriceInput(inv.latest_price ? String(inv.latest_price) : '') }}
+                                className="text-[10px] font-medium px-2 py-0.5 rounded"
+                                style={{ background: 'rgba(13,148,136,0.08)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.2)' }}>
+                                Guncelle
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {inv.snapshot_date && (
+                      <div className="text-[10px] text-right" style={{ color: 'var(--muted)' }}>
+                        Son guncelleme: {new Date(inv.snapshot_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Totals */}
+                  <div className="flex flex-col gap-1.5 text-[12px]">
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--muted)' }}>Maliyet</span>
+                      <span className="mono font-semibold">{fmt(costBasis, inv.currency)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--muted)' }}>Guncel</span>
+                      <span className="mono font-semibold amt-blue">{fmt(currentVal, inv.currency)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span style={{ color: 'var(--muted)' }}>K/Z</span>
+                      <span className="mono font-semibold flex items-center gap-1" style={{ color: pnlColor }}>
+                        {isProfit ? '+' : ''}{fmt(pnl, inv.currency)}
+                        <span className="text-[10px]">({isProfit ? '+' : ''}{pnlPct.toFixed(1)}%)</span>
+                        <span>{isProfit ? '↑' : isLoss ? '↓' : ''}</span>
+                      </span>
+                    </div>
+                    {inv.currency !== 'TRY' && inv.total_value_try && (
+                      <div className="flex justify-between text-[11px] mt-1 pt-1" style={{ borderTop: '1px solid var(--border)' }}>
+                        <span style={{ color: 'var(--muted)' }}>TRY Deger</span>
+                        <span className="mono font-semibold">{fmt(inv.total_value_try)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )

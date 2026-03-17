@@ -71,6 +71,22 @@ export async function GET() {
       console.error('CoinGecko fetch failed:', e)
     }
 
+    // 4) BIST TNZTP price from Yahoo Finance
+    let tnztpPrice = 0
+    try {
+      const tnztpRes = await fetch(
+        'https://query1.finance.yahoo.com/v8/finance/chart/TNZTP.IS?interval=1d&range=1d',
+        { headers: { 'User-Agent': 'Mozilla/5.0' }, cache: 'no-store' }
+      )
+      if (tnztpRes.ok) {
+        const tnztpData = await tnztpRes.json()
+        tnztpPrice = tnztpData?.chart?.result?.[0]?.meta?.regularMarketPrice || 0
+        console.log('Yahoo TNZTP price:', tnztpPrice)
+      }
+    } catch (e) {
+      console.error('Yahoo TNZTP fetch failed:', e)
+    }
+
     // Validate we got at least one rate
     if (usd_try === 0 && eur_try === 0) {
       console.error('No rates fetched from any source')
@@ -103,7 +119,38 @@ export async function GET() {
 
     console.log('Supabase insert SUCCESS:', inserted)
 
-    return NextResponse.json({ success: true, rates, saved: inserted })
+    // Auto-update TNZTP investment snapshot if price available
+    if (tnztpPrice > 0) {
+      try {
+        // Find TNZTP investment by symbol
+        const { data: tnztpInv } = await supabase
+          .from('investments').select('id, quantity')
+          .eq('symbol', 'TNZTP').eq('is_active', true).limit(1)
+
+        if (tnztpInv && tnztpInv.length > 0) {
+          const inv = tnztpInv[0]
+          const totalValue = inv.quantity * tnztpPrice
+          // TNZTP is TRY-denominated
+          const totalValueTry = totalValue
+
+          await supabase.from('investment_snapshots').delete()
+            .eq('investment_id', inv.id).eq('snapshot_date', today)
+
+          await supabase.from('investment_snapshots').insert({
+            investment_id: inv.id,
+            snapshot_date: today,
+            price: Math.round(tnztpPrice * 1000) / 1000,
+            total_value: Math.round(totalValue * 100) / 100,
+            total_value_try: Math.round(totalValueTry * 100) / 100,
+          })
+          console.log('TNZTP snapshot updated — price:', tnztpPrice, 'total:', totalValue)
+        }
+      } catch (e) {
+        console.error('TNZTP snapshot update failed:', e)
+      }
+    }
+
+    return NextResponse.json({ success: true, rates, saved: inserted, tnztp_price: tnztpPrice || null })
   } catch (e: any) {
     console.error('Unhandled error:', e)
     return NextResponse.json({ error: e.message || 'Bilinmeyen hata' }, { status: 500 })
