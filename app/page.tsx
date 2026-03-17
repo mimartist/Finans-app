@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, daysUntil, daysUntilLabel } from '@/lib/supabase'
@@ -12,44 +12,73 @@ type PaymentItem = {
   days: number; paid: boolean; overdue: boolean
 }
 
+type MonthKey = { year: number; month: number }
+
+const MONTH_NAMES = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+
+function monthLabel(m: MonthKey) {
+  return `${MONTH_NAMES[m.month - 1]} ${m.year}`
+}
+
+function sameMonth(a: MonthKey, b: MonthKey) {
+  return a.year === b.year && a.month === b.month
+}
+
+function monthOffset(base: MonthKey, offset: number): MonthKey {
+  const d = new Date(base.year, base.month - 1 + offset, 1)
+  return { year: d.getFullYear(), month: d.getMonth() + 1 }
+}
+
 export default function Dashboard() {
+  const now = new Date()
+  const currentMonth: MonthKey = { year: now.getFullYear(), month: now.getMonth() + 1 }
+
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loans, setLoans] = useState<Loan[]>([])
   const [recurring, setRecurring] = useState<RecurringExpense[]>([])
   const [rates, setRates] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(true)
   const [investTotalTry, setInvestTotalTry] = useState(0)
-  const [paidThisMonth, setPaidThisMonth] = useState<any[]>([])
   const [payments, setPayments] = useState<PaymentItem[]>([])
   const [allAlacak, setAllAlacak] = useState<DebtRecord[]>([])
+  const [kriptoTry, setKriptoTry] = useState(0)
 
-  const loadAll = useCallback(async () => {
-    const now = new Date()
-    const todayStr = now.toISOString().split('T')[0]
-    const year = now.getFullYear()
-    const month = now.getMonth() + 1
+  const [selectedMonth, setSelectedMonth] = useState<MonthKey>(currentMonth)
+  const [monthLoading, setMonthLoading] = useState(false)
+  const pillsRef = useRef<HTMLDivElement>(null)
 
-    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: paid }, { data: recAlacak }] = await Promise.all([
+  const isCurrent = sameMonth(selectedMonth, currentMonth)
+  const isPast = selectedMonth.year < currentMonth.year || (selectedMonth.year === currentMonth.year && selectedMonth.month < currentMonth.month)
+  const isFuture = selectedMonth.year > currentMonth.year || (selectedMonth.year === currentMonth.year && selectedMonth.month > currentMonth.month)
+
+  // Generate month pills: 3 past + current + 2 future
+  const monthPills: MonthKey[] = []
+  for (let i = -3; i <= 2; i++) {
+    monthPills.push(monthOffset(currentMonth, i))
+  }
+
+  // Load global data (accounts, rates, investments, loans, recurring, alacak)
+  const loadGlobal = useCallback(async () => {
+    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: recAlacak }, { data: cryptoSnaps }] = await Promise.all([
       supabase.from('accounts').select('*').eq('is_active', true),
       supabase.from('loans').select('*').eq('is_active', true),
       supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
       supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
       supabase.from('investment_snapshots').select('investment_id, total_value_try, snapshot_date').order('snapshot_date', { ascending: false }),
-      supabase.from('recurring_payments').select('*').eq('period_year', year).eq('period_month', month).eq('is_paid', true),
       supabase.from('debt_records').select('*').eq('type', 'alacak').eq('is_settled', false),
+      supabase.from('investment_snapshots')
+        .select('*, investments!inner(platform, type, is_active)')
+        .eq('investments.is_active', true)
+        .in('investments.platform', ['Binance'])
+        .order('snapshot_date', { ascending: false }),
     ])
 
-    const accs = acc || []
-    const lnsList = lns || []
-    const recList = rec || []
-    const paidList = paid || []
-
-    setAccounts(accs)
-    setLoans(lnsList)
-    setRecurring(recList)
+    setAccounts(acc || [])
+    setLoans(lns || [])
+    setRecurring(rec || [])
     setAllAlacak(recAlacak || [])
     setRates(rt?.[0] || null)
-    // For each investment_id, take the most recent snapshot (already ordered desc)
+
     const seen = new Set<number>()
     const latestSnaps = (snaps || []).filter((sn: any) => {
       if (seen.has(sn.investment_id)) return false
@@ -57,10 +86,27 @@ export default function Dashboard() {
       return true
     })
     setInvestTotalTry(latestSnaps.reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
-    setPaidThisMonth(paidList)
 
-    // Build payment items with paid check
-    const todayDay = now.getDate()
+    const latestByInvestment = (cryptoSnaps || []).reduce((acc: Record<number, any>, snap: any) => {
+      if (!acc[snap.investment_id]) acc[snap.investment_id] = snap
+      return acc
+    }, {} as Record<number, any>)
+    setKriptoTry(Object.values(latestByInvestment).reduce((s: number, snap: any) => s + (snap.total_value_try || 0), 0))
+
+    return { accs: acc || [], lnsList: lns || [], recList: rec || [] }
+  }, [])
+
+  // Load month-specific data (paid items) and build payment list
+  const loadMonth = useCallback(async (m: MonthKey, lnsList: Loan[], recList: RecurringExpense[]) => {
+    const { data: paid } = await supabase
+      .from('recurring_payments').select('*')
+      .eq('period_year', m.year).eq('period_month', m.month)
+      .eq('is_paid', true)
+
+    const paidList = paid || []
+    const now = new Date()
+    const isCurrentMonth = m.year === now.getFullYear() && m.month === now.getMonth() + 1
+    const todayDay = isCurrentMonth ? now.getDate() : 32 // 32 means all days passed for past months
 
     const loanItems: PaymentItem[] = lnsList
       .filter(l => l.payment_day)
@@ -68,11 +114,11 @@ export default function Dashboard() {
         const isPaid = paidList.some(p =>
           p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id)
         )
-        const isOverdue = !isPaid && l.payment_day < todayDay
+        const isOverdue = isCurrentMonth && !isPaid && l.payment_day < todayDay
         return {
           id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency,
           day: l.payment_day, type: 'kredi', source: 'loan' as const, sourceId: l.id,
-          days: daysUntil(l.payment_day), paid: isPaid, overdue: isOverdue,
+          days: isCurrentMonth ? daysUntil(l.payment_day) : 0, paid: isPaid, overdue: isOverdue,
         }
       })
 
@@ -80,26 +126,49 @@ export default function Dashboard() {
       .filter(r => r.payment_day && r.category !== 'nakit')
       .map(r => {
         const isPaid = paidList.some(p => p.expense_id === r.id)
-        const isOverdue = !isPaid && r.payment_day! < todayDay
+        const isOverdue = isCurrentMonth && !isPaid && r.payment_day! < todayDay
         return {
           id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency,
           day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id,
-          days: daysUntil(r.payment_day!), paid: isPaid, overdue: isOverdue,
+          days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isOverdue,
         }
       })
 
     const all = [...loanItems, ...expItems].sort((a, b) => {
-      // Unpaid first, then overdue, then by days
       if (a.paid !== b.paid) return a.paid ? 1 : -1
       if (a.overdue !== b.overdue) return a.overdue ? -1 : 1
-      return a.days - b.days
+      return a.day - b.day
     })
 
     setPayments(all)
-    setLoading(false)
   }, [])
 
-  useEffect(() => { loadAll() }, [loadAll])
+  // Initial load
+  useEffect(() => {
+    (async () => {
+      const { lnsList, recList } = await loadGlobal()
+      await loadMonth(currentMonth, lnsList, recList)
+      setLoading(false)
+    })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When selectedMonth changes (after initial load)
+  const initialLoadDone = useRef(false)
+  useEffect(() => {
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true
+      return
+    }
+    if (loans.length === 0 && recurring.length === 0) return
+    setMonthLoading(true)
+    loadMonth(selectedMonth, loans, recurring).then(() => setMonthLoading(false))
+  }, [selectedMonth]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reload everything (for rate refresh, payment actions)
+  const reloadAll = useCallback(async () => {
+    const { lnsList, recList } = await loadGlobal()
+    await loadMonth(selectedMonth, lnsList, recList)
+  }, [loadGlobal, loadMonth, selectedMonth])
 
   const eurTry = rates?.eur_try || 0
   const usdTry = rates?.usd_try || 0
@@ -119,8 +188,6 @@ export default function Dashboard() {
   const eurTotal = accounts.filter(a => a.currency === 'EUR' && a.type !== 'kripto').reduce((s, a) => s + a.balance, 0)
   const usdTotal = accounts.filter(a => a.currency === 'USD').reduce((s, a) => s + a.balance, 0)
   const kriptoAccounts = accounts.filter(a => a.type === 'kripto')
-  const kriptoTotal = kriptoAccounts.reduce((s, a) => s + a.balance, 0)
-  const kriptoCurrency = kriptoAccounts[0]?.currency || 'EUR'
 
   const totalDebtTry = loans.reduce((sum, l) => sum + toTry(l.remaining_amount || 0, l.currency), 0)
   const monthlyTotalAll = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
@@ -130,7 +197,7 @@ export default function Dashboard() {
   const runwayMonths = netMonthlyObligation > 0 ? (totalAssetsTry / netMonthlyObligation).toFixed(1) : '∞'
   const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
 
-  // Bu Ay Ozet
+  // Month summary
   const unpaidPayments = payments.filter(p => !p.paid)
   const paidPayments = payments.filter(p => p.paid)
   const overduePayments = payments.filter(p => p.overdue)
@@ -159,11 +226,9 @@ export default function Dashboard() {
     const year = now.getFullYear()
     const month = now.getMonth() + 1
     const today = now.toISOString().split('T')[0]
-    // For overdue items, use the actual payment day as paid_date context
     const paidDate = today
 
     if (payModal.source === 'recurring') {
-      // Insert recurring expense payment
       const { error } = await supabase.from('recurring_payments').insert({
         expense_id: payModal.sourceId,
         period_year: year, period_month: month,
@@ -173,7 +238,6 @@ export default function Dashboard() {
     }
 
     if (payModal.source === 'loan') {
-      // Insert loan payment with notes identifier
       const { error } = await supabase.from('recurring_payments').insert({
         expense_id: null,
         notes: `loan_${payModal.sourceId}`,
@@ -182,7 +246,6 @@ export default function Dashboard() {
       })
       if (error) { alert('Hata: ' + error.message); setPaying(false); return }
 
-      // Update loan installments
       const loan = loans.find(l => l.id === payModal.sourceId)
       if (loan) {
         await supabase.from('loans').update({
@@ -192,7 +255,6 @@ export default function Dashboard() {
       }
     }
 
-    // Deduct from selected account
     const account = accounts.find(a => a.id === payAccountId)
     if (account) {
       let deductAmount = payModal.amount
@@ -206,7 +268,6 @@ export default function Dashboard() {
       setAccounts(prev => prev.map(a => a.id === payAccountId ? { ...a, balance: a.balance - deductAmount } : a))
     }
 
-    // Instant local state: mark as paid by matching source + sourceId
     setPayments(prev => prev.map(p =>
       p.source === payModal.source && p.sourceId === payModal.sourceId
         ? { ...p, paid: true, overdue: false }
@@ -216,15 +277,12 @@ export default function Dashboard() {
     setPaying(false)
     setPayModal(null)
     setPayAccountId(null)
-
-    // Background reload for DB consistency
-    loadAll()
+    reloadAll()
   }
 
-  const now2 = new Date()
-  const hour = now2.getHours()
+  const hour = now.getHours()
   const greeting = hour < 12 ? 'Gunaydin' : hour < 18 ? 'Iyi gunler' : 'Iyi aksamlar'
-  const monthLabel = now2.toLocaleDateString('tr-TR', { month: 'short' })
+  const selMonthShort = MONTH_NAMES[selectedMonth.month - 1].substring(0, 3)
 
   if (loading) {
     return (
@@ -235,14 +293,14 @@ export default function Dashboard() {
   }
 
   const renderPaymentItem = (p: PaymentItem) => {
-    const isUrgent = !p.paid && !p.overdue && p.days <= 3
-    // Determine left border + badge bg
+    const isUrgent = isCurrent && !p.paid && !p.overdue && p.days <= 3
     let leftBorder = 'var(--accent)'
     let badgeBg = 'var(--bg4)'
     let badgeColor = 'var(--muted)'
     if (p.paid) { leftBorder = '#4ade9a'; badgeBg = 'rgba(74,222,154,0.08)'; badgeColor = '#059669' }
     else if (p.overdue) { leftBorder = '#f59e0b'; badgeBg = 'rgba(245,158,11,0.08)'; badgeColor = '#d97706' }
     else if (isUrgent) { leftBorder = '#dc2626'; badgeBg = 'rgba(220,38,38,0.08)'; badgeColor = '#dc2626' }
+    else if (isFuture) { leftBorder = '#3b82f6'; badgeBg = 'rgba(59,130,246,0.06)'; badgeColor = '#3b82f6' }
 
     return (
       <div key={p.id}
@@ -253,32 +311,29 @@ export default function Dashboard() {
           border: '1px solid var(--border)',
           borderLeft: `3px solid ${leftBorder}`,
         }}>
-        {/* Date badge / checkmark */}
         <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0" style={{ background: badgeBg }}>
           {p.paid ? (
             <div className="text-lg" style={{ color: '#4ade9a' }}>✓</div>
           ) : (
             <>
               <div className="text-[11px] font-bold leading-none" style={{ color: badgeColor }}>{p.day}</div>
-              <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>{monthLabel}</div>
+              <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>{selMonthShort}</div>
             </>
           )}
         </div>
 
-        {/* Name + status */}
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate" style={{
             color: p.paid ? 'var(--muted)' : 'var(--text)',
             textDecoration: p.paid ? 'line-through' : 'none',
           }}>{p.name}</div>
           <div className="text-[11px] mt-0.5" style={{
-            color: p.paid ? '#059669' : p.overdue ? '#d97706' : isUrgent ? '#dc2626' : 'var(--muted)',
+            color: p.paid ? '#059669' : p.overdue ? '#d97706' : isUrgent ? '#dc2626' : isFuture ? '#3b82f6' : 'var(--muted)',
           }}>
-            {p.paid ? 'Odendi' : p.overdue ? 'Gecmis - Odendi?' : daysUntilLabel(p.days)}
+            {p.paid ? 'Odendi' : p.overdue ? 'Gecmis - Odendi?' : isFuture ? 'Planlanan' : isPast && !p.paid ? 'Odenmedi' : daysUntilLabel(p.days)}
           </div>
         </div>
 
-        {/* Amount + action */}
         <div className="text-right flex items-center gap-2">
           <div>
             <div className="mono text-sm font-semibold" style={{
@@ -286,7 +341,7 @@ export default function Dashboard() {
               textDecoration: p.paid ? 'line-through' : 'none',
             }}>
               {fmt(p.amount, p.currency)}
-              {!p.paid && p.currency === 'EUR' && <span className="text-[10px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(p.amount * eurTry)})</span>}
+              {isCurrent && !p.paid && p.currency === 'EUR' && <span className="text-[10px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(p.amount * eurTry)})</span>}
             </div>
           </div>
           {p.paid ? (
@@ -294,18 +349,28 @@ export default function Dashboard() {
               style={{ background: 'rgba(74,222,154,0.1)', color: '#059669' }}>
               Odendi
             </span>
-          ) : p.overdue ? (
+          ) : isCurrent && p.overdue ? (
             <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
               className="px-2 py-1 rounded-lg text-[10px] font-semibold flex-shrink-0"
               style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', border: '1px solid rgba(245,158,11,0.3)' }}>
               Onayla
             </button>
-          ) : (
+          ) : isCurrent ? (
             <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
               className="px-2 py-1 rounded-lg text-[10px] font-semibold flex-shrink-0"
               style={{ background: 'rgba(5,150,105,0.08)', color: '#059669', border: '1px solid rgba(5,150,105,0.2)' }}>
               Yapildi
             </button>
+          ) : isPast ? (
+            <span className="px-2 py-1 rounded-lg text-[10px] font-semibold"
+              style={{ background: 'rgba(245,158,11,0.06)', color: '#d97706' }}>
+              Odenmedi
+            </span>
+          ) : (
+            <span className="px-2 py-1 rounded-lg text-[10px] font-semibold"
+              style={{ background: 'rgba(59,130,246,0.06)', color: '#3b82f6' }}>
+              Planlanan
+            </span>
           )}
         </div>
       </div>
@@ -326,7 +391,8 @@ export default function Dashboard() {
             <button onClick={async () => {
               setLoading(true)
               await fetch('/api/update-rates')
-              await loadAll()
+              await reloadAll()
+              setLoading(false)
             }} className="w-9 h-9 rounded-lg flex items-center justify-center text-base"
               style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}
               title="Kurlari Guncelle">↻</button>
@@ -340,12 +406,64 @@ export default function Dashboard() {
           <div className="mx-4 mb-3 px-4 py-2.5 rounded-lg flex items-center gap-2 text-[12px]"
             style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#d97706' }}>
             <span>Doviz kuru guncel degil</span>
-            <button onClick={async () => { setLoading(true); await fetch('/api/update-rates'); await loadAll() }}
+            <button onClick={async () => { setLoading(true); await fetch('/api/update-rates'); await reloadAll(); setLoading(false) }}
               className="ml-auto font-semibold underline">Guncelle</button>
           </div>
         )}
 
-        {/* Summary Grid */}
+        {/* Month Selector */}
+        <div className="mx-4 mb-4">
+          <div ref={pillsRef} className="flex gap-2 overflow-x-auto no-scrollbar py-1" style={{ scrollbarWidth: 'none' }}>
+            <button
+              onClick={() => setSelectedMonth(monthOffset(monthPills[0], -1))}
+              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium"
+              style={{ background: 'var(--bg4)', color: 'var(--muted)' }}>
+              ‹
+            </button>
+            {monthPills.map(m => {
+              const active = sameMonth(m, selectedMonth)
+              const isCurr = sameMonth(m, currentMonth)
+              return (
+                <button
+                  key={`${m.year}-${m.month}`}
+                  onClick={() => setSelectedMonth(m)}
+                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium whitespace-nowrap"
+                  style={{
+                    background: active ? '#0d9488' : 'var(--bg4)',
+                    color: active ? '#fff' : 'var(--muted)',
+                    border: active ? 'none' : '1px solid var(--border)',
+                  }}>
+                  {MONTH_NAMES[m.month - 1].substring(0, 3)} {m.year !== currentMonth.year ? m.year : ''}
+                  {isCurr && !active ? ' ●' : isCurr && active ? ' ●' : ''}
+                </button>
+              )
+            })}
+            <button
+              onClick={() => setSelectedMonth(monthOffset(monthPills[monthPills.length - 1], 1))}
+              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium"
+              style={{ background: 'var(--bg4)', color: 'var(--muted)' }}>
+              ›
+            </button>
+          </div>
+        </div>
+
+        {/* Month context banner */}
+        {isPast && (
+          <div className="mx-4 mb-3 px-4 py-2.5 rounded-lg flex items-center gap-2 text-[12px]"
+            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#d97706' }}>
+            <span>Gecmis Ay — {monthLabel(selectedMonth)}</span>
+            <span className="ml-auto mono font-semibold">Bu ay toplam odenen: {fmt(paidTotalTry)}</span>
+          </div>
+        )}
+        {isFuture && (
+          <div className="mx-4 mb-3 px-4 py-2.5 rounded-lg flex items-center gap-2 text-[12px]"
+            style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6' }}>
+            <span>Planlanan — {monthLabel(selectedMonth)}</span>
+            <span className="ml-auto mono font-semibold">Tahmini toplam: {fmt(totalObligationTry)}</span>
+          </div>
+        )}
+
+        {/* Summary Grid — always current data */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mx-4 mb-4">
           <div className="card-lg p-5 md:col-span-2">
             <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Varlik</div>
@@ -381,7 +499,7 @@ export default function Dashboard() {
                 { key: 'TRY', icon: '🇹🇷', value: fmt(tryTotal), label: 'Toplam TL', total: tryTotal },
                 { key: 'EUR', icon: '🇪🇺', value: fmt(eurTotal, 'EUR'), label: 'Toplam EUR', total: eurTotal },
                 { key: 'USD', icon: '🇺🇸', value: fmt(usdTotal, 'USD'), label: 'Toplam USD', total: usdTotal },
-                { key: 'KRP', icon: '₿', value: fmt(kriptoTotal, kriptoCurrency), label: 'Kripto', total: kriptoTotal },
+                { key: 'KRP', icon: '₿', value: kriptoTry > 0 ? fmt(kriptoTry) : '—', label: 'KRİPTO', total: kriptoTry },
               ].map(p => (
                 <div key={p.key} className="flex-1 rounded-lg p-2.5" style={{ background: 'var(--bg4)', opacity: p.total === 0 ? 0.4 : 1 }}>
                   <div className="text-xs mb-1" style={{ color: 'var(--muted)' }}>{p.icon}</div>
@@ -422,11 +540,13 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Bu Ay Ozet Card */}
-        <div className="mx-4 mb-4 card p-4">
-          <div className="text-[12px] font-semibold mb-3" style={{ color: 'var(--text)' }}>Bu Ay Ozet</div>
+        {/* Month Summary Card */}
+        <div className="mx-4 mb-4 card p-4" style={{ opacity: monthLoading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+          <div className="text-[12px] font-semibold mb-3" style={{ color: 'var(--text)' }}>
+            {isPast ? `${monthLabel(selectedMonth)} Ozet` : isFuture ? `${monthLabel(selectedMonth)} Planlanan` : 'Bu Ay Ozet'}
+          </div>
           <div className="flex justify-between text-[12px] mb-2">
-            <span style={{ color: 'var(--muted)' }}>Toplam yukumluluk</span>
+            <span style={{ color: 'var(--muted)' }}>{isFuture ? 'Tahmini yukumluluk' : 'Toplam yukumluluk'}</span>
             <span className="mono font-semibold">{fmt(totalObligationTry)}</span>
           </div>
           <div className="flex justify-between text-[12px] mb-2">
@@ -434,7 +554,7 @@ export default function Dashboard() {
             <span className="mono font-semibold amt-green">{fmt(paidTotalTry)}</span>
           </div>
           <div className="flex justify-between text-[12px] mb-3">
-            <span style={{ color: 'var(--muted)' }}>Kalan</span>
+            <span style={{ color: 'var(--muted)' }}>{isFuture ? 'Planlanmis' : 'Kalan'}</span>
             <span className="mono font-semibold amt-red">{fmt(remainingTotalTry)}</span>
           </div>
           <div className="progress-wrap mb-1">
@@ -442,75 +562,78 @@ export default function Dashboard() {
           </div>
           <div className="flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
             <span>%{paidPct} tamamlandi</span>
-            <span>{paidPayments.length}/{payments.length} odeme tamamlandi</span>
+            <span>{paidPayments.length}/{payments.length} odeme {isFuture ? 'planlanmis' : 'tamamlandi'}</span>
           </div>
         </div>
 
-        {/* Bekleyen Odemeler */}
-        <div className="px-5 mb-2">
-          <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-            Bekleyen Odemeler
-            {overduePayments.length > 0 && <span style={{ color: '#d97706' }}> · {overduePayments.length} gecmis</span>}
-          </div>
-        </div>
-        {unpaidPayments.length === 0 ? (
-          <div className="mx-4 card p-4 text-center text-sm" style={{ color: '#059669' }}>
-            Tum odemeler tamamlandi bu ay
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2 mx-4">
-            {unpaidPayments.map(p => renderPaymentItem(p))}
-          </div>
-        )}
-
-        {/* Tamamlanan Odemeler */}
-        {paidPayments.length > 0 && (
-          <>
-            <div className="px-5 mt-4 mb-2 flex items-center gap-2">
-              <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: '#059669' }}>Tamamlanan Odemeler</div>
-              <div className="flex-1 h-px" style={{ background: 'rgba(74,222,154,0.3)' }} />
-              <div className="text-[10px] font-medium" style={{ color: '#059669' }}>{paidPayments.length} odeme</div>
+        {/* Payment Lists */}
+        <div style={{ opacity: monthLoading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+          {/* Bekleyen / Planlanan Odemeler */}
+          <div className="px-5 mb-2">
+            <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: isFuture ? '#3b82f6' : 'var(--muted)' }}>
+              {isFuture ? 'Planlanan Odemeler' : isPast ? 'Odenmemis' : 'Bekleyen Odemeler'}
+              {isCurrent && overduePayments.length > 0 && <span style={{ color: '#d97706' }}> · {overduePayments.length} gecmis</span>}
             </div>
+          </div>
+          {unpaidPayments.length === 0 ? (
+            <div className="mx-4 card p-4 text-center text-sm" style={{ color: isPast ? '#d97706' : '#059669' }}>
+              {isPast ? 'Tum odemeler tamamlanmis' : isFuture ? 'Henuz odeme yok' : 'Tum odemeler tamamlandi bu ay'}
+            </div>
+          ) : (
             <div className="flex flex-col gap-2 mx-4">
-              {paidPayments.map(p => renderPaymentItem(p))}
+              {unpaidPayments.map(p => renderPaymentItem(p))}
             </div>
-          </>
-        )}
+          )}
 
-        {/* Bekleyen Gelirler (Recurring Alacak) */}
-        {recurringAlacak.length > 0 && (
-          <>
-            <div className="px-5 mt-4 mb-2 flex items-center gap-2">
-              <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: '#0d9488' }}>Bekleyen Gelirler</div>
-              <div className="flex-1 h-px" style={{ background: 'rgba(13,148,136,0.2)' }} />
-              <div className="text-[10px] font-medium" style={{ color: '#0d9488' }}>+{fmt(monthlyIncome)}/ay</div>
-            </div>
-            <div className="flex flex-col gap-2 mx-4">
-              {recurringAlacak.map(d => (
-                <div key={d.id} className="px-4 py-3 flex items-center gap-3"
-                  style={{ background: 'var(--bg3)', borderRadius: 12, boxShadow: 'var(--shadow)', border: '1px solid var(--border)', borderLeft: '3px solid #0d9488' }}>
-                  <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0" style={{ background: 'rgba(13,148,136,0.08)' }}>
-                    {d.expected_day ? (
-                      <>
-                        <div className="text-[11px] font-bold leading-none" style={{ color: '#0d9488' }}>{d.expected_day}</div>
-                        <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>{monthLabel}</div>
-                      </>
-                    ) : (
-                      <div className="text-base">🔄</div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{d.person_name}</div>
-                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
-                      {d.frequency === 'aylik' ? 'Aylik' : d.frequency === 'haftalik' ? 'Haftalik' : d.frequency === '2haftada1' ? '2 Haftada 1' : 'Duzenli'} gelir
+          {/* Tamamlanan Odemeler */}
+          {paidPayments.length > 0 && (
+            <>
+              <div className="px-5 mt-4 mb-2 flex items-center gap-2">
+                <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: '#059669' }}>Tamamlanan Odemeler</div>
+                <div className="flex-1 h-px" style={{ background: 'rgba(74,222,154,0.3)' }} />
+                <div className="text-[10px] font-medium" style={{ color: '#059669' }}>{paidPayments.length} odeme</div>
+              </div>
+              <div className="flex flex-col gap-2 mx-4">
+                {paidPayments.map(p => renderPaymentItem(p))}
+              </div>
+            </>
+          )}
+
+          {/* Bekleyen Gelirler (Recurring Alacak) — only show for current month */}
+          {isCurrent && recurringAlacak.length > 0 && (
+            <>
+              <div className="px-5 mt-4 mb-2 flex items-center gap-2">
+                <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: '#0d9488' }}>Bekleyen Gelirler</div>
+                <div className="flex-1 h-px" style={{ background: 'rgba(13,148,136,0.2)' }} />
+                <div className="text-[10px] font-medium" style={{ color: '#0d9488' }}>+{fmt(monthlyIncome)}/ay</div>
+              </div>
+              <div className="flex flex-col gap-2 mx-4">
+                {recurringAlacak.map(d => (
+                  <div key={d.id} className="px-4 py-3 flex items-center gap-3"
+                    style={{ background: 'var(--bg3)', borderRadius: 12, boxShadow: 'var(--shadow)', border: '1px solid var(--border)', borderLeft: '3px solid #0d9488' }}>
+                    <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0" style={{ background: 'rgba(13,148,136,0.08)' }}>
+                      {d.expected_day ? (
+                        <>
+                          <div className="text-[11px] font-bold leading-none" style={{ color: '#0d9488' }}>{d.expected_day}</div>
+                          <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>{selMonthShort}</div>
+                        </>
+                      ) : (
+                        <div className="text-base">🔄</div>
+                      )}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{d.person_name}</div>
+                      <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                        {d.frequency === 'aylik' ? 'Aylik' : d.frequency === 'haftalik' ? 'Haftalik' : d.frequency === '2haftada1' ? '2 Haftada 1' : 'Duzenli'} gelir
+                      </div>
+                    </div>
+                    <div className="mono text-sm font-semibold amt-green">+{fmt(d.amount, d.currency)}</div>
                   </div>
-                  <div className="mono text-sm font-semibold amt-green">+{fmt(d.amount, d.currency)}</div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Pay confirmation modal */}
         {payModal && (

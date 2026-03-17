@@ -92,6 +92,18 @@ export type DebtRecord = {
   paid_amount?: number
 }
 
+export type CreditCardTransaction = {
+  id: number
+  card_id: number
+  statement_id?: number
+  transaction_date: string
+  description: string
+  category: string
+  amount: number
+  currency: string
+  created_at?: string
+}
+
 export type Investment = {
   id: number
   name: string
