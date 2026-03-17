@@ -385,7 +385,7 @@ export default function Dashboard() {
         <div className="flex justify-between items-center px-5 pt-5 pb-4">
           <div>
             <div className="text-[12px] font-medium" style={{ color: 'var(--muted)' }}>{greeting}</div>
-            <div className="text-xl font-bold mt-0.5" style={{ color: 'var(--text)' }}>Atakan Bey</div>
+            <div className="text-xl font-bold mt-0.5" style={{ color: 'var(--text)' }}>Atakan Ormanli</div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={async () => {

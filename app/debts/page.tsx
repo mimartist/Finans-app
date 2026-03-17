@@ -12,6 +12,31 @@ const emptyForm = {
   is_recurring: false, frequency: 'aylik', expected_day: '', total_amount: '', paid_amount: '',
 }
 
+function daysOverdue(due: string): number {
+  const diff = new Date().getTime() - new Date(due).getTime()
+  return Math.floor(diff / (1000 * 60 * 60 * 24))
+}
+
+function daysUntilDue(due: string): number {
+  const diff = new Date(due).getTime() - new Date().getTime()
+  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+}
+
+function sortDebts(list: DebtRecord[]): DebtRecord[] {
+  const now = new Date()
+  return [...list].sort((a, b) => {
+    // Priority: 1=overdue, 2=due within 7d, 3=normal with due, 4=no due
+    const scoreA = !a.due_date && !a.is_recurring ? 4 : a.due_date && new Date(a.due_date) < now ? 1 : a.due_date && daysUntilDue(a.due_date) <= 7 ? 2 : 3
+    const scoreB = !b.due_date && !b.is_recurring ? 4 : b.due_date && new Date(b.due_date) < now ? 1 : b.due_date && daysUntilDue(b.due_date) <= 7 ? 2 : 3
+    if (scoreA !== scoreB) return scoreA - scoreB
+    // Within same priority, sort by due date
+    if (a.due_date && b.due_date) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+    if (a.due_date) return -1
+    if (b.due_date) return 1
+    return 0
+  })
+}
+
 export default function DebtsPage() {
   const [debts, setDebts] = useState<DebtRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,6 +49,7 @@ export default function DebtsPage() {
   const [payModal, setPayModal] = useState<DebtRecord | null>(null)
   const [payAmount, setPayAmount] = useState('')
   const [paying, setPaying] = useState(false)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
 
   const [eurTry, setEurTry] = useState(0)
   const [usdTry, setUsdTry] = useState(0)
@@ -50,9 +76,7 @@ export default function DebtsPage() {
   const verecekler = debts.filter(d => d.type === 'verecek')
   const totalAlacak = alacaklar.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
   const totalVerecek = verecekler.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
-  const hasMultiCurrency = debts.some(d => d.currency !== 'TRY')
-  const shown = tab === 'alacak' ? alacaklar : verecekler
-  const isOverdue = (due?: string) => due ? new Date(due) < new Date() : false
+  const shown = sortDebts(tab === 'alacak' ? alacaklar : verecekler)
 
   function openAdd() { setEditId(null); setForm({ ...emptyForm, type: tab }); setShowForm(true) }
   function openEdit(d: DebtRecord) {
@@ -109,6 +133,7 @@ export default function DebtsPage() {
     const { error } = await supabase.from('debt_records').update({ is_settled: true }).eq('id', id)
     if (error) { alert('Hata: ' + error.message); return }
     setDebts(prev => prev.filter(d => d.id !== id))
+    setExpandedId(null)
   }
 
   async function handleDelete(id: number) {
@@ -116,6 +141,7 @@ export default function DebtsPage() {
     if (error) { alert('Hata: ' + error.message); return }
     setDebts(prev => prev.filter(d => d.id !== id))
     setDeleteConfirm(null)
+    setExpandedId(null)
   }
 
   async function handlePartialPay() {
@@ -157,30 +183,36 @@ export default function DebtsPage() {
           <button onClick={openAdd} className="btn-primary px-4 py-2 text-sm">+ Ekle</button>
         </div>
 
-        <div className="flex gap-3 mx-4 mb-4">
-          <div className="flex-1 card p-3 cursor-pointer" style={{ borderColor: tab === 'alacak' ? '#059669' : 'var(--border)' }} onClick={() => setTab('alacak')}>
-            <div className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Alacak</div>
-            <div className="mono text-base font-bold amt-green">{fmt(totalAlacak)}</div>
-            <div className="text-[10px] mt-1 amt-green">{alacaklar.length} kisi{hasMultiCurrency ? ' · kur dahil' : ''}</div>
-          </div>
-          <div className="flex-1 card p-3 cursor-pointer" style={{ borderColor: tab === 'verecek' ? '#dc2626' : 'var(--border)' }} onClick={() => setTab('verecek')}>
-            <div className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Verecek</div>
-            <div className="mono text-base font-bold amt-red">{fmt(totalVerecek)}</div>
-            <div className="text-[10px] mt-1 amt-red">{verecekler.length} kisi{hasMultiCurrency ? ' · kur dahil' : ''}</div>
-          </div>
-        </div>
-
+        {/* Summary pills */}
         <div className="flex gap-2 mx-4 mb-4">
-          {(['alacak', 'verecek'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} className="flex-1 py-2 rounded-lg text-sm font-medium"
-              style={{
-                background: tab === t ? (t === 'alacak' ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.08)') : 'var(--bg3)',
-                border: `1px solid ${tab === t ? (t === 'alacak' ? 'rgba(5,150,105,0.3)' : 'rgba(220,38,38,0.3)') : 'var(--border)'}`,
-                color: tab === t ? (t === 'alacak' ? '#059669' : '#dc2626') : 'var(--muted)',
-              }}>
-              {t === 'alacak' ? '↙ Alacaklarim' : '↗ Vereceklerim'}
-            </button>
-          ))}
+          <button onClick={() => setTab('alacak')} className="flex-1 px-3 py-2.5 rounded-lg flex items-center justify-between"
+            style={{
+              background: tab === 'alacak' ? 'rgba(5,150,105,0.08)' : 'var(--bg3)',
+              border: `1.5px solid ${tab === 'alacak' ? 'rgba(5,150,105,0.4)' : 'var(--border)'}`,
+            }}>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[12px]">↙</span>
+              <span className="text-[12px] font-semibold" style={{ color: tab === 'alacak' ? '#059669' : 'var(--muted)' }}>Alacak</span>
+            </div>
+            <div className="text-right">
+              <div className="mono text-[13px] font-bold amt-green">{fmt(totalAlacak)}</div>
+              <div className="text-[9px]" style={{ color: 'var(--muted)' }}>{alacaklar.length} kayit</div>
+            </div>
+          </button>
+          <button onClick={() => setTab('verecek')} className="flex-1 px-3 py-2.5 rounded-lg flex items-center justify-between"
+            style={{
+              background: tab === 'verecek' ? 'rgba(220,38,38,0.06)' : 'var(--bg3)',
+              border: `1.5px solid ${tab === 'verecek' ? 'rgba(220,38,38,0.3)' : 'var(--border)'}`,
+            }}>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[12px]">↗</span>
+              <span className="text-[12px] font-semibold" style={{ color: tab === 'verecek' ? '#dc2626' : 'var(--muted)' }}>Verecek</span>
+            </div>
+            <div className="text-right">
+              <div className="mono text-[13px] font-bold amt-red">{fmt(totalVerecek)}</div>
+              <div className="text-[9px]" style={{ color: 'var(--muted)' }}>{verecekler.length} kayit</div>
+            </div>
+          </button>
         </div>
 
         {shown.length === 0 ? (
@@ -189,81 +221,160 @@ export default function DebtsPage() {
             <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>+ Kayit Ekle</button>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 mx-4">
+          <div className="flex flex-col gap-1.5 mx-4">
             {shown.map((d) => {
-              const overdue = isOverdue(d.due_date)
+              const isOverdue = d.due_date ? new Date(d.due_date) < new Date() : false
+              const dueSoon = d.due_date && !isOverdue ? daysUntilDue(d.due_date) <= 7 : false
+              const overdueDays = isOverdue && d.due_date ? daysOverdue(d.due_date) : 0
               const color = d.type === 'alacak' ? '#059669' : '#dc2626'
+              const isExpanded = expandedId === d.id
               const totalAmt = d.total_amount || ((d.paid_amount || 0) + d.amount)
               const paidAmt = d.paid_amount || 0
-              const remaining = d.amount
               const hasParts = d.is_recurring || paidAmt > 0
               const paidPct = totalAmt > 0 ? Math.round((paidAmt / totalAmt) * 100) : 0
+
+              let borderLeft = '3px solid var(--border)'
+              if (isOverdue) borderLeft = '3px solid #dc2626'
+              else if (dueSoon) borderLeft = '3px solid #f59e0b'
+
               return (
-                <div key={d.id} className="card p-4">
-                  <div className="flex justify-between items-start mb-2">
+                <div key={d.id}>
+                  {/* Compact row */}
+                  <div
+                    onClick={() => setExpandedId(isExpanded ? null : d.id)}
+                    className="px-3 py-2.5 flex items-center gap-3 cursor-pointer"
+                    style={{
+                      background: 'var(--bg3)',
+                      borderRadius: isExpanded ? '12px 12px 0 0' : 12,
+                      border: '1px solid var(--border)',
+                      borderLeft,
+                      borderBottom: isExpanded ? '1px solid var(--border)' : undefined,
+                    }}>
+                    {/* Icon */}
+                    <div className="text-base flex-shrink-0" style={{ width: 24, textAlign: 'center' }}>
+                      {d.is_recurring ? '🔄' : '👤'}
+                    </div>
+
+                    {/* Name + subtitle */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-semibold">{d.person_name}</div>
-                        {d.is_recurring && <span className="badge badge-blue">🔄 {freqLabels[d.frequency || 'aylik'] || 'Duzenli'}</span>}
+                      <div className="text-[13px] font-semibold truncate">{d.person_name}</div>
+                      <div className="text-[10px] mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-medium"
+                          style={{
+                            background: d.type === 'alacak' ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.06)',
+                            color,
+                          }}>
+                          {d.type === 'alacak' ? 'Alacak' : 'Verecek'}
+                        </span>
+                        {d.is_recurring ? (
+                          <span>{freqLabels[d.frequency || 'aylik']} {fmt(d.amount, d.currency)}</span>
+                        ) : d.due_date ? (
+                          <span>Vade: {new Date(d.due_date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                        ) : (
+                          <span>Tek seferlik</span>
+                        )}
                       </div>
-                      {d.description && <div className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--muted)' }}>{d.description}</div>}
-                      {d.is_recurring && d.expected_day && (
-                        <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>Her ayin {d.expected_day}'i</div>
+                      {isOverdue && (
+                        <div className="text-[10px] mt-0.5 font-medium" style={{ color: '#dc2626' }}>
+                          ⚠️ {overdueDays} gun gecikmis
+                        </div>
                       )}
                     </div>
-                    <div className="flex items-start gap-2">
+
+                    {/* Amount + chevron */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <div className="text-right">
-                        <div className="mono text-base font-bold" style={{ color }}>{fmt(remaining, d.currency)}</div>
+                        <div className="mono text-[13px] font-bold" style={{ color }}>{fmt(d.amount, d.currency)}</div>
                         {d.currency !== 'TRY' && (
-                          <div className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>({fmt(toTry(remaining, d.currency))})</div>
+                          <div className="mono text-[10px]" style={{ color: 'var(--muted)' }}>({fmt(toTry(d.amount, d.currency))})</div>
                         )}
-                        <div className={`badge mt-1 ${d.type === 'alacak' ? 'badge-green' : 'badge-red'}`}>{d.type}</div>
                       </div>
-                      <div className="flex flex-col gap-1 ml-1">
-                        <button onClick={() => { setPayModal(d); setPayAmount('') }} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs"
-                          title={d.type === 'alacak' ? 'Tahsilat Al' : 'Taksit Ver'} style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}>💰</button>
-                        <button onClick={() => handleSettle(d.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" title="Tamami odendi" style={{ background: 'rgba(5,150,105,0.08)' }}>✅</button>
-                        <button onClick={() => openEdit(d)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
-                        <button onClick={() => setDeleteConfirm(d.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
-                      </div>
+                      <span className="text-[12px]" style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>›</span>
                     </div>
                   </div>
 
-                  {hasParts && (
-                    <div className="mb-2">
-                      <div className="progress-wrap mb-1.5">
-                        <div className="progress-bar" style={{ width: `${paidPct}%`, background: d.type === 'alacak' ? '#059669' : '#dc2626' }} />
+                  {/* Expanded detail */}
+                  {isExpanded && (
+                    <div className="px-4 py-3" style={{
+                      background: 'var(--bg3)',
+                      borderRadius: '0 0 12px 12px',
+                      border: '1px solid var(--border)',
+                      borderTop: 'none',
+                      borderLeft,
+                    }}>
+                      {/* Progress bar for recurring / partial paid */}
+                      {hasParts && (
+                        <div className="mb-3">
+                          <div className="progress-wrap mb-1.5">
+                            <div className="progress-bar" style={{ width: `${paidPct}%`, background: color }} />
+                          </div>
+                          <div className="flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
+                            <span>Toplam: <span className="font-semibold" style={{ color: 'var(--text)' }}>{fmt(totalAmt, d.currency)}</span></span>
+                            <span>Odenen: <span className="amt-green font-semibold">{fmt(paidAmt, d.currency)}</span></span>
+                            <span>Kalan: <span className="font-semibold" style={{ color }}>{fmt(d.amount, d.currency)}</span></span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Detail rows */}
+                      <div className="flex flex-col gap-1 mb-3">
+                        {d.description && (
+                          <div className="flex justify-between text-[11px]">
+                            <span style={{ color: 'var(--muted)' }}>Aciklama</span>
+                            <span className="text-right max-w-[60%] truncate">{d.description}</span>
+                          </div>
+                        )}
+                        {d.transaction_date && (
+                          <div className="flex justify-between text-[11px]">
+                            <span style={{ color: 'var(--muted)' }}>Islem tarihi</span>
+                            <span>{new Date(d.transaction_date).toLocaleDateString('tr-TR')}</span>
+                          </div>
+                        )}
+                        {d.due_date && !d.is_recurring && (
+                          <div className="flex justify-between text-[11px]">
+                            <span style={{ color: 'var(--muted)' }}>Vade</span>
+                            <span style={{ color: isOverdue ? '#dc2626' : dueSoon ? '#d97706' : 'var(--text)' }}>
+                              {new Date(d.due_date).toLocaleDateString('tr-TR')}
+                              {isOverdue && ` (${overdueDays} gun gecikmis)`}
+                              {dueSoon && ` (${daysUntilDue(d.due_date!)} gun)`}
+                            </span>
+                          </div>
+                        )}
+                        {d.is_recurring && d.expected_day && (
+                          <div className="flex justify-between text-[11px]">
+                            <span style={{ color: 'var(--muted)' }}>Odeme gunu</span>
+                            <span>Her ayin {d.expected_day}'i</span>
+                          </div>
+                        )}
+                        {d.notes && (
+                          <div className="flex justify-between text-[11px]">
+                            <span style={{ color: 'var(--muted)' }}>Not</span>
+                            <span style={{ color: 'var(--muted)' }}>{d.notes}</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
-                        <span>Toplam: <span className="font-semibold" style={{ color: 'var(--text)' }}>{fmt(totalAmt, d.currency)}</span>
-                          {d.currency !== 'TRY' && <span> ({fmt(toTry(totalAmt, d.currency))})</span>}
-                        </span>
-                        <span>Odenen: <span className="amt-green font-semibold">{fmt(paidAmt, d.currency)}</span></span>
-                        <span>Kalan: <span className="font-semibold" style={{ color }}>{fmt(remaining, d.currency)}</span></span>
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2">
+                        <button onClick={() => { setPayModal(d); setPayAmount('') }}
+                          className="flex-1 py-2 rounded-lg text-[12px] font-semibold"
+                          style={{ background: d.type === 'alacak' ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.06)', color, border: `1px solid ${d.type === 'alacak' ? 'rgba(5,150,105,0.2)' : 'rgba(220,38,38,0.2)'}` }}>
+                          {d.type === 'alacak' ? 'Tahsilat Al' : 'Odeme Yap'}
+                        </button>
+                        <button onClick={() => handleSettle(d.id)}
+                          className="py-2 px-3 rounded-lg text-[12px] font-medium"
+                          style={{ background: 'rgba(5,150,105,0.08)', color: '#059669' }}>
+                          ✓ Tamami
+                        </button>
+                        <button onClick={() => openEdit(d)}
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-xs"
+                          style={{ background: 'var(--bg4)' }}>✏️</button>
+                        <button onClick={() => setDeleteConfirm(d.id)}
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-xs"
+                          style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
                       </div>
                     </div>
                   )}
-
-                  <div className="flex flex-col gap-1">
-                    {d.transaction_date && (
-                      <div className="flex justify-between text-[11px]">
-                        <span style={{ color: 'var(--muted)' }}>Tarih</span>
-                        <span>{new Date(d.transaction_date).toLocaleDateString('tr-TR')}</span>
-                      </div>
-                    )}
-                    {d.due_date && !d.is_recurring && (
-                      <div className="flex justify-between text-[11px]">
-                        <span style={{ color: 'var(--muted)' }}>Vade</span>
-                        <span style={{ color: overdue ? '#dc2626' : 'var(--text)' }}>{new Date(d.due_date).toLocaleDateString('tr-TR')}{overdue && ' Gecikmis'}</span>
-                      </div>
-                    )}
-                    {d.notes && (
-                      <div className="flex justify-between text-[11px]">
-                        <span style={{ color: 'var(--muted)' }}>Not</span>
-                        <span style={{ color: 'var(--muted)' }}>{d.notes}</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
               )
             })}
@@ -288,7 +399,7 @@ export default function DebtsPage() {
         {payModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="card p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-1">{payModal.type === 'alacak' ? 'Tahsilat Al' : 'Taksit Ver'}</div>
+              <div className="text-sm font-semibold mb-1">{payModal.type === 'alacak' ? 'Tahsilat Al' : 'Odeme Yap'}</div>
               <div className="text-[13px] mb-3" style={{ color: 'var(--muted)' }}>
                 <span className="font-medium" style={{ color: 'var(--text)' }}>{payModal.person_name}</span> — Kalan: {fmt(payModal.amount, payModal.currency)}
               </div>
@@ -339,7 +450,6 @@ export default function DebtsPage() {
                   <input value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" type="number" className="input mono" />
                 </div>
 
-                {/* Recurring toggle */}
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={form.is_recurring} onChange={e => set('is_recurring', e.target.checked)} className="w-4 h-4 rounded accent-[#0d9488]" />
                   <span style={{ color: 'var(--muted)' }}>Duzenli / Tekrar eden odeme</span>
