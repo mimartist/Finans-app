@@ -1,191 +1,234 @@
 'use client'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt } from '@/lib/supabase'
-import type { Account, ExchangeRate } from '@/lib/supabase'
+import { supabase, fmt, isDemo } from '@/lib/supabase'
+import type { Account, ExchangeRate, DebtRecord } from '@/lib/supabase'
+import { IconWallet, IconTrendUp, IconArrowsExchange, IconPlus } from '@/components/Icons'
 
-const emptyForm = { name: '', bank: '', type: 'vadesiz', currency: 'TRY', balance: '' }
+type Tab = 'hesaplar' | 'yatirimlar' | 'alacak'
+
+// Mock data
+const MOCK_ACCOUNTS: Account[] = [
+  { id: 1, name: 'Ziraat TL', bank: 'Ziraat', type: 'vadesiz', currency: 'TRY', balance: 45200, is_active: true, updated_at: '' },
+  { id: 2, name: 'Garanti EUR', bank: 'Garanti', type: 'vadesiz', currency: 'EUR', balance: 3200, is_active: true, updated_at: '' },
+  { id: 3, name: 'Is Bankasi USD', bank: 'Is Bankasi', type: 'vadesiz', currency: 'USD', balance: 1500, is_active: true, updated_at: '' },
+  { id: 4, name: 'Vakifbank Vadeli', bank: 'Vakifbank', type: 'vadeli', currency: 'TRY', balance: 120000, is_active: true, updated_at: '' },
+]
+const MOCK_INVESTMENTS = [
+  { id: 1, name: 'BİST Hisse', type: 'hisse', platform: 'Midas', currency: 'TRY', value: 52000, pnl: 3200, pnlPct: 6.5 },
+  { id: 2, name: 'Bitcoin', type: 'kripto', platform: 'Binance', currency: 'USD', value: 8500, pnl: 1200, pnlPct: 16.4 },
+  { id: 3, name: 'Altin', type: 'altin', platform: 'Ziraat', currency: 'TRY', value: 33000, pnl: -800, pnlPct: -2.4 },
+]
+const MOCK_DEBTS: DebtRecord[] = [
+  { id: 1, person_name: 'Ahmet Yilmaz', type: 'alacak', amount: 15000, currency: 'TRY', description: 'Ofis kirasi', transaction_date: '2026-01-15', due_date: '2026-03-30', is_settled: false, is_recurring: true, frequency: 'aylik', expected_day: 15 },
+  { id: 2, person_name: 'Mehmet Demir', type: 'alacak', amount: 5000, currency: 'TRY', description: 'Proje odemesi', transaction_date: '2026-02-20', is_settled: false },
+  { id: 3, person_name: 'Kargo Firması', type: 'verecek', amount: 2400, currency: 'TRY', description: 'Kargo borcu', transaction_date: '2026-03-01', due_date: '2026-04-01', is_settled: false },
+]
+const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('T')[0], usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
 
 export default function AccountsPage() {
+  const [tab, setTab] = useState<Tab>('hesaplar')
   const [accounts, setAccounts] = useState<Account[]>([])
   const [rates, setRates] = useState<ExchangeRate | null>(null)
+  const [debts, setDebts] = useState<DebtRecord[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editId, setEditId] = useState<number | null>(null)
-  const [form, setForm] = useState(emptyForm)
-  const [saving, setSaving] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
-  async function load() {
-    const [{ data: acc }, { data: rt }] = await Promise.all([
-      supabase.from('accounts').select('*').eq('is_active', true).order('bank'),
-      supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
-    ])
-    setAccounts(acc || [])
-    setRates(rt?.[0] || null)
-    setLoading(false)
-  }
-
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (isDemo) {
+      setAccounts(MOCK_ACCOUNTS)
+      setRates(MOCK_RATES)
+      setDebts(MOCK_DEBTS)
+      setLoading(false)
+      return
+    }
+    (async () => {
+      const [{ data: acc }, { data: rt }, { data: dbt }] = await Promise.all([
+        supabase.from('accounts').select('*').eq('is_active', true).order('bank'),
+        supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
+        supabase.from('debt_records').select('*').eq('is_settled', false),
+      ])
+      setAccounts(acc || [])
+      setRates(rt?.[0] || null)
+      setDebts(dbt || [])
+      setLoading(false)
+    })()
+  }, [])
 
   const eurTry = rates?.eur_try || 0
   const usdTry = rates?.usd_try || 0
-  const toTry = (a: Account) => {
-    if (a.currency === 'EUR') return a.balance * eurTry
-    if (a.currency === 'USD') return a.balance * usdTry
-    return a.balance
-  }
-  const totalTry = accounts.reduce((s, a) => s + toTry(a), 0)
+  const toTry = (amount: number, currency: string) => currency === 'EUR' ? amount * eurTry : currency === 'USD' ? amount * usdTry : amount
+  const totalBalance = accounts.reduce((s, a) => s + toTry(a.balance, a.currency), 0)
+  const alacaklar = debts.filter(d => d.type === 'alacak')
+  const verecekler = debts.filter(d => d.type === 'verecek')
 
-  const grouped = accounts.reduce<Record<string, Account[]>>((g, a) => {
-    const key = a.bank || 'Diger'
-    ;(g[key] = g[key] || []).push(a)
-    return g
-  }, {})
+  const tabs: { key: Tab; label: string; Icon: any }[] = [
+    { key: 'hesaplar', label: 'Hesaplar', Icon: IconWallet },
+    { key: 'yatirimlar', label: 'Yatirimlar', Icon: IconTrendUp },
+    { key: 'alacak', label: 'Alacak / Verecek', Icon: IconArrowsExchange },
+  ]
 
-  function openAdd() { setEditId(null); setForm(emptyForm); setShowForm(true) }
-  function openEdit(a: Account) {
-    setEditId(a.id)
-    setForm({ name: a.name, bank: a.bank, type: a.type, currency: a.currency, balance: String(a.balance) })
-    setShowForm(true)
-  }
-  function closeForm() { setShowForm(false); setEditId(null); setForm(emptyForm) }
-
-  async function handleSave() {
-    if (!form.name || !form.bank || !form.balance) return
-    setSaving(true)
-    const payload = { name: form.name, bank: form.bank, type: form.type, currency: form.currency, balance: parseFloat(form.balance), is_active: true }
-    if (editId) { await supabase.from('accounts').update(payload).eq('id', editId) }
-    else { await supabase.from('accounts').insert(payload) }
-    setSaving(false); closeForm(); await load()
-  }
-
-  async function handleDelete(id: number) {
-    await supabase.from('accounts').update({ is_active: false }).eq('id', id)
-    setDeleteConfirm(null); await load()
-  }
-
-  const set = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }))
-
-  if (loading) return <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>Yukleniyor...</div>
+  if (loading) return (
+    <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>
+      <div className="text-sm font-medium">Yukleniyor...</div>
+    </div>
+  )
 
   return (
     <div className="app-layout">
       <BottomNav />
       <div className="app-main pb-24 page-enter">
-        <div className="flex justify-between items-center px-5 pt-5 pb-4">
+        {/* Header */}
+        <div className="flex justify-between items-center px-5 pt-6 pb-4">
           <div>
-            <div className="text-[12px] font-medium" style={{ color: 'var(--muted)' }}>Modul</div>
-            <div className="text-xl font-bold mt-0.5">Hesaplar</div>
+            <div className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>Finans</div>
+            <div className="text-xl font-extrabold" style={{ color: 'var(--text)' }}>Hesaplar</div>
           </div>
-          <button onClick={openAdd} className="btn-primary px-4 py-2 text-sm">+ Ekle</button>
         </div>
 
-        <div className="mx-4 mb-4 card-lg p-5">
-          <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Varlik (TRY)</div>
-          <div className="mono text-2xl font-bold amt-blue">{fmt(totalTry)}</div>
-          {rates && (
-            <div className="text-[11px] mt-2 flex gap-3" style={{ color: 'var(--muted)' }}>
-              <span>EUR/TRY: {eurTry.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span>USD/TRY: {usdTry.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-          )}
+        {/* Tab Selector — pill style */}
+        <div className="mx-4 mb-4">
+          <div className="flex gap-2 p-1 rounded-full" style={{ background: 'var(--bg4)' }}>
+            {tabs.map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-xs font-semibold transition-all"
+                style={{
+                  background: tab === t.key ? 'linear-gradient(135deg, #2b2d6e, #3d3f8f)' : 'transparent',
+                  color: tab === t.key ? '#fff' : 'var(--muted)',
+                  boxShadow: tab === t.key ? '0 2px 8px rgba(43,45,110,0.25)' : 'none',
+                }}>
+                <t.Icon color={tab === t.key ? '#fff' : 'var(--muted)'} size={14} />
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {Object.entries(grouped).map(([bank, accs]) => {
-          const bankTotal = accs.reduce((s, a) => s + toTry(a), 0)
-          return (
-            <div key={bank} className="mb-4">
-              <div className="px-5 pb-2 flex justify-between items-center">
-                <div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>{bank}</div>
-                <div className="text-[12px] mono font-semibold amt-blue">{fmt(bankTotal)}</div>
-              </div>
-              <div className="flex flex-col gap-2 mx-4">
-                {accs.map(a => (
-                  <div key={a.id} className="card px-4 py-3 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0" style={{ background: 'var(--bg4)' }}>
-                      {a.currency === 'TRY' ? '🇹🇷' : a.currency === 'EUR' ? '🇪🇺' : a.currency === 'USD' ? '🇺🇸' : '💰'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{a.name}</div>
-                      <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
-                        {a.type}{a.currency !== 'TRY' && ` · ≈ ${fmt(toTry(a))}`}
-                      </div>
-                    </div>
-                    <div className="text-right flex items-center gap-2">
-                      <div className="mono text-sm font-semibold amt-blue">{fmt(a.balance, a.currency)}</div>
-                      <div className="flex gap-1">
-                        <button onClick={() => openEdit(a)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
-                        <button onClick={() => setDeleteConfirm(a.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* ===== TAB: HESAPLAR ===== */}
+        {tab === 'hesaplar' && (
+          <>
+            {/* Total */}
+            <div className="mx-4 mb-4 card-hero p-5" style={{ position: 'relative', zIndex: 1 }}>
+              <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>Toplam Bakiye</div>
+              <div className="mono text-2xl font-extrabold mt-1" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalBalance)}</div>
+              <div className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>{accounts.length} aktif hesap</div>
             </div>
-          )
-        })}
 
-        {accounts.length === 0 && (
-          <div className="mx-4 card p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
-            Henuz hesap eklenmemis.<br />
-            <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>+ Hesap Ekle</button>
-          </div>
+            {/* Account list */}
+            <div className="flex flex-col gap-2 mx-4">
+              {accounts.map(a => (
+                <div key={a.id} className="tx-item">
+                  <div className="tx-icon" style={{ background: a.currency === 'TRY' ? 'rgba(43,45,110,0.06)' : a.currency === 'EUR' ? 'rgba(99,102,241,0.06)' : 'rgba(48,164,108,0.06)' }}>
+                    <IconWallet color={a.currency === 'TRY' ? '#2b2d6e' : a.currency === 'EUR' ? '#6366f1' : '#30a46c'} size={18} />
+                  </div>
+                  <div className="tx-info">
+                    <div className="tx-name">{a.name}</div>
+                    <div className="tx-detail">{a.bank} · {a.type === 'vadeli' ? 'Vadeli' : 'Vadesiz'}</div>
+                  </div>
+                  <div className="tx-amount">
+                    <div className="tx-value" style={{ color: '#2b2d6e' }}>{fmt(a.balance, a.currency)}</div>
+                    {a.currency !== 'TRY' && <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{fmt(toTry(a.balance, a.currency))}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
-        {deleteConfirm !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-2">Hesabi Sil</div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu hesabi silmek istediginize emin misiniz?</div>
-              <div className="flex gap-2">
-                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
-                <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
+        {/* ===== TAB: YATIRIMLAR ===== */}
+        {tab === 'yatirimlar' && (
+          <>
+            <div className="mx-4 mb-4 card-hero p-5" style={{ position: 'relative', zIndex: 1 }}>
+              <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>Toplam Portfoy</div>
+              <div className="mono text-2xl font-extrabold mt-1" style={{ position: 'relative', zIndex: 2 }}>
+                {fmt(MOCK_INVESTMENTS.reduce((s, i) => s + (i.currency === 'USD' ? i.value * usdTry : i.value), 0))}
               </div>
             </div>
-          </div>
+
+            <div className="flex flex-col gap-2 mx-4">
+              {MOCK_INVESTMENTS.map(inv => (
+                <div key={inv.id} className="tx-item">
+                  <div className="tx-icon" style={{ background: inv.pnl >= 0 ? 'rgba(48,164,108,0.06)' : 'rgba(229,72,77,0.06)' }}>
+                    <IconTrendUp color={inv.pnl >= 0 ? '#30a46c' : '#e5484d'} size={18} />
+                  </div>
+                  <div className="tx-info">
+                    <div className="tx-name">{inv.name}</div>
+                    <div className="tx-detail">{inv.platform} · {inv.type}</div>
+                  </div>
+                  <div className="tx-amount">
+                    <div className="tx-value" style={{ color: '#2b2d6e' }}>{fmt(inv.value, inv.currency)}</div>
+                    <div className="tx-badge" style={{ background: inv.pnl >= 0 ? 'rgba(48,164,108,0.08)' : 'rgba(229,72,77,0.08)', color: inv.pnl >= 0 ? '#30a46c' : '#e5484d' }}>
+                      {inv.pnl >= 0 ? '+' : ''}{inv.pnlPct}%
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
-        {showForm && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card w-full max-w-lg rounded-b-none p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
-              <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{editId ? 'Hesabi Duzenle' : 'Yeni Hesap'}</div>
-                <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+        {/* ===== TAB: ALACAK / VERECEK ===== */}
+        {tab === 'alacak' && (
+          <>
+            {/* Summary pills */}
+            <div className="flex gap-2 mx-4 mb-4">
+              <div className="flex-1 rounded-full py-2.5 px-3 text-center" style={{ border: '1.5px solid rgba(48,164,108,0.3)' }}>
+                <div className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: '#30a46c' }}>Alacak</div>
+                <div className="mono text-[11px] font-bold mt-0.5" style={{ color: '#30a46c' }}>{fmt(alacaklar.reduce((s, d) => s + d.amount, 0))}</div>
               </div>
-              <div className="flex flex-col gap-3">
-                <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Hesap Adi</label>
-                  <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Orn: Vadesiz TL" className="input" />
-                </div>
-                <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Banka</label>
-                  <input value={form.bank} onChange={e => set('bank', e.target.value)} placeholder="Orn: Ziraat" className="input" />
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
-                    <select value={form.type} onChange={e => set('type', e.target.value)} className="input">
-                      <option value="vadesiz">Vadesiz</option><option value="vadeli">Vadeli</option>
-                      <option value="yatirim">Yatirim</option><option value="nakit">Nakit</option>
-                    </select>
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
-                    <select value={form.currency} onChange={e => set('currency', e.target.value)} className="input">
-                      <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Bakiye</label>
-                  <input value={form.balance} onChange={e => set('balance', e.target.value)} placeholder="0" type="number" step="0.01" className="input mono" />
-                </div>
+              <div className="flex-1 rounded-full py-2.5 px-3 text-center" style={{ border: '1.5px solid rgba(229,72,77,0.3)' }}>
+                <div className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: '#e5484d' }}>Verecek</div>
+                <div className="mono text-[11px] font-bold mt-0.5" style={{ color: '#e5484d' }}>{fmt(verecekler.reduce((s, d) => s + d.amount, 0))}</div>
               </div>
-              <button onClick={handleSave} disabled={saving || !form.name || !form.bank || !form.balance}
-                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Guncelle' : 'Ekle'}</button>
             </div>
-          </div>
+
+            {/* Alacaklar */}
+            {alacaklar.length > 0 && (
+              <>
+                <div className="mx-5 mb-2 text-xs font-bold" style={{ color: '#30a46c' }}>Alacaklar</div>
+                <div className="flex flex-col gap-2 mx-4 mb-4">
+                  {alacaklar.map(d => (
+                    <div key={d.id} className="tx-item">
+                      <div className="tx-icon" style={{ background: 'rgba(48,164,108,0.06)' }}>
+                        <span className="text-sm font-bold" style={{ color: '#30a46c' }}>{d.person_name.charAt(0)}</span>
+                      </div>
+                      <div className="tx-info">
+                        <div className="tx-name">{d.person_name}</div>
+                        <div className="tx-detail">{d.description || 'Alacak'}{d.is_recurring ? ' · Duzenli' : ''}</div>
+                      </div>
+                      <div className="tx-amount">
+                        <div className="tx-value amt-green">+{fmt(d.amount, d.currency)}</div>
+                        {d.due_date && <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{new Date(d.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Verecekler */}
+            {verecekler.length > 0 && (
+              <>
+                <div className="mx-5 mb-2 text-xs font-bold" style={{ color: '#e5484d' }}>Verecekler</div>
+                <div className="flex flex-col gap-2 mx-4 mb-4">
+                  {verecekler.map(d => (
+                    <div key={d.id} className="tx-item">
+                      <div className="tx-icon" style={{ background: 'rgba(229,72,77,0.06)' }}>
+                        <span className="text-sm font-bold" style={{ color: '#e5484d' }}>{d.person_name.charAt(0)}</span>
+                      </div>
+                      <div className="tx-info">
+                        <div className="tx-name">{d.person_name}</div>
+                        <div className="tx-detail">{d.description || 'Verecek'}</div>
+                      </div>
+                      <div className="tx-amount">
+                        <div className="tx-value amt-red">-{fmt(d.amount, d.currency)}</div>
+                        {d.due_date && <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{new Date(d.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
