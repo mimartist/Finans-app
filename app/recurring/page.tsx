@@ -31,19 +31,16 @@ export default function RecurringPage() {
   useEffect(() => { load() }, [])
 
   const categories = ['tumu', ...Array.from(new Set(expenses.map(e => e.category)))]
-  // Sort by nearest payment day (like a calendar - next upcoming first)
-  const getDaysAway = (e: RecurringExpense) => {
+  // Sort by payment day ascending (1-31 calendar order), items without day go last
+  const getPayDay = (e: RecurringExpense) => {
     if (e.expense_type === 'one_time' && e.expense_date) {
-      const today = new Date(); today.setHours(0, 0, 0, 0)
-      const target = new Date(e.expense_date); target.setHours(0, 0, 0, 0)
-      return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      return new Date(e.expense_date).getDate()
     }
-    if (e.payment_day) return daysUntil(e.payment_day)
-    return 999
+    return e.payment_day || 99
   }
   const filtered = (filter === 'tumu' ? expenses : expenses.filter(e => e.category === filter))
     .filter(e => typeFilter === 'all' ? true : (e.expense_type || 'recurring') === typeFilter)
-    .sort((a, b) => getDaysAway(a) - getDaysAway(b))
+    .sort((a, b) => getPayDay(a) - getPayDay(b))
   const total = filtered.reduce((s, e) => s + e.amount, 0)
   const totalAll = expenses.reduce((s, e) => s + e.amount, 0)
   const recurringCount = expenses.filter(e => (e.expense_type || 'recurring') === 'recurring').length
