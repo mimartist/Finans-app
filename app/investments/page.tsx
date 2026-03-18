@@ -157,7 +157,7 @@ export default function InvestmentsPage() {
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
-  if (loading) return <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>Yukleniyor...</div>
+  if (loading) return <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>Yükleniyor...</div>
 
   return (
     <div className="app-layout">
@@ -167,20 +167,20 @@ export default function InvestmentsPage() {
         <div className="flex justify-between items-center px-5 pt-5 pb-4">
           <div>
             <div className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>Finans</div>
-            <div className="text-xl font-extrabold mt-0.5">Yatirimlar</div>
+            <div className="text-xl font-extrabold mt-0.5">Yatırımlar</div>
           </div>
           <div className="flex gap-2">
             <button onClick={updateRates} disabled={updatingRates}
               className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5"
               style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: updatingRates ? 'var(--muted)' : 'var(--accent)' }}>
-              {updatingRates ? '↻ ...' : '↻ Kurlari Guncelle'}
+              {updatingRates ? '↻ ...' : '↻ Kurları Güncelle'}
             </button>
           </div>
         </div>
 
         {/* Portfolio Summary */}
         <div className="mx-4 mb-4 card-lg p-5">
-          <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Portfoy</div>
+          <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Portföy</div>
           <div className="mono text-3xl font-bold amt-blue">{fmt(totalValueTry)}</div>
           {rates && (
             <div className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
@@ -193,7 +193,7 @@ export default function InvestmentsPage() {
               <span className="mono font-semibold">{fmt(totalCostTry)}</span>
             </div>
             <div className="flex justify-between text-[12px]">
-              <span style={{ color: 'var(--muted)' }}>Guncel Deger</span>
+              <span style={{ color: 'var(--muted)' }}>Güncel Değer</span>
               <span className="mono font-semibold amt-blue">{fmt(totalValueTry)}</span>
             </div>
             <div className="flex justify-between text-[12px]">
@@ -209,7 +209,7 @@ export default function InvestmentsPage() {
 
         {rates && (
           <>
-            <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Doviz Kurlari</div></div>
+            <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Döviz Kurları</div></div>
             <div className="flex gap-2 mx-4 mb-4">
               {[{ label: 'USD/TRY', val: rates.usd_try, icon: '🇺🇸' }, { label: 'EUR/TRY', val: rates.eur_try, icon: '🇪🇺' }, { label: 'ALTIN/gr', val: rates.gold_try, icon: '🥇' }].map(r => (
                 <div key={r.label} className="flex-1 card p-3">
@@ -226,8 +226,8 @@ export default function InvestmentsPage() {
 
         {investments.length === 0 ? (
           <div className="mx-4 card p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
-            Henuz yatirim eklenmemis.<br />
-            <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>Yatirim Ekle</button>
+            Henüz yatırım eklenmemiş.<br />
+            <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>Yatırım Ekle</button>
           </div>
         ) : (
           <div className="flex flex-col gap-1.5 mx-4">
@@ -289,11 +289,11 @@ export default function InvestmentsPage() {
                       {/* Price rows */}
                       <div className="flex flex-col gap-1.5 text-[12px] mb-3 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
                         <div className="flex justify-between">
-                          <span style={{ color: 'var(--muted)' }}>Maliyet fiyati</span>
+                          <span style={{ color: 'var(--muted)' }}>Maliyet fiyatı</span>
                           <span className="mono font-medium">{fmtPrice(inv.avg_cost || 0, inv.currency)}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span style={{ color: 'var(--muted)' }}>Guncel fiyat</span>
+                          <span style={{ color: 'var(--muted)' }}>Güncel fiyat</span>
                           <div className="flex items-center gap-2">
                             {isEditingPrice ? (
                               <div className="flex items-center gap-1">
@@ -326,7 +326,7 @@ export default function InvestmentsPage() {
                                   <button onClick={(e) => { e.stopPropagation(); setPriceEditId(inv.id); setPriceInput(inv.latest_price ? String(inv.latest_price) : '') }}
                                     className="text-[10px] font-medium px-2 py-0.5 rounded"
                                     style={{ background: 'rgba(13,148,136,0.08)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.2)' }}>
-                                    Guncelle
+                                    Güncelle
                                   </button>
                                 )}
                               </>
@@ -335,7 +335,7 @@ export default function InvestmentsPage() {
                         </div>
                         {inv.snapshot_date && (
                           <div className="text-[10px] text-right" style={{ color: 'var(--muted)' }}>
-                            Son guncelleme: {new Date(inv.snapshot_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            Son güncelleme: {new Date(inv.snapshot_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </div>
                         )}
                       </div>
@@ -347,7 +347,7 @@ export default function InvestmentsPage() {
                           <span className="mono font-semibold">{fmt(costBasis, inv.currency)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span style={{ color: 'var(--muted)' }}>Guncel</span>
+                          <span style={{ color: 'var(--muted)' }}>Güncel</span>
                           <span className="mono font-semibold amt-blue">{fmt(currentVal, inv.currency)}</span>
                         </div>
                         <div className="flex justify-between items-center">
@@ -360,7 +360,7 @@ export default function InvestmentsPage() {
                         </div>
                         {inv.currency !== 'TRY' && inv.total_value_try && (
                           <div className="flex justify-between text-[11px] mt-1 pt-1" style={{ borderTop: '1px solid var(--border)' }}>
-                            <span style={{ color: 'var(--muted)' }}>TRY Deger</span>
+                            <span style={{ color: 'var(--muted)' }}>TRY Değer</span>
                             <span className="mono font-semibold">{fmt(inv.total_value_try)}</span>
                           </div>
                         )}
@@ -386,10 +386,10 @@ export default function InvestmentsPage() {
         {deleteConfirm !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="card p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-2">Yatirimi Sil</div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu yatirimi silmek istediginize emin misiniz?</div>
+              <div className="text-sm font-semibold mb-2">Yatırımı Sil</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu yatırımı silmek istediğinize emin misiniz?</div>
               <div className="flex gap-2">
-                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
               </div>
             </div>
@@ -401,20 +401,20 @@ export default function InvestmentsPage() {
             <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{editId ? 'Yatirimi Duzenle' : 'Yeni Yatirim'}</div>
+                <div className="text-sm font-semibold">{editId ? 'Yatırımı Düzenle' : 'Yeni Yatırım'}</div>
                 <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Yatirim Adi</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Yatırım Adı</label>
                   <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Orn: BIST Hisse" className="input" />
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tür</label>
                     <select value={form.type} onChange={e => set('type', e.target.value)} className="input">
-                      <option value="hisse">Hisse</option><option value="fon">Fon</option><option value="altin">Altin</option>
-                      <option value="doviz">Doviz</option><option value="kripto">Kripto</option><option value="diger">Diger</option>
+                      <option value="hisse">Hisse</option><option value="fon">Fon</option><option value="altin">Altın</option>
+                      <option value="doviz">Döviz</option><option value="kripto">Kripto</option><option value="diger">Diğer</option>
                     </select>
                   </div>
                   <div className="flex-1">
@@ -434,7 +434,7 @@ export default function InvestmentsPage() {
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={form.currency} onChange={e => set('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -446,7 +446,7 @@ export default function InvestmentsPage() {
                 </div>
               </div>
               <button onClick={handleSave} disabled={saving || !form.name || !form.quantity}
-                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Guncelle' : 'Ekle'}</button>
+                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Güncelle' : 'Ekle'}</button>
             </div>
           </div>
         )}

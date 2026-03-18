@@ -4,7 +4,7 @@ import BottomNav from '@/components/BottomNav'
 import { supabase, fmt } from '@/lib/supabase'
 import type { DebtRecord } from '@/lib/supabase'
 
-const freqLabels: Record<string, string> = { aylik: 'Aylik', haftalik: 'Haftalik', '2haftada1': '2 Haftada 1', duzensiz: 'Duzensiz' }
+const freqLabels: Record<string, string> = { aylik: 'Aylık', haftalik: 'Haftalık', '2haftada1': '2 Haftada 1', duzensiz: 'Düzensiz' }
 
 const emptyForm = {
   person_name: '', type: 'alacak' as 'alacak' | 'verecek', amount: '', currency: 'TRY',
@@ -169,7 +169,7 @@ export default function DebtsPage() {
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
-  if (loading) return <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>Yukleniyor...</div>
+  if (loading) return <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>Yükleniyor...</div>
 
   return (
     <div className="app-layout">
@@ -196,7 +196,7 @@ export default function DebtsPage() {
             </div>
             <div className="text-right">
               <div className="mono text-[13px] font-bold amt-green">{fmt(totalAlacak)}</div>
-              <div className="text-[9px]" style={{ color: 'var(--muted)' }}>{alacaklar.length} kayit</div>
+              <div className="text-[9px]" style={{ color: 'var(--muted)' }}>{alacaklar.length} kayıt</div>
             </div>
           </button>
           <button onClick={() => setTab('verecek')} className="flex-1 px-3 py-2.5 rounded-lg flex items-center justify-between"
@@ -210,15 +210,15 @@ export default function DebtsPage() {
             </div>
             <div className="text-right">
               <div className="mono text-[13px] font-bold amt-red">{fmt(totalVerecek)}</div>
-              <div className="text-[9px]" style={{ color: 'var(--muted)' }}>{verecekler.length} kayit</div>
+              <div className="text-[9px]" style={{ color: 'var(--muted)' }}>{verecekler.length} kayıt</div>
             </div>
           </button>
         </div>
 
         {shown.length === 0 ? (
           <div className="mx-4 card p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
-            Kayit bulunamadi.<br />
-            <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>Kayit Ekle</button>
+            Kayıt bulunamadı.<br />
+            <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>Kayıt Ekle</button>
           </div>
         ) : (
           <div className="flex flex-col gap-1.5 mx-4">
@@ -276,7 +276,7 @@ export default function DebtsPage() {
                       </div>
                       {isOverdue && (
                         <div className="text-[10px] mt-0.5 font-medium" style={{ color: '#dc2626' }}>
-                          ⚠️ {overdueDays} gun gecikmis
+                          ⚠️ {overdueDays} gün gecikmiş
                         </div>
                       )}
                     </div>
@@ -310,7 +310,7 @@ export default function DebtsPage() {
                           </div>
                           <div className="flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
                             <span>Toplam: <span className="font-semibold" style={{ color: 'var(--text)' }}>{fmt(totalAmt, d.currency)}</span></span>
-                            <span>Odenen: <span className="amt-green font-semibold">{fmt(paidAmt, d.currency)}</span></span>
+                            <span>Ödenen: <span className="amt-green font-semibold">{fmt(paidAmt, d.currency)}</span></span>
                             <span>Kalan: <span className="font-semibold" style={{ color }}>{fmt(d.amount, d.currency)}</span></span>
                           </div>
                         </div>
@@ -320,13 +320,13 @@ export default function DebtsPage() {
                       <div className="flex flex-col gap-1 mb-3">
                         {d.description && (
                           <div className="flex justify-between text-[11px]">
-                            <span style={{ color: 'var(--muted)' }}>Aciklama</span>
+                            <span style={{ color: 'var(--muted)' }}>Açıklama</span>
                             <span className="text-right max-w-[60%] truncate">{d.description}</span>
                           </div>
                         )}
                         {d.transaction_date && (
                           <div className="flex justify-between text-[11px]">
-                            <span style={{ color: 'var(--muted)' }}>Islem tarihi</span>
+                            <span style={{ color: 'var(--muted)' }}>İşlem tarihi</span>
                             <span>{new Date(d.transaction_date).toLocaleDateString('tr-TR')}</span>
                           </div>
                         )}
@@ -335,15 +335,15 @@ export default function DebtsPage() {
                             <span style={{ color: 'var(--muted)' }}>Vade</span>
                             <span style={{ color: isOverdue ? '#dc2626' : dueSoon ? '#d97706' : 'var(--text)' }}>
                               {new Date(d.due_date).toLocaleDateString('tr-TR')}
-                              {isOverdue && ` (${overdueDays} gun gecikmis)`}
-                              {dueSoon && ` (${daysUntilDue(d.due_date!)} gun)`}
+                              {isOverdue && ` (${overdueDays} gün gecikmiş)`}
+                              {dueSoon && ` (${daysUntilDue(d.due_date!)} gün)`}
                             </span>
                           </div>
                         )}
                         {d.is_recurring && d.expected_day && (
                           <div className="flex justify-between text-[11px]">
-                            <span style={{ color: 'var(--muted)' }}>Odeme gunu</span>
-                            <span>Her ayin {d.expected_day}'i</span>
+                            <span style={{ color: 'var(--muted)' }}>Ödeme günü</span>
+                            <span>Her ayın {d.expected_day}'i</span>
                           </div>
                         )}
                         {d.notes && (
@@ -359,12 +359,12 @@ export default function DebtsPage() {
                         <button onClick={() => { setPayModal(d); setPayAmount('') }}
                           className="flex-1 py-2 rounded-lg text-[12px] font-semibold"
                           style={{ background: d.type === 'alacak' ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.06)', color, border: `1px solid ${d.type === 'alacak' ? 'rgba(5,150,105,0.2)' : 'rgba(220,38,38,0.2)'}` }}>
-                          {d.type === 'alacak' ? 'Tahsilat Al' : 'Odeme Yap'}
+                          {d.type === 'alacak' ? 'Tahsilat Al' : 'Ödeme Yap'}
                         </button>
                         <button onClick={() => handleSettle(d.id)}
                           className="py-2 px-3 rounded-lg text-[12px] font-medium"
                           style={{ background: 'rgba(5,150,105,0.08)', color: '#059669' }}>
-                          ✓ Tamami
+                          ✓ Tamamı
                         </button>
                         <button onClick={() => openEdit(d)}
                           className="w-9 h-9 rounded-lg flex items-center justify-center text-xs"
@@ -385,10 +385,10 @@ export default function DebtsPage() {
         {deleteConfirm !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="card p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-2">Kaydi Sil</div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu kaydi kalici olarak silmek istediginize emin misiniz?</div>
+              <div className="text-sm font-semibold mb-2">Kaydı Sil</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu kaydı kalıcı olarak silmek istediğinize emin misiniz?</div>
               <div className="flex gap-2">
-                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
               </div>
             </div>
@@ -399,18 +399,18 @@ export default function DebtsPage() {
         {payModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="card p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-1">{payModal.type === 'alacak' ? 'Tahsilat Al' : 'Odeme Yap'}</div>
+              <div className="text-sm font-semibold mb-1">{payModal.type === 'alacak' ? 'Tahsilat Al' : 'Ödeme Yap'}</div>
               <div className="text-[13px] mb-3" style={{ color: 'var(--muted)' }}>
                 <span className="font-medium" style={{ color: 'var(--text)' }}>{payModal.person_name}</span> — Kalan: {fmt(payModal.amount, payModal.currency)}
               </div>
               <div className="mb-4">
                 <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>
-                  {payModal.type === 'alacak' ? 'Tahsilat Tutari' : 'Odeme Tutari'}
+                  {payModal.type === 'alacak' ? 'Tahsilat Tutarı' : 'Ödeme Tutarı'}
                 </label>
                 <input value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder="0" type="number" className="input mono" />
               </div>
               <div className="flex gap-2">
-                <button onClick={() => { setPayModal(null); setPayAmount('') }} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => { setPayModal(null); setPayAmount('') }} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={handlePartialPay} disabled={paying || !payAmount || parseFloat(payAmount) <= 0}
                   className="btn-primary flex-1 py-2.5 text-sm">{paying ? 'Kaydediliyor...' : 'Onayla'}</button>
               </div>
@@ -424,23 +424,23 @@ export default function DebtsPage() {
             <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{editId ? 'Kaydi Duzenle' : 'Yeni Kayit'}</div>
+                <div className="text-sm font-semibold">{editId ? 'Kaydı Düzenle' : 'Yeni Kayıt'}</div>
                 <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kisi Adi</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kişi Adı</label>
                   <input value={form.person_name} onChange={e => set('person_name', e.target.value)} placeholder="Orn: Ahmet" className="input" />
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tür</label>
                     <select value={form.type} onChange={e => set('type', e.target.value)} className="input">
                       <option value="alacak">Alacak</option><option value="verecek">Verecek</option>
                     </select>
                   </div>
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={form.currency} onChange={e => set('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -453,23 +453,23 @@ export default function DebtsPage() {
 
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={form.is_recurring} onChange={e => set('is_recurring', e.target.checked)} className="w-4 h-4 rounded accent-[#0d9488]" />
-                  <span style={{ color: 'var(--muted)' }}>Duzenli / Tekrar eden odeme</span>
+                  <span style={{ color: 'var(--muted)' }}>Düzenli / Tekrar eden ödeme</span>
                 </label>
 
                 {form.is_recurring ? (
                   <>
                     <div className="flex gap-3">
                       <div className="flex-1">
-                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Siklik</label>
+                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Sıklık</label>
                         <select value={form.frequency} onChange={e => set('frequency', e.target.value)} className="input">
-                          <option value="aylik">Aylik</option>
-                          <option value="haftalik">Haftalik</option>
+                          <option value="aylik">Aylık</option>
+                          <option value="haftalik">Haftalık</option>
                           <option value="2haftada1">2 Haftada 1</option>
-                          <option value="duzensiz">Duzensiz</option>
+                          <option value="duzensiz">Düzensiz</option>
                         </select>
                       </div>
                       <div className="flex-1">
-                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ayin kacinda?</label>
+                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ayın kaçında?</label>
                         <input value={form.expected_day} onChange={e => set('expected_day', e.target.value)} placeholder="1-31" type="number" min="1" max="31" className="input" />
                       </div>
                     </div>
@@ -479,7 +479,7 @@ export default function DebtsPage() {
                         <input value={form.total_amount} onChange={e => set('total_amount', e.target.value)} placeholder="0" type="number" className="input mono" />
                       </div>
                       <div className="flex-1">
-                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Odenen tutar</label>
+                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ödenen tutar</label>
                         <input value={form.paid_amount} onChange={e => set('paid_amount', e.target.value)} placeholder="0" type="number" className="input mono" />
                       </div>
                     </div>
@@ -492,12 +492,12 @@ export default function DebtsPage() {
                 )}
 
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Aciklama</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Açıklama</label>
                   <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="Opsiyonel" className="input" />
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Islem Tarihi</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>İşlem Tarihi</label>
                     <input value={form.transaction_date} onChange={e => set('transaction_date', e.target.value)} type="date" className="input" />
                   </div>
                   <div className="flex-1">
@@ -507,7 +507,7 @@ export default function DebtsPage() {
                 </div>
               </div>
               <button onClick={handleSave} disabled={saving || !form.person_name || !form.amount}
-                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Guncelle' : 'Ekle'}</button>
+                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Güncelle' : 'Ekle'}</button>
             </div>
           </div>
         )}

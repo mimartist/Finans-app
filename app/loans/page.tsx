@@ -206,7 +206,7 @@ export default function LoansPage() {
 
   const catLabel = (val: string) => EXPENSE_CATEGORIES.find(c => c.value === val)
 
-  if (loading) return <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>Yukleniyor...</div>
+  if (loading) return <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>Yükleniyor...</div>
 
   return (
     <div className="app-layout">
@@ -227,7 +227,7 @@ export default function LoansPage() {
           <div className="flex gap-2 mt-4" style={{ position: 'relative', zIndex: 2 }}>
             <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
               style={{ border: '1px solid rgba(255,138,138,0.25)', background: 'rgba(255,138,138,0.08)' }}>
-              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,138,138,0.7)' }}>AYLIK ODEME</div>
+              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,138,138,0.7)' }}>AYLIK ÖDEME</div>
               <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#ff8a8a' }}>{fmt(totalMonthly)}</div>
             </div>
             <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
@@ -242,7 +242,7 @@ export default function LoansPage() {
               return (
                 <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
                   style={{ border: '1px solid rgba(134,239,172,0.25)', background: 'rgba(134,239,172,0.08)' }}>
-                  <div className="text-[9px] font-medium" style={{ color: 'rgba(134,239,172,0.7)' }}>ODENEN</div>
+                  <div className="text-[9px] font-medium" style={{ color: 'rgba(134,239,172,0.7)' }}>ÖDENEN</div>
                   <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#86efac' }}>%{paidPct}</div>
                 </div>
               )
@@ -255,7 +255,7 @@ export default function LoansPage() {
 
         {loans.length === 0 && (
           <div className="mx-4 card p-6 text-center text-sm mb-4" style={{ color: 'var(--muted)' }}>
-            Henuz kredi eklenmemis.<br />
+            Henüz kredi eklenmemiş.<br />
             <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>Kredi Ekle</button>
           </div>
         )}
@@ -284,7 +284,7 @@ export default function LoansPage() {
                         <span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>/ay</span>
                       </div>
                       {isPaid ? (
-                        <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Bu ay odendi</div>
+                        <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Bu ay ödendi</div>
                       ) : days !== null ? (
                         <div className="text-[11px] mt-0.5" style={{ color: days <= 3 ? '#dc2626' : 'var(--muted)' }}>{daysUntilLabel(days)}</div>
                       ) : null}
@@ -306,12 +306,12 @@ export default function LoansPage() {
                     <span style={{ color: pct >= 75 ? '#059669' : 'var(--muted)' }}>{loan.paid_installments}/{loan.total_installments} taksit</span>
                   )}
                   {loan.end_date && (
-                    <span>Bitis: {new Date(loan.end_date).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}</span>
+                    <span>Bitiş: {new Date(loan.end_date).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}</span>
                   )}
                 </div>
                 {loan.paid_installments > 0 && (
                   <div className="text-[10px] mt-1.5" style={{ color: 'var(--muted)' }}>
-                    Toplam Odenen: <span className="amt-green font-semibold">{fmt(loan.paid_installments * loan.monthly_payment, loan.currency)}</span>
+                    Toplam Ödenen: <span className="amt-green font-semibold">{fmt(loan.paid_installments * loan.monthly_payment, loan.currency)}</span>
                     {loan.currency === 'EUR' && <span> ({fmt(loan.paid_installments * loan.monthly_payment * eurTry)})</span>}
                     <span> · {loan.paid_installments} taksit</span>
                   </div>
@@ -333,9 +333,9 @@ export default function LoansPage() {
               {paidLoansList.length > 0 && (
                 <>
                   <div className="px-5 mb-2 flex items-center gap-2">
-                    <div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: '#059669' }}>Odenen Krediler</div>
+                    <div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: '#059669' }}>Ödenen Krediler</div>
                     <div className="flex-1 h-px" style={{ background: 'rgba(74,222,154,0.3)' }} />
-                    <div className="text-[10px] font-medium" style={{ color: '#059669' }}>{paidLoansList.length} odeme</div>
+                    <div className="text-[10px] font-medium" style={{ color: '#059669' }}>{paidLoansList.length} ödeme</div>
                   </div>
                   <div className="flex flex-col gap-2 mx-4 mb-4">
                     {paidLoansList.map(l => renderLoanCard(l, true))}
@@ -346,7 +346,7 @@ export default function LoansPage() {
           )
         })()}
 
-        <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Kredi Kartlari</div></div>
+        <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Kredi Kartları</div></div>
 
         {totalKK > 0 && (
           <div className="mx-4 mb-2 card px-4 py-3 flex items-center justify-between">
@@ -376,14 +376,14 @@ export default function LoansPage() {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium">{card.name}</div>
-                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>Ekstre: {card.statement_day}'i · Son odeme: {card.due_day}'i</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>Ekstre: {card.statement_day}'i · Son ödeme: {card.due_day}'i</div>
                   </div>
                   <div className="text-right">
                     {stmt ? (
                       <>
                         <div className={isCardPaid ? 'mono text-sm font-semibold' : 'mono text-sm font-semibold amt-amber'} style={isCardPaid ? { color: '#4ade9a' } : undefined}>{fmt(stmt.total_amount)}</div>
                         {isCardPaid ? (
-                          <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Odendi</div>
+                          <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Ödendi</div>
                         ) : (
                           <div className="text-[11px] mt-0.5" style={{ color: days && days <= 3 ? '#dc2626' : 'var(--muted)' }}>{days !== null ? daysUntilLabel(days) : ''}</div>
                         )}
@@ -405,7 +405,7 @@ export default function LoansPage() {
                     <button onClick={() => toggleExpand(card.id)}
                       className="text-[11px] font-medium px-3 py-1.5 rounded-lg"
                       style={{ background: 'var(--bg4)', color: 'var(--muted)' }}>
-                      {isExpanded ? 'Gizle' : `Son ${cardTxs.length} islem`}
+                      {isExpanded ? 'Gizle' : `Son ${cardTxs.length} işlem`}
                     </button>
                   )}
                 </div>
@@ -445,9 +445,9 @@ export default function LoansPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="card p-5 w-full max-w-sm">
               <div className="text-sm font-semibold mb-2">Krediyi Sil</div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu krediyi silmek istediginize emin misiniz?</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu krediyi silmek istediğinize emin misiniz?</div>
               <div className="flex gap-2">
-                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
               </div>
             </div>
@@ -458,10 +458,10 @@ export default function LoansPage() {
         {txDeleteConfirm !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="card p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-2">Harcamayi Sil</div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu harcamayi silmek istediginize emin misiniz?</div>
+              <div className="text-sm font-semibold mb-2">Harcamayı Sil</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu harcamayı silmek istediğinize emin misiniz?</div>
               <div className="flex gap-2">
-                <button onClick={() => setTxDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => setTxDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={() => handleTxDelete(txDeleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
               </div>
             </div>
@@ -474,24 +474,24 @@ export default function LoansPage() {
             <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{editId ? 'Krediyi Duzenle' : 'Yeni Kredi'}</div>
+                <div className="text-sm font-semibold">{editId ? 'Krediyi Düzenle' : 'Yeni Kredi'}</div>
                 <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
-                {inp('Kredi Adi', 'name', 'text', 'Orn: Mercedes Kredi')}
+                {inp('Kredi Adı', 'name', 'text', 'Orn: Mercedes Kredi')}
                 <div className="flex gap-3">
                   {inp('Banka', 'bank', 'text', 'Orn: Garanti')}
                   <div>
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tür</label>
                     <select value={form.type} onChange={e => set('type', e.target.value)} className="input">
-                      <option value="ihtiyac">Ihtiyac</option><option value="tasit">Tasit</option>
-                      <option value="konut">Konut</option><option value="ticari">Ticari</option><option value="diger">Diger</option>
+                      <option value="ihtiyac">İhtiyaç</option><option value="tasit">Taşıt</option>
+                      <option value="konut">Konut</option><option value="ticari">Ticari</option><option value="diger">Diğer</option>
                     </select>
                   </div>
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={form.currency} onChange={e => set('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -499,14 +499,14 @@ export default function LoansPage() {
                   {inp('Faiz %', 'interest_rate', 'number', '0')}
                 </div>
                 <div className="flex gap-3">{inp('Orijinal Tutar', 'original_amount', 'number', '0')}{inp('Kalan Tutar', 'remaining_amount', 'number', '0')}</div>
-                <div className="flex gap-3">{inp('Aylik Odeme', 'monthly_payment', 'number', '0')}{inp('Odeme Gunu', 'payment_day', 'number', '1-31')}</div>
-                <div className="flex gap-3">{inp('Toplam Taksit', 'total_installments', 'number', '0')}{inp('Odenen Taksit', 'paid_installments', 'number', '0')}</div>
-                <div className="flex gap-3">{inp('Baslangic', 'start_date', 'date')}{inp('Bitis', 'end_date', 'date')}</div>
+                <div className="flex gap-3">{inp('Aylık Ödeme', 'monthly_payment', 'number', '0')}{inp('Ödeme Günü', 'payment_day', 'number', '1-31')}</div>
+                <div className="flex gap-3">{inp('Toplam Taksit', 'total_installments', 'number', '0')}{inp('Ödenen Taksit', 'paid_installments', 'number', '0')}</div>
+                <div className="flex gap-3">{inp('Başlangıç', 'start_date', 'date')}{inp('Bitiş', 'end_date', 'date')}</div>
                 {inp('Teminat', 'collateral', 'text', 'Orn: Arac rehni')}
                 {inp('Notlar', 'notes', 'text')}
               </div>
               <button onClick={handleSave} disabled={saving || !form.name || !form.bank || !form.monthly_payment}
-                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Guncelle' : 'Ekle'}</button>
+                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Güncelle' : 'Ekle'}</button>
             </div>
           </div>
         )}
@@ -517,7 +517,7 @@ export default function LoansPage() {
             <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{txEditId ? 'Harcamayi Duzenle' : 'Yeni Harcama'}</div>
+                <div className="text-sm font-semibold">{txEditId ? 'Harcamayı Düzenle' : 'Yeni Harcama'}</div>
                 <button onClick={closeTxForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
@@ -526,13 +526,13 @@ export default function LoansPage() {
                   <input value={txForm.transaction_date} onChange={e => setTx('transaction_date', e.target.value)} type="date" className="input" />
                 </div>
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Aciklama</label>
-                  <input value={txForm.description} onChange={e => setTx('description', e.target.value)} placeholder="Orn: Migros alisveris" className="input" />
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Açıklama</label>
+                  <input value={txForm.description} onChange={e => setTx('description', e.target.value)} placeholder="Orn: Migros alışveriş" className="input" />
                 </div>
                 <div>
                   <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kategori</label>
                   <select value={txForm.category} onChange={e => setTx('category', e.target.value)} className="input">
-                    <option value="">Secin...</option>
+                    <option value="">Seçin...</option>
                     {CATEGORY_GROUPS.map(group => (
                       <optgroup key={group} label={group}>
                         {EXPENSE_CATEGORIES.filter(c => c.group === group).map(c => (
@@ -556,7 +556,7 @@ export default function LoansPage() {
                 </div>
               </div>
               <button onClick={handleTxSave} disabled={txSaving || !txForm.description || !txForm.amount}
-                className="btn-primary w-full mt-4 py-3">{txSaving ? 'Kaydediliyor...' : txEditId ? 'Guncelle' : 'Ekle'}</button>
+                className="btn-primary w-full mt-4 py-3">{txSaving ? 'Kaydediliyor...' : txEditId ? 'Güncelle' : 'Ekle'}</button>
             </div>
           </div>
         )}

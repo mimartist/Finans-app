@@ -136,7 +136,7 @@ export default function AccountsPage() {
 
   // Group accounts by bank
   const bankGroups = accounts.reduce((groups, acc) => {
-    const bank = acc.bank || 'Diger'
+    const bank = acc.bank || 'Diğer'
     if (!groups[bank]) groups[bank] = []
     groups[bank].push(acc)
     return groups
@@ -226,13 +226,13 @@ export default function AccountsPage() {
 
   const tabs: { key: Tab; label: string; Icon: any }[] = [
     { key: 'hesaplar', label: 'Hesaplar', Icon: IconWallet },
-    { key: 'yatirimlar', label: 'Yatirimlar', Icon: IconTrendUp },
-    { key: 'alacak', label: 'Alacak/Borc', Icon: IconArrowsExchange },
+    { key: 'yatirimlar', label: 'Yatırımlar', Icon: IconTrendUp },
+    { key: 'alacak', label: 'Alacak/Borç', Icon: IconArrowsExchange },
   ]
 
   if (loading) return (
     <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>
-      <div className="text-sm font-medium">Yukleniyor...</div>
+      <div className="text-sm font-medium">Yükleniyor...</div>
     </div>
   )
 
@@ -401,7 +401,7 @@ export default function AccountsPage() {
                 </div>
               </div>
               <div className="text-[10px] mt-3 text-center" style={{ color: 'rgba(255,255,255,0.35)', position: 'relative', zIndex: 2 }}>
-                {investments.length} yatirim · {winners} karda · {losers} zararda
+                {investments.length} yatırım · {winners} karda · {losers} zararda
               </div>
             </div>
 
@@ -452,13 +452,13 @@ export default function AccountsPage() {
                   style={{ border: '1px solid rgba(134,239,172,0.25)', background: 'rgba(134,239,172,0.08)' }}>
                   <div className="text-[9px] font-medium" style={{ color: 'rgba(134,239,172,0.7)' }}>ALACAK</div>
                   <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#86efac' }}>{fmt(totalAlacak)}</div>
-                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{alacaklar.length} kisi</div>
+                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{alacaklar.length} kişi</div>
                 </div>
                 <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
                   style={{ border: '1px solid rgba(255,138,138,0.25)', background: 'rgba(255,138,138,0.08)' }}>
                   <div className="text-[9px] font-medium" style={{ color: 'rgba(255,138,138,0.7)' }}>BORC</div>
                   <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#ff8a8a' }}>{fmt(totalVerecek)}</div>
-                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{verecekler.length} kisi</div>
+                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{verecekler.length} kişi</div>
                 </div>
               </div>
               {(overdueAlacak > 0 || upcomingAlacak > 0) && (
@@ -482,7 +482,7 @@ export default function AccountsPage() {
                       </div>
                       <div className="tx-info">
                         <div className="tx-name">{d.person_name}</div>
-                        <div className="tx-detail">{d.description || 'Alacak'}{d.is_recurring ? ' · Duzenli' : ''}</div>
+                        <div className="tx-detail">{d.description || 'Alacak'}{d.is_recurring ? ' · Düzenli' : ''}</div>
                       </div>
                       <div className="tx-amount">
                         <div className="tx-value amt-green">+{fmt(d.amount, d.currency)}</div>
@@ -497,7 +497,7 @@ export default function AccountsPage() {
             {/* Verecekler */}
             {verecekler.length > 0 && (
               <>
-                <div className="mx-5 mb-2 text-xs font-bold" style={{ color: '#e5484d' }}>Borclar</div>
+                <div className="mx-5 mb-2 text-xs font-bold" style={{ color: '#e5484d' }}>Borçlar</div>
                 <div className="flex flex-col gap-2 mx-4 mb-4">
                   {verecekler.map(d => (
                     <div key={d.id} className="tx-item" style={{ cursor: 'pointer' }} onClick={() => openDebtEdit(d)}>
@@ -525,20 +525,20 @@ export default function AccountsPage() {
             <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">Yatirimi Duzenle</div>
+                <div className="text-sm font-semibold">Yatırımı Düzenle</div>
                 <button onClick={closeInvEdit} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Yatirim Adi</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Yatırım Adı</label>
                   <input value={invForm.name} onChange={e => setInv('name', e.target.value)} className="input" />
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tür</label>
                     <select value={invForm.type} onChange={e => setInv('type', e.target.value)} className="input">
-                      <option value="hisse">Hisse</option><option value="fon">Fon</option><option value="altin">Altin</option>
-                      <option value="doviz">Doviz</option><option value="kripto">Kripto</option><option value="diger">Diger</option>
+                      <option value="hisse">Hisse</option><option value="fon">Fon</option><option value="altin">Altın</option>
+                      <option value="doviz">Döviz</option><option value="kripto">Kripto</option><option value="diger">Diğer</option>
                     </select>
                   </div>
                   <div className="flex-1">
@@ -558,9 +558,9 @@ export default function AccountsPage() {
                 </div>
                 {/* Current price */}
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Guncel Fiyat (Birim)</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Güncel Fiyat (Birim)</label>
                   <input value={invForm.current_price} onChange={e => setInv('current_price', e.target.value)} type="number" step="any" className="input mono"
-                    placeholder={editInv?.latest_price ? `Son: ${editInv.latest_price}` : 'Guncel fiyati girin'} />
+                    placeholder={editInv?.latest_price ? `Son: ${editInv.latest_price}` : 'Güncel fiyatı girin'} />
                 </div>
 
                 {/* Live P&L calculation card */}
@@ -575,7 +575,7 @@ export default function AccountsPage() {
                   if (qty <= 0 || avgCost <= 0) return null
                   return (
                     <div className="rounded-xl p-3" style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}>
-                      <div className="text-[9px] uppercase tracking-wide font-semibold mb-2" style={{ color: 'var(--muted)' }}>Canli Hesaplama</div>
+                      <div className="text-[9px] uppercase tracking-wide font-semibold mb-2" style={{ color: 'var(--muted)' }}>Canlı Hesaplama</div>
                       <div className="flex justify-between text-[11px] mb-1">
                         <span style={{ color: 'var(--muted)' }}>Maliyet</span>
                         <span className="mono font-bold">{fmt(costBasis, invForm.currency)}</span>
@@ -583,7 +583,7 @@ export default function AccountsPage() {
                       {curPrice > 0 && (
                         <>
                           <div className="flex justify-between text-[11px] mb-1">
-                            <span style={{ color: 'var(--muted)' }}>Guncel Deger</span>
+                            <span style={{ color: 'var(--muted)' }}>Güncel Değer</span>
                             <span className="mono font-bold">{fmt(currentValue, invForm.currency)}</span>
                           </div>
                           <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6 }} className="flex justify-between text-[11px]">
@@ -608,7 +608,7 @@ export default function AccountsPage() {
 
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={invForm.currency} onChange={e => setInv('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -621,7 +621,7 @@ export default function AccountsPage() {
 
                 {editInv?.snapshot_date && (
                   <div className="text-[10px] text-right" style={{ color: 'var(--muted)' }}>
-                    Son guncelleme: {new Date(editInv.snapshot_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    Son güncelleme: {new Date(editInv.snapshot_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </div>
                 )}
               </div>
@@ -633,9 +633,9 @@ export default function AccountsPage() {
                   className="w-full mt-2 py-3 rounded-xl text-sm font-semibold">Sil</button>
               ) : (
                 <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
-                  <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu yatirimi silmek istediginize emin misiniz?</div>
+                  <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu yatırımı silmek istediğinize emin misiniz?</div>
                   <div className="flex gap-2">
-                    <button onClick={() => setInvDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--bg4)', color: 'var(--text)' }}>Iptal</button>
+                    <button onClick={() => setInvDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--bg4)', color: 'var(--text)' }}>İptal</button>
                     <button onClick={handleInvDelete} className="flex-1 py-2 rounded-lg text-sm font-semibold" style={{ background: '#dc2626', color: '#fff' }}>Evet, Sil</button>
                   </div>
                 </div>
@@ -650,23 +650,23 @@ export default function AccountsPage() {
             <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">Kaydi Duzenle</div>
+                <div className="text-sm font-semibold">Kaydı Düzenle</div>
                 <button onClick={closeDebtEdit} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kisi Adi</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kişi Adı</label>
                   <input value={debtForm.person_name} onChange={e => setDbt('person_name', e.target.value)} className="input" />
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tür</label>
                     <select value={debtForm.type} onChange={e => setDbt('type', e.target.value)} className="input">
                       <option value="alacak">Alacak</option><option value="verecek">Verecek</option>
                     </select>
                   </div>
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={debtForm.currency} onChange={e => setDbt('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -677,7 +677,7 @@ export default function AccountsPage() {
                   <input value={debtForm.amount} onChange={e => setDbt('amount', e.target.value)} type="number" step="any" className="input mono" />
                 </div>
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Aciklama</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Açıklama</label>
                   <input value={debtForm.description} onChange={e => setDbt('description', e.target.value)} className="input" />
                 </div>
                 <div>
@@ -693,9 +693,9 @@ export default function AccountsPage() {
                   className="w-full mt-2 py-3 rounded-xl text-sm font-semibold">Sil</button>
               ) : (
                 <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
-                  <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu kaydi silmek istediginize emin misiniz?</div>
+                  <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu kaydı silmek istediğinize emin misiniz?</div>
                   <div className="flex gap-2">
-                    <button onClick={() => setDebtDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--bg4)', color: 'var(--text)' }}>Iptal</button>
+                    <button onClick={() => setDebtDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--bg4)', color: 'var(--text)' }}>İptal</button>
                     <button onClick={handleDebtDelete} className="flex-1 py-2 rounded-lg text-sm font-semibold" style={{ background: '#dc2626', color: '#fff' }}>Evet, Sil</button>
                   </div>
                 </div>

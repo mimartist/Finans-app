@@ -3,7 +3,7 @@ import '../styles/globals.css'
 
 export const metadata: Metadata = {
   title: 'Finans Asistan',
-  description: 'Kisisel finans ve varlik takip asistani',
+  description: 'Kişisel finans ve varlık takip asistanı',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,

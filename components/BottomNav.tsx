@@ -73,7 +73,7 @@ export default function BottomNav() {
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold mt-4"
             style={{ background: 'linear-gradient(135deg, #2b2d6e, #3d3f8f)', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(43,45,110,0.3)' }}>
             <IconPlus color="#fff" size={20} strokeWidth={2.5} />
-            <span>Hizli Ekle</span>
+            <span>Hızlı Ekle</span>
           </button>
         </nav>
       </aside>

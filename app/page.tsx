@@ -15,7 +15,7 @@ type PaymentItem = {
 
 type MonthKey = { year: number; month: number }
 
-const MONTH_NAMES = ['Ocak','Subat','Mart','Nisan','Mayis','Haziran','Temmuz','Agustos','Eylul','Ekim','Kasim','Aralik']
+const MONTH_NAMES = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
 
 function monthLabel(m: MonthKey) { return `${MONTH_NAMES[m.month-1]} ${m.year}` }
 function sameMonth(a: MonthKey, b: MonthKey) { return a.year === b.year && a.month === b.month }
@@ -227,14 +227,14 @@ export default function Dashboard() {
   }
 
   const hour = now.getHours()
-  const greeting = hour < 12 ? 'Gunaydin' : hour < 18 ? 'Iyi Gunler' : 'Iyi Aksamlar'
+  const greeting = hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi Günler' : 'İyi Akşamlar'
   const selMonthShort = MONTH_NAMES[selectedMonth.month - 1].substring(0, 3)
 
   if (loading) return (
     <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>
       <div className="flex flex-col items-center gap-3">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-extrabold text-white" style={{ background: 'linear-gradient(135deg, #2b2d6e, #4a4db0)' }}>F</div>
-        <div className="text-sm font-medium">Yukleniyor...</div>
+        <div className="text-sm font-medium">Yükleniyor...</div>
       </div>
     </div>
   )
@@ -254,7 +254,7 @@ export default function Dashboard() {
         <div className="tx-info">
           <div className="tx-name" style={{ textDecoration: p.paid ? 'line-through' : 'none' }}>{p.name}</div>
           <div className="tx-detail" style={{ color: statusColor }}>
-            {p.paid ? 'Odendi' : (() => {
+            {p.paid ? 'Ödendi' : (() => {
               if (p.type === 'kredi_karti') {
                 // CC: days is actual diff from today, calculate real date
                 const payDate = new Date(); payDate.setDate(payDate.getDate() + p.days)
@@ -272,7 +272,7 @@ export default function Dashboard() {
           {isCurrent && !p.paid && (
             <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
               className="tx-badge" style={{ background: p.overdue ? 'rgba(229,160,0,0.08)' : 'rgba(43,45,110,0.06)', color: p.overdue ? '#e5a000' : '#2b2d6e', border: 'none', cursor: 'pointer' }}>
-              {p.overdue ? 'Onayla' : 'Ode'}
+              {p.overdue ? 'Onayla' : 'Öde'}
             </button>
           )}
         </div>
@@ -313,12 +313,12 @@ export default function Dashboard() {
         <div className="mx-4 mt-3 card-hero p-6" style={{ position: 'relative', zIndex: 1, cursor: 'pointer', transition: 'all 0.3s ease' }}
           onClick={() => setHeroExpanded(e => !e)}>
           <div className="flex items-center justify-between mb-1" style={{ position: 'relative', zIndex: 2 }}>
-            <div className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)' }}>Toplam Varlik</div>
+            <div className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)' }}>Toplam Varlık</div>
             <IconWallet color="rgba(255,255,255,0.3)" size={20} />
           </div>
           <div className="mono text-3xl font-extrabold mb-1" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalAssetsTry)}</div>
           <div className="text-[10px] mb-4" style={{ position: 'relative', zIndex: 2, color: 'rgba(255,255,255,0.4)' }}>
-            {heroExpanded ? 'Gizlemek icin dokun ↑' : 'Detaylar icin dokun ↓'}
+            {heroExpanded ? 'Gizlemek için dokun ↑' : 'Detaylar için dokun ↓'}
           </div>
           <div className="flex gap-2" style={{ position: 'relative', zIndex: 2 }}>
             {[
@@ -344,11 +344,11 @@ export default function Dashboard() {
             marginTop: heroExpanded ? 20 : 0,
           }}>
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 16 }}>
-              <div className="text-[9px] font-medium uppercase tracking-wider mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>Varlik Dagilimi</div>
+              <div className="text-[9px] font-medium uppercase tracking-wider mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>Varlık Dağılımı</div>
               <div className="flex flex-col gap-3">
                 {[
                   { label: 'Nakit', value: cashTry, icon: '🏦' },
-                  { label: 'Yatirim', value: investTotalTry, icon: '📈' },
+                  { label: 'Yatırım', value: investTotalTry, icon: '📈' },
                   { label: 'Alacak', value: alacakTry, icon: '💰' },
                 ].filter(r => r.value > 0).map(r => {
                   const pct = totalAssetsTry > 0 ? Math.round((r.value / totalAssetsTry) * 100) : 0
@@ -374,11 +374,11 @@ export default function Dashboard() {
               </div>
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 14, paddingTop: 12 }}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Toplam Borc</span>
+                  <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Toplam Borç</span>
                   <span className="mono text-[11px] font-bold" style={{ color: '#ff8a8a' }}>{fmt(totalDebtTry)}</span>
                 </div>
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-[10px] font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>Net Varlik</span>
+                  <span className="text-[10px] font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>Net Varlık</span>
                   <span className="mono text-[13px] font-extrabold" style={{ color: totalAssetsTry - totalDebtTry >= 0 ? '#86efac' : '#ff8a8a' }}>
                     {fmt(totalAssetsTry - totalDebtTry)}
                   </span>
@@ -388,15 +388,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ===== DUAL COLUMNS: Varliklar | Harcamalar ===== */}
+        {/* ===== DUAL COLUMNS: Varlıklar | Harcamalar ===== */}
         <div className="grid grid-cols-2 gap-3 mx-4 mt-4">
-          {/* Left: Varliklar */}
+          {/* Left: Varlıklar */}
           <div className="card p-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#2b2d6e' }}>Varliklar</div>
+            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#2b2d6e' }}>Varlıklar</div>
             <div className="flex flex-col gap-3">
               {[
                 { label: 'Nakit', value: cashTry, color: '#2b2d6e' },
-                { label: 'Yatirim', value: investTotalTry, color: '#4a4db0' },
+                { label: 'Yatırım', value: investTotalTry, color: '#4a4db0' },
                 { label: 'Alacak', value: alacakTry, color: '#6366f1' },
               ].filter(r => r.value > 0).map(r => (
                 <div key={r.label}>
@@ -414,11 +414,11 @@ export default function Dashboard() {
 
           {/* Right: Harcamalar */}
           <div className="card p-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#e5484d' }}>Yukumluluk</div>
+            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#e5484d' }}>Yükümlülük</div>
             <div className="flex flex-col gap-3">
               {[
-                { label: 'Toplam Borc', value: totalDebtTry, color: '#e5484d' },
-                { label: 'Aylik Gider', value: monthlyTotalAll, color: '#d97706' },
+                { label: 'Toplam Borç', value: totalDebtTry, color: '#e5484d' },
+                { label: 'Aylık Gider', value: monthlyTotalAll, color: '#d97706' },
               ].map(r => (
                 <div key={r.label}>
                   <div className="flex items-center justify-between">
@@ -442,7 +442,7 @@ export default function Dashboard() {
 
         {/* ===== CHART ===== */}
         <div className="mx-4 mt-4 card p-4">
-          <div className="text-xs font-bold mb-2" style={{ color: 'var(--text)' }}>Aylik Gider Trendi</div>
+          <div className="text-xs font-bold mb-2" style={{ color: 'var(--text)' }}>Aylık Gider Trendi</div>
           <ResponsiveContainer width="100%" height={120}>
             <BarChart data={chartData} barSize={20}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -490,17 +490,17 @@ export default function Dashboard() {
           {/* Header */}
           <div className="flex items-center justify-between mb-3 px-1">
             <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>{isPast ? monthLabel(selectedMonth) : isFuture ? monthLabel(selectedMonth) : 'Bu Ay'}</span>
-            <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>{paidPayments.length}/{payments.length} odeme</span>
+            <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>{paidPayments.length}/{payments.length} ödeme</span>
           </div>
 
-          {/* Inner nested cards — Toplam / Odenen */}
+          {/* Inner nested cards — Toplam / Ödenen */}
           <div className="flex gap-2.5 mb-2.5">
             <div className="flex-1" style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 3px rgba(43,45,110,0.04)' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Toplam</div>
               <div className="mono text-lg font-extrabold mt-1" style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>{fmt(totalObligation)}</div>
             </div>
             <div className="flex-1" style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 3px rgba(43,45,110,0.04)' }}>
-              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Odenen</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Ödenen</div>
               <div className="mono text-lg font-extrabold mt-1 amt-green" style={{ letterSpacing: '-0.03em' }}>{fmt(paidTotal)}</div>
             </div>
           </div>
@@ -514,7 +514,7 @@ export default function Dashboard() {
               </div>
               <div className="text-right">
                 <div className="mono text-xl font-extrabold" style={{ color: '#2b2d6e', letterSpacing: '-0.03em' }}>%{paidPct}</div>
-                <div className="text-[9px]" style={{ color: 'var(--muted)' }}>tamamlandi</div>
+                <div className="text-[9px]" style={{ color: 'var(--muted)' }}>tamamlandı</div>
               </div>
             </div>
             <div className="progress-wrap">
@@ -528,8 +528,8 @@ export default function Dashboard() {
           {unpaidPayments.length > 0 && (
             <>
               <div className="flex items-center justify-between mx-5 mb-3">
-                <span className="text-xs font-bold">{isFuture ? 'Planlanan' : isPast ? 'Odenmemis' : 'Bekleyen Odemeler'}</span>
-                {overduePayments.length > 0 && <span className="badge badge-amber">{overduePayments.length} gecmis</span>}
+                <span className="text-xs font-bold">{isFuture ? 'Planlanan' : isPast ? 'Ödenmemiş' : 'Bekleyen Ödemeler'}</span>
+                {overduePayments.length > 0 && <span className="badge badge-amber">{overduePayments.length} geçmiş</span>}
               </div>
               <div className="tx-list mx-4 mb-4">{unpaidPayments.map(renderPaymentItem)}</div>
             </>
@@ -537,14 +537,14 @@ export default function Dashboard() {
           {unpaidPayments.length === 0 && (
             <div className="mx-4 mb-4 card p-6 text-center">
               <IconCheck color="#30a46c" size={28} strokeWidth={2.5} />
-              <div className="text-sm font-semibold mt-2" style={{ color: '#30a46c' }}>Tum odemeler tamamlandi</div>
+              <div className="text-sm font-semibold mt-2" style={{ color: '#30a46c' }}>Tum ödemeler tamamlandı</div>
             </div>
           )}
           {paidPayments.length > 0 && (
             <>
               <div className="flex items-center justify-between mx-5 mb-3">
                 <span className="text-xs font-bold" style={{ color: '#30a46c' }}>Tamamlanan</span>
-                <span className="text-[10px] font-medium" style={{ color: '#30a46c' }}>{paidPayments.length} odeme</span>
+                <span className="text-[10px] font-medium" style={{ color: '#30a46c' }}>{paidPayments.length} ödeme</span>
               </div>
               <div className="tx-list mx-4 mb-4">{paidPayments.map(renderPaymentItem)}</div>
             </>
@@ -556,7 +556,7 @@ export default function Dashboard() {
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(30,31,84,0.5)' }}
             onClick={e => { if (e.target === e.currentTarget) { setPayModal(null); setPayAccountId(null) } }}>
             <div className="card p-6 w-full max-w-sm scale-in">
-              <div className="text-base font-bold mb-1">{payModal.overdue ? 'Gecmis Odemeyi Onayla' : 'Odeme Yap'}</div>
+              <div className="text-base font-bold mb-1">{payModal.overdue ? 'Geçmiş Ödemeyi Onayla' : 'Ödeme Yap'}</div>
               <div className="text-sm mb-5" style={{ color: 'var(--muted)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text)' }}>{payModal.name}</span>
                 <span className="mono ml-2 font-bold">{fmt(payModal.amount, payModal.currency)}</span>
@@ -568,7 +568,7 @@ export default function Dashboard() {
                 </select>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setPayModal(null); setPayAccountId(null) }} className="btn-outline flex-1 py-3 text-sm">Iptal</button>
+                <button onClick={() => { setPayModal(null); setPayAccountId(null) }} className="btn-outline flex-1 py-3 text-sm">İptal</button>
                 <button onClick={handlePay} disabled={paying || !payAccountId} className="btn-primary flex-1 py-3 text-sm">{paying ? 'Kaydediliyor...' : 'Onayla'}</button>
               </div>
             </div>
