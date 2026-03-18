@@ -26,18 +26,23 @@ const MOCK_DEBTS: DebtRecord[] = [
 ]
 const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('T')[0], usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
 
-// Bank brand colors
-const BANK_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
-  'Denizbank': { bg: 'rgba(0,83,159,0.06)', text: '#00539f', icon: '🏦' },
-  'Garanti BBVA': { bg: 'rgba(0,130,66,0.06)', text: '#008242', icon: '🏛️' },
-  'Halkbank': { bg: 'rgba(0,73,144,0.06)', text: '#004990', icon: '🏦' },
-  'N26': { bg: 'rgba(72,209,204,0.06)', text: '#36a3a0', icon: '💳' },
-  'Sparkasse': { bg: 'rgba(255,0,0,0.06)', text: '#cc0000', icon: '🔴' },
-  'Ziraat': { bg: 'rgba(0,123,62,0.06)', text: '#007b3e', icon: '🌾' },
-  'Vakifbank': { bg: 'rgba(0,51,153,0.06)', text: '#003399', icon: '🏛️' },
-  'Is Bankasi': { bg: 'rgba(0,56,147,0.06)', text: '#003893', icon: '🏦' },
+// Bank brand colors & domains for favicon
+const BANK_META: Record<string, { bg: string; text: string; domain: string }> = {
+  'Denizbank': { bg: 'rgba(0,83,159,0.06)', text: '#00539f', domain: 'denizbank.com' },
+  'Garanti BBVA': { bg: 'rgba(0,130,66,0.06)', text: '#008242', domain: 'garantibbva.com.tr' },
+  'Halkbank': { bg: 'rgba(0,73,144,0.06)', text: '#004990', domain: 'halkbank.com.tr' },
+  'N26': { bg: 'rgba(72,209,204,0.06)', text: '#36a3a0', domain: 'n26.com' },
+  'Sparkasse': { bg: 'rgba(255,0,0,0.06)', text: '#cc0000', domain: 'sparkasse.de' },
+  'Ziraat': { bg: 'rgba(0,123,62,0.06)', text: '#007b3e', domain: 'ziraatbank.com.tr' },
+  'Vakifbank': { bg: 'rgba(0,51,153,0.06)', text: '#003399', domain: 'vakifbank.com.tr' },
+  'Is Bankasi': { bg: 'rgba(0,56,147,0.06)', text: '#003893', domain: 'isbank.com.tr' },
 }
-const getBank = (bank: string) => BANK_COLORS[bank] || { bg: 'rgba(43,45,110,0.06)', text: '#2b2d6e', icon: '🏦' }
+const getBankMeta = (bank: string) => BANK_META[bank] || { bg: 'rgba(43,45,110,0.06)', text: '#2b2d6e', domain: '' }
+const getBankLogo = (bank: string) => {
+  const meta = getBankMeta(bank)
+  if (meta.domain) return `https://www.google.com/s2/favicons?domain=${meta.domain}&sz=64`
+  return ''
+}
 
 export default function AccountsPage() {
   const [tab, setTab] = useState<Tab>('hesaplar')
@@ -175,7 +180,8 @@ export default function AccountsPage() {
             {/* Bank grouped accounts */}
             <div className="flex flex-col gap-3 mx-4">
               {bankTotals.map(({ bank, accounts: bankAccounts, total }) => {
-                const colors = getBank(bank)
+                const colors = getBankMeta(bank)
+                const logo = getBankLogo(bank)
                 const isExpanded = expandedBanks.has(bank)
                 return (
                   <div key={bank} className="rounded-2xl overflow-hidden" style={{ border: '1.5px solid var(--border)', background: 'var(--bg2)', boxShadow: 'var(--shadow)' }}>
@@ -183,9 +189,13 @@ export default function AccountsPage() {
                     <button onClick={() => toggleBank(bank)}
                       className="w-full flex items-center gap-3 px-4 py-3.5"
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-sm"
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
                         style={{ background: colors.bg }}>
-                        {colors.icon}
+                        {logo ? (
+                          <img src={logo} alt={bank} className="w-6 h-6 object-contain" style={{ borderRadius: 4 }} />
+                        ) : (
+                          <IconWallet color={colors.text} size={18} />
+                        )}
                       </div>
                       <div className="flex-1 text-left">
                         <div className="text-[13px] font-bold" style={{ color: 'var(--text)' }}>{bank}</div>
