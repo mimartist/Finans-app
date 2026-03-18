@@ -17,7 +17,7 @@ type InvestmentWithSnapshot = Investment & {
   snapshot_date?: string
 }
 
-const emptyInvForm = { name: '', type: 'hisse', symbol: '', quantity: '', avg_cost: '', currency: 'TRY', platform: '' }
+const emptyInvForm = { name: '', type: 'hisse', symbol: '', quantity: '', avg_cost: '', currency: 'TRY', platform: '', current_price: '' }
 const emptyDebtForm = { person_name: '', type: 'alacak' as 'alacak' | 'verecek', amount: '', currency: 'TRY', description: '', due_date: '' }
 
 // Mock data
@@ -160,7 +160,8 @@ export default function AccountsPage() {
   // Investment edit handlers
   function openInvEdit(inv: InvestmentWithSnapshot) {
     setEditInv(inv)
-    setInvForm({ name: inv.name, type: inv.type, symbol: inv.symbol || '', quantity: String(inv.quantity || ''), avg_cost: String(inv.avg_cost || ''), currency: inv.currency, platform: inv.platform || '' })
+    const currentPrice = inv.latest_price || (inv.total_value && inv.quantity ? inv.total_value / inv.quantity : 0)
+    setInvForm({ name: inv.name, type: inv.type, symbol: inv.symbol || '', quantity: String(inv.quantity || ''), avg_cost: String(inv.avg_cost || ''), currency: inv.currency, platform: inv.platform || '', current_price: currentPrice ? String(currentPrice) : '' })
     setInvDeleteConfirm(false)
   }
   function closeInvEdit() { setEditInv(null); setInvForm(emptyInvForm); setInvDeleteConfirm(false) }
@@ -169,8 +170,23 @@ export default function AccountsPage() {
     if (!editInv || !invForm.name || !invForm.quantity) return
     if (isDemo) { closeInvEdit(); return }
     setInvSaving(true)
-    const payload = { name: invForm.name, type: invForm.type, symbol: invForm.symbol || null, quantity: parseFloat(invForm.quantity) || 0, avg_cost: parseFloat(invForm.avg_cost) || 0, currency: invForm.currency, platform: invForm.platform || null, is_active: true }
+    const qty = parseFloat(invForm.quantity) || 0
+    const avgCost = parseFloat(invForm.avg_cost) || 0
+    const currentPrice = parseFloat(invForm.current_price) || 0
+    const payload = { name: invForm.name, type: invForm.type, symbol: invForm.symbol || null, quantity: qty, avg_cost: avgCost, currency: invForm.currency, platform: invForm.platform || null, is_active: true }
     await supabase.from('investments').update(payload).eq('id', editInv.id)
+    // Update or insert snapshot with current price
+    if (currentPrice > 0) {
+      const totalValue = currentPrice * qty
+      const today = new Date().toISOString().split('T')[0]
+      const totalValueTry = invForm.currency === 'EUR' ? totalValue * eurTry : invForm.currency === 'USD' ? totalValue * usdTry : totalValue
+      // Upsert: delete old snapshot for this investment, insert new one
+      await supabase.from('investment_snapshots').delete().eq('investment_id', editInv.id)
+      await supabase.from('investment_snapshots').insert({
+        investment_id: editInv.id, snapshot_date: today, price: currentPrice,
+        total_value: totalValue, total_value_try: totalValueTry,
+      })
+    }
     setInvSaving(false); closeInvEdit(); await loadData()
   }
 
@@ -540,6 +556,56 @@ export default function AccountsPage() {
                     <input value={invForm.avg_cost} onChange={e => setInv('avg_cost', e.target.value)} type="number" step="any" className="input mono" />
                   </div>
                 </div>
+                {/* Current price */}
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Guncel Fiyat (Birim)</label>
+                  <input value={invForm.current_price} onChange={e => setInv('current_price', e.target.value)} type="number" step="any" className="input mono"
+                    placeholder={editInv?.latest_price ? `Son: ${editInv.latest_price}` : 'Guncel fiyati girin'} />
+                </div>
+
+                {/* Live P&L calculation card */}
+                {(() => {
+                  const qty = parseFloat(invForm.quantity) || 0
+                  const avgCost = parseFloat(invForm.avg_cost) || 0
+                  const curPrice = parseFloat(invForm.current_price) || 0
+                  const costBasis = qty * avgCost
+                  const currentValue = curPrice > 0 ? qty * curPrice : 0
+                  const pnl = currentValue - costBasis
+                  const pnlPct = costBasis > 0 ? (pnl / costBasis) * 100 : 0
+                  if (qty <= 0 || avgCost <= 0) return null
+                  return (
+                    <div className="rounded-xl p-3" style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}>
+                      <div className="text-[9px] uppercase tracking-wide font-semibold mb-2" style={{ color: 'var(--muted)' }}>Canli Hesaplama</div>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span style={{ color: 'var(--muted)' }}>Maliyet</span>
+                        <span className="mono font-bold">{fmt(costBasis, invForm.currency)}</span>
+                      </div>
+                      {curPrice > 0 && (
+                        <>
+                          <div className="flex justify-between text-[11px] mb-1">
+                            <span style={{ color: 'var(--muted)' }}>Guncel Deger</span>
+                            <span className="mono font-bold">{fmt(currentValue, invForm.currency)}</span>
+                          </div>
+                          <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6 }} className="flex justify-between text-[11px]">
+                            <span className="font-semibold" style={{ color: pnl >= 0 ? '#30a46c' : '#e5484d' }}>
+                              {pnl >= 0 ? 'Kar' : 'Zarar'}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="mono font-bold" style={{ color: pnl >= 0 ? '#30a46c' : '#e5484d' }}>
+                                {pnl >= 0 ? '+' : ''}{fmt(pnl, invForm.currency)}
+                              </span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold"
+                                style={{ background: pnl >= 0 ? 'rgba(48,164,108,0.1)' : 'rgba(229,72,77,0.1)', color: pnl >= 0 ? '#30a46c' : '#e5484d' }}>
+                                {pnl >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
+
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
@@ -552,6 +618,12 @@ export default function AccountsPage() {
                     <input value={invForm.platform} onChange={e => setInv('platform', e.target.value)} className="input" />
                   </div>
                 </div>
+
+                {editInv?.snapshot_date && (
+                  <div className="text-[10px] text-right" style={{ color: 'var(--muted)' }}>
+                    Son guncelleme: {new Date(editInv.snapshot_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
+                )}
               </div>
               <button onClick={handleInvSave} disabled={invSaving || !invForm.name || !invForm.quantity}
                 className="btn-primary w-full mt-4 py-3">{invSaving ? 'Kaydediliyor...' : 'Kaydet'}</button>
