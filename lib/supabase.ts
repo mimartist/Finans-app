@@ -72,6 +72,9 @@ export type RecurringExpense = {
   is_variable: boolean
   is_active: boolean
   remind_days_before: number
+  expense_type: 'recurring' | 'one_time'
+  expense_date?: string
+  end_date?: string
 }
 
 export type DebtRecord = {
