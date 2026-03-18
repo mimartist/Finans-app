@@ -1,6 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
+import QuickAdd from './QuickAdd'
 
 const ACTIVE = '#0d9488'
 const INACTIVE = '#9ca3af'
@@ -25,17 +27,24 @@ function NavIcon({ name, color }: { name: string; color: string }) {
   }
 }
 
-const navItems = [
+const navItemsLeft = [
   { href: '/',            icon: 'home',        label: 'Ana' },
   { href: '/accounts',    icon: 'bank',        label: 'Hesaplar' },
   { href: '/loans',       icon: 'credit-card', label: 'Krediler' },
+]
+
+const navItemsRight = [
   { href: '/recurring',   icon: 'calendar',    label: 'Giderler' },
   { href: '/debts',       icon: 'handshake',   label: 'Alacak' },
-  { href: '/investments', icon: 'trending-up', label: 'Yatirim' },
+  { href: '/investments', icon: 'trending-up',  label: 'Yatirim' },
 ]
+
+const allNavItems = [...navItemsLeft, ...navItemsRight]
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+
   return (
     <>
       {/* Desktop Sidebar */}
@@ -45,7 +54,7 @@ export default function BottomNav() {
           <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>Asistan</div>
         </div>
         <nav className="flex flex-col gap-1 px-3">
-          {navItems.map((item) => {
+          {allNavItems.map((item) => {
             const active = pathname === item.href
             return (
               <Link
@@ -63,6 +72,21 @@ export default function BottomNav() {
               </Link>
             )
           })}
+          <button
+            onClick={() => setShowQuickAdd(true)}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mt-2"
+            style={{
+              background: 'var(--accent)',
+              color: '#fff',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span>Hizli Ekle</span>
+          </button>
         </nav>
       </aside>
 
@@ -77,8 +101,9 @@ export default function BottomNav() {
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
-        <div className="flex pt-4 pb-4">
-          {navItems.map((item) => {
+        <div className="flex items-end pt-3 pb-3">
+          {/* Left nav items */}
+          {navItemsLeft.map((item) => {
             const active = pathname === item.href
             return (
               <Link
@@ -88,7 +113,45 @@ export default function BottomNav() {
                 style={{ textDecoration: 'none' }}
               >
                 <NavIcon name={item.icon} color={active ? ACTIVE : INACTIVE} />
-                <span style={{ fontSize: 11, fontWeight: 500, color: active ? ACTIVE : INACTIVE }}>
+                <span style={{ fontSize: 10, fontWeight: 500, color: active ? ACTIVE : INACTIVE }}>
+                  {item.label}
+                </span>
+              </Link>
+            )
+          })}
+
+          {/* Center FAB button */}
+          <div className="flex-1 flex justify-center" style={{ marginTop: -18 }}>
+            <button
+              onClick={() => setShowQuickAdd(true)}
+              className="flex items-center justify-center"
+              style={{
+                width: 52, height: 52,
+                borderRadius: '50%',
+                background: 'var(--accent)',
+                border: '3px solid var(--bg2)',
+                boxShadow: '0 2px 12px rgba(13,148,136,0.35)',
+                cursor: 'pointer',
+              }}
+            >
+              <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Right nav items */}
+          {navItemsRight.map((item) => {
+            const active = pathname === item.href
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex-1 flex flex-col items-center gap-1"
+                style={{ textDecoration: 'none' }}
+              >
+                <NavIcon name={item.icon} color={active ? ACTIVE : INACTIVE} />
+                <span style={{ fontSize: 10, fontWeight: 500, color: active ? ACTIVE : INACTIVE }}>
                   {item.label}
                 </span>
               </Link>
@@ -96,6 +159,9 @@ export default function BottomNav() {
           })}
         </div>
       </nav>
+
+      {/* Quick Add Modal */}
+      {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} />}
     </>
   )
 }

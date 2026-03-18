@@ -6,15 +6,24 @@ export const EXPENSE_CATEGORIES = [
   { value: 'dogalgaz', label: 'Doğalgaz', group: 'Konut', icon: '🔥' },
   { value: 'su', label: 'Su', group: 'Konut', icon: '💧' },
   { value: 'internet', label: 'İnternet', group: 'Konut', icon: '📡' },
+  { value: 'telefon', label: 'Telefon', group: 'Konut', icon: '📱' },
+  { value: 'tv_streaming', label: 'TV/Streaming', group: 'Konut', icon: '📺' },
+  { value: 'temizlik', label: 'Temizlik', group: 'Konut', icon: '🧹' },
+  { value: 'ev_esya', label: 'Ev Eşyası', group: 'Konut', icon: '🛋️' },
+  { value: 'tamir_tadilat', label: 'Tamir/Tadilat', group: 'Konut', icon: '🔨' },
   // Ulaşım
   { value: 'yakit', label: 'Yakıt', group: 'Ulaşım', icon: '⛽' },
   { value: 'arac_bakim', label: 'Araç Bakım', group: 'Ulaşım', icon: '🔧' },
   { value: 'arac_sigorta', label: 'Araç Sigorta', group: 'Ulaşım', icon: '🛡' },
   { value: 'toplu_tasima', label: 'Toplu Taşıma', group: 'Ulaşım', icon: '🚌' },
+  { value: 'otopark', label: 'Otopark', group: 'Ulaşım', icon: '🅿️' },
+  { value: 'kopru_otoyol', label: 'Köprü/Otoyol', group: 'Ulaşım', icon: '🛣️' },
+  { value: 'taksi', label: 'Taksi/Uber', group: 'Ulaşım', icon: '🚕' },
   // Kişisel
   { value: 'market', label: 'Market', group: 'Kişisel', icon: '🛒' },
   { value: 'restoran', label: 'Restoran/Kafe', group: 'Kişisel', icon: '🍽' },
   { value: 'saglik', label: 'Sağlık', group: 'Kişisel', icon: '🏥' },
+  { value: 'eczane', label: 'Eczane/İlaç', group: 'Kişisel', icon: '💊' },
   { value: 'giyim', label: 'Giyim', group: 'Kişisel', icon: '👕' },
   { value: 'kozmetik', label: 'Kozmetik/Bakım', group: 'Kişisel', icon: '💄' },
   { value: 'spor', label: 'Spor', group: 'Kişisel', icon: '💪' },
@@ -22,21 +31,40 @@ export const EXPENSE_CATEGORIES = [
   { value: 'eglence', label: 'Eğlence', group: 'Kişisel', icon: '🎬' },
   { value: 'seyahat', label: 'Seyahat/Tatil', group: 'Kişisel', icon: '✈️' },
   { value: 'elektronik', label: 'Elektronik', group: 'Kişisel', icon: '📱' },
+  { value: 'abonelik', label: 'Abonelik', group: 'Kişisel', icon: '🔄' },
+  { value: 'cocuk_okul', label: 'Çocuk/Okul', group: 'Kişisel', icon: '🎒' },
+  { value: 'evcil_hayvan', label: 'Evcil Hayvan', group: 'Kişisel', icon: '🐾' },
   // İş
   { value: 'personel', label: 'Personel', group: 'İş', icon: '👤' },
   { value: 'sgk', label: 'SGK', group: 'İş', icon: '🏛' },
   { value: 'vergi', label: 'Vergi', group: 'İş', icon: '📋' },
   { value: 'muhasebe', label: 'Muhasebe', group: 'İş', icon: '📊' },
   { value: 'ofis', label: 'Ofis Gideri', group: 'İş', icon: '🏭' },
+  { value: 'reklam', label: 'Reklam', group: 'İş', icon: '📢' },
+  { value: 'yazilim_saas', label: 'Yazılım/SaaS', group: 'İş', icon: '💻' },
+  { value: 'kargo', label: 'Kargo/Lojistik', group: 'İş', icon: '📦' },
+  { value: 'is_seyahat', label: 'İş Seyahati', group: 'İş', icon: '🧳' },
   // Finans
   { value: 'kredi_odeme', label: 'Kredi Ödemesi', group: 'Finans', icon: '🏦' },
   { value: 'kk_odeme', label: 'KK Ödemesi', group: 'Finans', icon: '💳' },
   { value: 'sigorta', label: 'Sigorta', group: 'Finans', icon: '🛡' },
   { value: 'yatirim', label: 'Yatırım', group: 'Finans', icon: '📈' },
+  { value: 'komisyon', label: 'Komisyon/Masraf', group: 'Finans', icon: '💸' },
   // Diğer
   { value: 'hediye', label: 'Hediye', group: 'Diğer', icon: '🎁' },
   { value: 'bagis', label: 'Bağış', group: 'Diğer', icon: '🤲' },
+  { value: 'hizmet', label: 'Hizmet Alımı', group: 'Diğer', icon: '🤝' },
   { value: 'diger', label: 'Diğer', group: 'Diğer', icon: '📦' },
 ]
 
 export const CATEGORY_GROUPS = Array.from(new Set(EXPENSE_CATEGORIES.map(c => c.group)))
+
+// Helper: get icon for a category value
+export function getCategoryIcon(value: string): string {
+  return EXPENSE_CATEGORIES.find(c => c.value === value)?.icon || '📦'
+}
+
+// Helper: get label for a category value
+export function getCategoryLabel(value: string): string {
+  return EXPENSE_CATEGORIES.find(c => c.value === value)?.label || value
+}
