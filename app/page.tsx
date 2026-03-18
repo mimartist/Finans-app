@@ -60,6 +60,7 @@ export default function Dashboard() {
   const [kriptoTry, setKriptoTry] = useState(0)
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(currentMonth)
   const [monthLoading, setMonthLoading] = useState(false)
+  const [heroExpanded, setHeroExpanded] = useState(false)
 
   const isCurrent = sameMonth(selectedMonth, currentMonth)
   const isPast = selectedMonth.year < currentMonth.year || (selectedMonth.year === currentMonth.year && selectedMonth.month < currentMonth.month)
@@ -251,12 +252,16 @@ export default function Dashboard() {
         </div>
 
         {/* ===== HERO CARD ===== */}
-        <div className="mx-4 mt-3 card-hero p-6" style={{ position: 'relative', zIndex: 1 }}>
+        <div className="mx-4 mt-3 card-hero p-6" style={{ position: 'relative', zIndex: 1, cursor: 'pointer', transition: 'all 0.3s ease' }}
+          onClick={() => setHeroExpanded(e => !e)}>
           <div className="flex items-center justify-between mb-1" style={{ position: 'relative', zIndex: 2 }}>
             <div className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)' }}>Toplam Varlik</div>
             <IconWallet color="rgba(255,255,255,0.3)" size={20} />
           </div>
-          <div className="mono text-3xl font-extrabold mb-5" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalAssetsTry)}</div>
+          <div className="mono text-3xl font-extrabold mb-1" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalAssetsTry)}</div>
+          <div className="text-[10px] mb-4" style={{ position: 'relative', zIndex: 2, color: 'rgba(255,255,255,0.4)' }}>
+            {heroExpanded ? 'Gizlemek icin dokun ↑' : 'Detaylar icin dokun ↓'}
+          </div>
           <div className="flex gap-2" style={{ position: 'relative', zIndex: 2 }}>
             {[
               { label: 'TRY', value: fmt(tryTotal) },
@@ -269,6 +274,59 @@ export default function Dashboard() {
                 <div className="mono text-[11px] font-bold mt-0.5">{c.value}</div>
               </div>
             ))}
+          </div>
+
+          {/* Expanded detail section */}
+          <div style={{
+            position: 'relative', zIndex: 2,
+            maxHeight: heroExpanded ? 300 : 0,
+            overflow: 'hidden',
+            transition: 'max-height 0.35s ease, opacity 0.3s ease, margin 0.3s ease',
+            opacity: heroExpanded ? 1 : 0,
+            marginTop: heroExpanded ? 20 : 0,
+          }}>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 16 }}>
+              <div className="text-[9px] font-medium uppercase tracking-wider mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>Varlik Dagilimi</div>
+              <div className="flex flex-col gap-3">
+                {[
+                  { label: 'Nakit', value: cashTry, icon: '🏦' },
+                  { label: 'Yatirim', value: investTotalTry, icon: '📈' },
+                  { label: 'Alacak', value: alacakTry, icon: '💰' },
+                ].filter(r => r.value > 0).map(r => {
+                  const pct = totalAssetsTry > 0 ? Math.round((r.value / totalAssetsTry) * 100) : 0
+                  return (
+                    <div key={r.label}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px]">{r.icon}</span>
+                          <span className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>{r.label}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="mono text-[11px] font-bold">{fmt(r.value)}</span>
+                          <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+                            style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}>%{pct}</span>
+                        </div>
+                      </div>
+                      <div className="w-full rounded-full" style={{ height: 3, background: 'rgba(255,255,255,0.1)' }}>
+                        <div className="rounded-full" style={{ height: 3, width: `${pct}%`, background: 'rgba(255,255,255,0.5)', transition: 'width 0.5s ease' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 14, paddingTop: 12 }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Toplam Borc</span>
+                  <span className="mono text-[11px] font-bold" style={{ color: '#ff8a8a' }}>{fmt(totalDebtTry)}</span>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-[10px] font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>Net Varlik</span>
+                  <span className="mono text-[13px] font-extrabold" style={{ color: totalAssetsTry - totalDebtTry >= 0 ? '#86efac' : '#ff8a8a' }}>
+                    {fmt(totalAssetsTry - totalDebtTry)}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
