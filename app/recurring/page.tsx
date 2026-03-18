@@ -4,6 +4,7 @@ import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, daysUntil, daysUntilLabel } from '@/lib/supabase'
 import type { RecurringExpense } from '@/lib/supabase'
 import { EXPENSE_CATEGORIES, CATEGORY_GROUPS, getCategoryIcon, getCategoryLabel } from '@/lib/categories'
+import { getCatIcon } from '@/components/Icons'
 
 const emptyForm = {
   name: '', category: 'fatura', subcategory: '', amount: '', currency: 'TRY',
@@ -194,72 +195,56 @@ export default function RecurringPage() {
           ))}
         </div>
 
-        {/* Category filter */}
-        <div className="flex gap-2 px-4 mb-4 overflow-x-auto pb-1">
+        {/* Category filter — no emojis, clean pills */}
+        <div className="flex gap-1.5 px-4 mb-4 overflow-x-auto pb-1">
           {categories.map(cat => (
             <button key={cat} onClick={() => setFilter(cat)}
-              className="flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium capitalize"
+              className="flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold capitalize"
               style={{
                 background: filter === cat ? 'linear-gradient(135deg, #2b2d6e, #3d3f8f)' : 'transparent',
                 border: filter === cat ? 'none' : '1.5px solid var(--border2)',
                 color: filter === cat ? '#fff' : 'var(--text2)',
               }}>
-              {getCategoryIcon(cat)} {getCategoryLabel(cat) || cat}
+              {getCategoryLabel(cat) || cat}
             </button>
           ))}
         </div>
 
         {/* Expense list */}
-        <div className="flex flex-col gap-2 mx-4">
+        <div className="flex flex-col mx-4">
           {filtered.map((exp) => {
             const info = getDaysInfo(exp)
             const isOneTime = exp.expense_type === 'one_time'
-            const icon = getCategoryIcon(exp.category)
-            const monthLabel = new Date().toLocaleDateString('tr-TR', { month: 'short' }).toUpperCase()
+            const monthLabel = new Date().toLocaleDateString('tr-TR', { month: 'short' })
+            const dayLabel = isOneTime && exp.expense_date
+              ? `${new Date(exp.expense_date).getDate()} ${new Date(exp.expense_date).toLocaleDateString('tr-TR', { month: 'short' })}`
+              : exp.payment_day ? `${exp.payment_day} ${monthLabel}` : ''
+            const statusColor = info?.isUrgent ? '#e5484d' : info?.isPast ? '#e5a000' : 'var(--muted)'
             return (
-              <div key={exp.id} className="tx-item px-4 py-3 flex items-center gap-3">
-                <div className="tx-icon w-10 h-10 flex flex-col items-center justify-center flex-shrink-0"
-                  style={info?.isUrgent ? { background: 'rgba(220,38,38,0.08)' } : undefined}>
-                  {isOneTime && exp.expense_date ? (
-                    <>
-                      <div className="text-[11px] font-bold leading-none" style={{ color: info?.isPast ? '#dc2626' : 'var(--accent)' }}>
-                        {new Date(exp.expense_date).getDate()}
-                      </div>
-                      <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>
-                        {new Date(exp.expense_date).toLocaleDateString('tr-TR', { month: 'short' }).toUpperCase()}
-                      </div>
-                    </>
-                  ) : exp.payment_day ? (
-                    <>
-                      <div className="text-[11px] font-bold leading-none" style={{ color: info?.isUrgent ? '#dc2626' : 'var(--text)' }}>{exp.payment_day}</div>
-                      <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>{monthLabel}</div>
-                    </>
-                  ) : (
-                    <div className="text-base">{icon}</div>
-                  )}
+              <div key={exp.id} className="tx-item" style={{ cursor: 'pointer' }} onClick={() => openEdit(exp)}>
+                <div className="tx-icon">
+                  {getCatIcon(exp.category, { color: '#2b2d6e', size: 20 })}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <div className="text-sm font-medium truncate">{exp.name}</div>
+                <div className="tx-info">
+                  <div className="tx-name">
+                    {exp.name}
                     {isOneTime && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
-                        style={{ background: 'rgba(13,148,136,0.1)', color: 'var(--accent)' }}>
+                      <span className="ml-1.5 text-[8px] px-1.5 py-0.5 rounded-full font-semibold"
+                        style={{ background: 'rgba(43,45,110,0.08)', color: '#2b2d6e', verticalAlign: 'middle' }}>
                         TEK
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] mt-0.5 capitalize" style={{ color: 'var(--muted)' }}>
-                    {icon} {getCategoryLabel(exp.category) || exp.category}{exp.subcategory ? ` · ${exp.subcategory}` : ''}
-                    {info ? <span style={{ color: info.isUrgent ? '#dc2626' : 'var(--muted)' }}> · {info.label}</span> : ''}
-                    {exp.end_date && <span> · ⏰ {new Date(exp.end_date).toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' })}'e kadar</span>}
+                  <div className="tx-detail" style={{ color: statusColor }}>
+                    {dayLabel}{dayLabel && info ? ' · ' : ''}{info?.label || ''}
                   </div>
                 </div>
-                <div className="text-right flex items-center gap-2">
-                  <div className="mono text-sm font-semibold">{fmt(exp.amount, exp.currency)}</div>
-                  <div className="flex gap-1">
-                    <button onClick={() => openEdit(exp)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
-                    <button onClick={() => setDeleteConfirm(exp.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
-                  </div>
+                <div className="tx-amount">
+                  <div className="tx-value">{fmt(exp.amount, exp.currency)}</div>
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(exp) }}
+                    className="tx-badge" style={{ background: 'rgba(43,45,110,0.06)', color: '#2b2d6e', border: 'none', cursor: 'pointer' }}>
+                    Duzenle
+                  </button>
                 </div>
               </div>
             )
@@ -392,6 +377,13 @@ export default function RecurringPage() {
               )}
               <button onClick={handleSave} disabled={saving || !form.name || !form.amount}
                 className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Guncelle' : 'Ekle'}</button>
+              {editId && (
+                <button onClick={() => { closeForm(); setDeleteConfirm(editId) }}
+                  className="w-full mt-2 py-3 rounded-xl text-sm font-semibold"
+                  style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: 'none', cursor: 'pointer' }}>
+                  Gideri Sil
+                </button>
+              )}
             </div>
           </div>
         )}

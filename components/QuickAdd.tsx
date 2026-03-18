@@ -12,6 +12,12 @@ export default function QuickAdd({ onClose }: Props) {
     expense_type: 'one_time' as 'recurring' | 'one_time',
     expense_date: new Date().toISOString().split('T')[0],
     payment_day: '',
+    payment_method: 'nakit' as 'nakit' | 'kredi_karti' | 'duzenli',
+  })
+  const [incomeForm, setIncomeForm] = useState({
+    person_name: '', amount: '', currency: 'TRY',
+    description: '', due_date: '',
+    is_recurring: false,
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -20,6 +26,7 @@ export default function QuickAdd({ onClose }: Props) {
   const cameraRef = useRef<HTMLInputElement>(null)
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
+  const setInc = (k: string, v: any) => setIncomeForm(f => ({ ...f, [k]: v }))
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -30,27 +37,50 @@ export default function QuickAdd({ onClose }: Props) {
   }
 
   async function handleSave() {
-    if (!form.name || !form.amount) return
     setSaving(true); setSaveError(null)
 
     if (isDemo) {
       await new Promise(r => setTimeout(r, 500))
-      setSaving(false)
-      onClose()
-      return
+      setSaving(false); onClose(); return
     }
 
-    if (type === 'expense') {
-      const payload: any = {
-        name: form.name, category: form.category, amount: parseFloat(form.amount) || 0,
-        currency: form.currency, is_variable: false, is_active: true,
-        expense_type: form.expense_type, remind_days_before: 3,
+    if (type === 'income') {
+      if (!incomeForm.person_name || !incomeForm.amount) { setSaving(false); return }
+      const payload = {
+        person_name: incomeForm.person_name,
+        type: 'alacak',
+        amount: parseFloat(incomeForm.amount) || 0,
+        currency: incomeForm.currency,
+        description: incomeForm.description || null,
+        due_date: incomeForm.due_date || null,
+        transaction_date: new Date().toISOString().split('T')[0],
+        is_settled: false,
+        is_recurring: incomeForm.is_recurring,
+        frequency: incomeForm.is_recurring ? 'aylik' : null,
       }
-      if (form.expense_type === 'one_time') {
+      const result = await supabase.from('debt_records').insert(payload)
+      if (result.error) {
+        setSaveError(`Hata: ${result.error.message}`)
+        setSaving(false); return
+      }
+    } else {
+      if (!form.name || !form.amount) { setSaving(false); return }
+      const isRecurring = form.payment_method === 'duzenli'
+      const payload: any = {
+        name: form.name, category: form.category,
+        amount: parseFloat(form.amount) || 0,
+        currency: form.currency, is_variable: false, is_active: true,
+        expense_type: isRecurring ? 'recurring' : 'one_time',
+        remind_days_before: 3,
+      }
+      if (isRecurring) {
+        payload.payment_day = parseInt(form.payment_day) || null
+      } else {
         payload.expense_date = form.expense_date || null
         payload.payment_day = form.expense_date ? new Date(form.expense_date).getDate() : null
-      } else {
-        payload.payment_day = parseInt(form.payment_day) || null
+      }
+      if (form.payment_method === 'kredi_karti') {
+        payload.subcategory = 'Kredi Karti'
       }
       let result = await supabase.from('recurring_expenses').insert(payload)
       if (result.error) {
@@ -65,9 +95,14 @@ export default function QuickAdd({ onClose }: Props) {
       }
     }
 
-    setSaving(false)
-    onClose()
+    setSaving(false); onClose()
   }
+
+  const pillBtn = (active: boolean, color: string) => ({
+    background: active ? 'var(--bg2)' : 'transparent',
+    boxShadow: active ? 'var(--shadow)' : 'none',
+    color: active ? color : 'var(--muted)',
+  })
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -91,29 +126,59 @@ export default function QuickAdd({ onClose }: Props) {
         <div className="flex gap-2 mb-5 p-1 rounded-xl" style={{ background: 'var(--bg4)' }}>
           <button onClick={() => setType('expense')}
             className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-center transition-all"
-            style={{
-              background: type === 'expense' ? 'var(--bg2)' : 'transparent',
-              boxShadow: type === 'expense' ? 'var(--shadow)' : 'none',
-              color: type === 'expense' ? '#e5484d' : 'var(--muted)',
-            }}>
+            style={pillBtn(type === 'expense', '#e5484d')}>
             Gider
           </button>
           <button onClick={() => setType('income')}
             className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-center transition-all"
-            style={{
-              background: type === 'income' ? 'var(--bg2)' : 'transparent',
-              boxShadow: type === 'income' ? 'var(--shadow)' : 'none',
-              color: type === 'income' ? '#30a46c' : 'var(--muted)',
-            }}>
+            style={pillBtn(type === 'income', '#30a46c')}>
             Gelir
           </button>
         </div>
 
         {type === 'income' ? (
-          <div className="text-center py-10">
-            <div className="text-3xl mb-3">🚧</div>
-            <div className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Gelir modulu yakinda eklenecek</div>
-          </div>
+          <>
+            {/* Income form */}
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Kisi / Firma</label>
+                <input value={incomeForm.person_name} onChange={e => setInc('person_name', e.target.value)} placeholder="Orn: Mimosso" className="input" autoFocus />
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Tutar</label>
+                  <input value={incomeForm.amount} onChange={e => setInc('amount', e.target.value)} placeholder="0" type="number" className="input mono" />
+                </div>
+                <div style={{ width: 80 }}>
+                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Doviz</label>
+                  <select value={incomeForm.currency} onChange={e => setInc('currency', e.target.value)} className="input">
+                    <option value="TRY">₺ TRY</option><option value="EUR">€ EUR</option><option value="USD">$ USD</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Aciklama</label>
+                <input value={incomeForm.description} onChange={e => setInc('description', e.target.value)} placeholder="Opsiyonel" className="input" />
+              </div>
+              <div>
+                <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Vade Tarihi</label>
+                <input value={incomeForm.due_date} onChange={e => setInc('due_date', e.target.value)} type="date" className="input" />
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={incomeForm.is_recurring} onChange={e => setInc('is_recurring', e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: '#2b2d6e' }} />
+                <span className="text-[12px]" style={{ color: 'var(--muted)' }}>Duzenli gelir (aylik)</span>
+              </label>
+            </div>
+
+            {saveError && (
+              <div className="mt-3 p-3 rounded-xl text-xs font-medium" style={{ background: 'rgba(229,72,77,0.06)', color: '#e5484d' }}>{saveError}</div>
+            )}
+            <button onClick={handleSave} disabled={saving || !incomeForm.person_name || !incomeForm.amount}
+              className="w-full mt-5 py-3.5 text-sm font-bold rounded-xl"
+              style={{ background: 'linear-gradient(135deg, #059669, #30a46c)', color: '#fff', border: 'none', cursor: 'pointer', opacity: saving || !incomeForm.person_name || !incomeForm.amount ? 0.5 : 1 }}>
+              {saving ? 'Kaydediliyor...' : 'Gelir Ekle'}
+            </button>
+          </>
         ) : (
           <>
             {/* Photo section */}
@@ -148,35 +213,18 @@ export default function QuickAdd({ onClose }: Props) {
                     className="w-7 h-7 rounded-lg flex items-center justify-center"
                     style={{ background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 12, border: 'none' }}>✕</button>
                 </div>
-                <div className="absolute bottom-2 left-2">
-                  <span className="px-2 py-1 rounded-lg text-[10px] font-medium"
-                    style={{ background: 'rgba(0,0,0,0.5)', color: '#b0b7c3' }}>
-                    OCR yakinda
-                  </span>
-                </div>
               </div>
             )}
 
-            {/* Expense type: one_time / recurring */}
+            {/* Payment method: Nakit / Kredi Karti / Duzenli */}
             <div className="flex gap-2 mb-4 p-1 rounded-xl" style={{ background: 'var(--bg4)' }}>
-              <button onClick={() => set('expense_type', 'one_time')}
-                className="flex-1 py-2 rounded-lg text-xs font-semibold text-center transition-all"
-                style={{
-                  background: form.expense_type === 'one_time' ? 'var(--bg2)' : 'transparent',
-                  boxShadow: form.expense_type === 'one_time' ? 'var(--shadow)' : 'none',
-                  color: form.expense_type === 'one_time' ? 'var(--accent)' : 'var(--muted)',
-                }}>
-                Tek Seferlik
-              </button>
-              <button onClick={() => set('expense_type', 'recurring')}
-                className="flex-1 py-2 rounded-lg text-xs font-semibold text-center transition-all"
-                style={{
-                  background: form.expense_type === 'recurring' ? 'var(--bg2)' : 'transparent',
-                  boxShadow: form.expense_type === 'recurring' ? 'var(--shadow)' : 'none',
-                  color: form.expense_type === 'recurring' ? 'var(--accent)' : 'var(--muted)',
-                }}>
-                Duzenli
-              </button>
+              {([['nakit', 'Nakit'], ['kredi_karti', 'Kredi Karti'], ['duzenli', 'Duzenli']] as const).map(([val, label]) => (
+                <button key={val} onClick={() => set('payment_method', val)}
+                  className="flex-1 py-2 rounded-lg text-[11px] font-semibold text-center transition-all"
+                  style={pillBtn(form.payment_method === val, '#2b2d6e')}>
+                  {label}
+                </button>
+              ))}
             </div>
 
             {/* Form fields */}
@@ -209,15 +257,15 @@ export default function QuickAdd({ onClose }: Props) {
                   ))}
                 </select>
               </div>
-              {form.expense_type === 'one_time' ? (
-                <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Tarih</label>
-                  <input value={form.expense_date} onChange={e => set('expense_date', e.target.value)} type="date" className="input" />
-                </div>
-              ) : (
+              {form.payment_method === 'duzenli' ? (
                 <div>
                   <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Odeme Gunu (1-31)</label>
                   <input value={form.payment_day} onChange={e => set('payment_day', e.target.value)} placeholder="1-31" type="number" min="1" max="31" className="input" />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Tarih</label>
+                  <input value={form.expense_date} onChange={e => set('expense_date', e.target.value)} type="date" className="input" />
                 </div>
               )}
             </div>
