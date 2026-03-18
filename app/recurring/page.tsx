@@ -149,17 +149,33 @@ export default function RecurringPage() {
           </div>
         </div>
 
-        {/* Summary cards */}
-        <div className="flex gap-3 mx-4 mb-4">
-          <div className="flex-1 card p-3">
-            <div className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Aylik</div>
-            <div className="mono text-base font-bold amt-red">{fmt(totalAll)}</div>
-            <div className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>{recurringCount} düzenli · {oneTimeCount} tek seferlik</div>
+        {/* Hero Card */}
+        <div className="mx-4 mb-4 card-hero p-5" style={{ position: 'relative', zIndex: 1 }}>
+          <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>Aylik Gider</div>
+          <div className="mono text-2xl font-extrabold mt-1" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalAll)}</div>
+          <div className="flex gap-2 mt-4" style={{ position: 'relative', zIndex: 2 }}>
+            <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+              style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
+              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>DÜZENLİ</div>
+              <div className="mono text-[12px] font-bold mt-0.5">{recurringCount}</div>
+              <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{fmt(expenses.filter(e => (e.expense_type || 'recurring') === 'recurring').reduce((s, e) => s + e.amount, 0))}</div>
+            </div>
+            <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+              style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
+              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>TEK SEFERLİK</div>
+              <div className="mono text-[12px] font-bold mt-0.5">{oneTimeCount}</div>
+              <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{fmt(expenses.filter(e => e.expense_type === 'one_time').reduce((s, e) => s + e.amount, 0))}</div>
+            </div>
+            {filter !== 'tumu' && (
+              <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+                style={{ border: '1px solid rgba(134,239,172,0.25)', background: 'rgba(134,239,172,0.08)' }}>
+                <div className="text-[9px] font-medium capitalize" style={{ color: 'rgba(134,239,172,0.7)' }}>{filter}</div>
+                <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#86efac' }}>{fmt(total)}</div>
+              </div>
+            )}
           </div>
-          <div className="flex-1 card p-3">
-            <div className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Secili Filtre</div>
-            <div className="mono text-base font-bold amt-blue">{fmt(total)}</div>
-            <div className="text-[10px] mt-1 capitalize" style={{ color: 'var(--muted)' }}>{filter}</div>
+          <div className="text-[10px] mt-3 text-center" style={{ color: 'rgba(255,255,255,0.35)', position: 'relative', zIndex: 2 }}>
+            {filtered.length} gider gösteriliyor
           </div>
         </div>
 

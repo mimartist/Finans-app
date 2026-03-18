@@ -220,24 +220,38 @@ export default function LoansPage() {
           </div>
         </div>
 
-        <div className="flex gap-3 mx-4 mb-4">
-          <div className="flex-1 card p-3">
-            <div className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Kalan Borc</div>
-            <div className="mono text-base font-bold amt-red">{fmt(totalRemaining)}</div>
-            <div className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>{loans.length} aktif kredi</div>
+        {/* Hero Card */}
+        <div className="mx-4 mb-4 card-hero p-5" style={{ position: 'relative', zIndex: 1 }}>
+          <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>Toplam Kalan Borc</div>
+          <div className="mono text-2xl font-extrabold mt-1" style={{ position: 'relative', zIndex: 2, color: '#ff8a8a' }}>{fmt(totalRemaining)}</div>
+          <div className="flex gap-2 mt-4" style={{ position: 'relative', zIndex: 2 }}>
+            <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+              style={{ border: '1px solid rgba(255,138,138,0.25)', background: 'rgba(255,138,138,0.08)' }}>
+              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,138,138,0.7)' }}>AYLIK ODEME</div>
+              <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#ff8a8a' }}>{fmt(totalMonthly)}</div>
+            </div>
+            <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+              style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
+              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>KREDİ KARTI</div>
+              <div className="mono text-[12px] font-bold mt-0.5">{fmt(totalKK)}</div>
+            </div>
+            {loans.length > 0 && (() => {
+              const totalOriginal = loans.reduce((s, l) => s + toTry(l, l.original_amount || 0), 0)
+              const totalPaid = totalOriginal - totalRemaining
+              const paidPct = totalOriginal > 0 ? Math.round((totalPaid / totalOriginal) * 100) : 0
+              return (
+                <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+                  style={{ border: '1px solid rgba(134,239,172,0.25)', background: 'rgba(134,239,172,0.08)' }}>
+                  <div className="text-[9px] font-medium" style={{ color: 'rgba(134,239,172,0.7)' }}>ODENEN</div>
+                  <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#86efac' }}>%{paidPct}</div>
+                </div>
+              )
+            })()}
           </div>
-          <div className="flex-1 card p-3">
-            <div className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Aylik Odeme</div>
-            <div className="mono text-base font-bold amt-amber">{fmt(totalMonthly)}</div>
-            <div className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>bu ay toplam</div>
+          <div className="text-[10px] mt-3 text-center" style={{ color: 'rgba(255,255,255,0.35)', position: 'relative', zIndex: 2 }}>
+            {loans.length} kredi · {cards.length} kart{loans.some(l => l.currency === 'EUR') ? ` · EUR/TRY ${eurTry.toFixed(2)}` : ''}
           </div>
         </div>
-
-        {loans.some(l => l.currency === 'EUR') && (
-          <div className="mx-4 mb-3 text-[11px] text-right" style={{ color: 'var(--muted)' }}>
-            EUR/TRY kuru: {eurTry.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-        )}
 
         {loans.length === 0 && (
           <div className="mx-4 card p-6 text-center text-sm mb-4" style={{ color: 'var(--muted)' }}>
