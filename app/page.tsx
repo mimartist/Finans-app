@@ -129,7 +129,7 @@ export default function Dashboard() {
     // Credit card statements as payment items
     const ccItems: PaymentItem[] = ccStatements.filter(s => (s.total_amount || 0) > 0).map(s => {
       const card = ccCards.find((c: any) => c.id === s.card_id)
-      const payDay = card?.payment_day || 10
+      const payDay = card?.due_day || 10
       const isPaid = s.is_paid || false
       return {
         id: `cc_${s.id}`, name: card?.name || 'Kredi Karti', amount: s.total_amount || 0,
