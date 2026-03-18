@@ -139,14 +139,14 @@ export default function RecurringPage() {
 
   return (
     <div className="app-layout">
+      <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
       <BottomNav />
       <div className="app-main pb-24 page-enter">
         <div className="flex justify-between items-center px-5 pt-5 pb-4">
           <div>
-            <div className="text-[12px] font-medium" style={{ color: 'var(--muted)' }}>Modul</div>
-            <div className="text-xl font-bold mt-0.5">Giderler</div>
+            <div className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>Finans</div>
+            <div className="text-xl font-extrabold mt-0.5">Giderler</div>
           </div>
-          <button onClick={openAdd} className="btn-primary px-4 py-2 text-sm">+ Ekle</button>
         </div>
 
         {/* Summary cards */}
@@ -167,11 +167,11 @@ export default function RecurringPage() {
         <div className="flex gap-2 px-4 mb-3">
           {([['all', 'Tümü'], ['recurring', 'Düzenli'], ['one_time', 'Tek Seferlik']] as const).map(([val, label]) => (
             <button key={val} onClick={() => setTypeFilter(val)}
-              className="px-3 py-1.5 rounded-lg text-[12px] font-medium"
+              className="px-3 py-1.5 rounded-full text-[12px] font-medium"
               style={{
-                background: typeFilter === val ? 'var(--accent-mid)' : 'var(--bg3)',
-                border: `1px solid ${typeFilter === val ? 'var(--accent)' : 'var(--border)'}`,
-                color: typeFilter === val ? 'var(--accent)' : 'var(--muted)',
+                background: typeFilter === val ? 'linear-gradient(135deg, #2b2d6e, #3d3f8f)' : 'transparent',
+                border: typeFilter === val ? 'none' : '1.5px solid var(--border2)',
+                color: typeFilter === val ? '#fff' : 'var(--text2)',
               }}>
               {label}
             </button>
@@ -182,12 +182,11 @@ export default function RecurringPage() {
         <div className="flex gap-2 px-4 mb-4 overflow-x-auto pb-1">
           {categories.map(cat => (
             <button key={cat} onClick={() => setFilter(cat)}
-              className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium capitalize"
+              className="flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium capitalize"
               style={{
-                background: filter === cat ? 'var(--accent-mid)' : 'var(--bg3)',
-                border: `1px solid ${filter === cat ? 'var(--accent)' : 'var(--border)'}`,
-                color: filter === cat ? 'var(--accent)' : 'var(--muted)',
-                boxShadow: filter === cat ? 'none' : 'var(--shadow)',
+                background: filter === cat ? 'linear-gradient(135deg, #2b2d6e, #3d3f8f)' : 'transparent',
+                border: filter === cat ? 'none' : '1.5px solid var(--border2)',
+                color: filter === cat ? '#fff' : 'var(--text2)',
               }}>
               {getCategoryIcon(cat)} {getCategoryLabel(cat) || cat}
             </button>
@@ -202,9 +201,9 @@ export default function RecurringPage() {
             const icon = getCategoryIcon(exp.category)
             const monthLabel = new Date().toLocaleDateString('tr-TR', { month: 'short' }).toUpperCase()
             return (
-              <div key={exp.id} className="card-accent px-4 py-3 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0"
-                  style={{ background: info?.isUrgent ? 'rgba(220,38,38,0.08)' : isOneTime ? 'rgba(13,148,136,0.06)' : 'var(--bg4)' }}>
+              <div key={exp.id} className="tx-item px-4 py-3 flex items-center gap-3">
+                <div className="tx-icon w-10 h-10 flex flex-col items-center justify-center flex-shrink-0"
+                  style={info?.isUrgent ? { background: 'rgba(220,38,38,0.08)' } : undefined}>
                   {isOneTime && exp.expense_date ? (
                     <>
                       <div className="text-[11px] font-bold leading-none" style={{ color: info?.isPast ? '#dc2626' : 'var(--accent)' }}>
@@ -273,7 +272,8 @@ export default function RecurringPage() {
         {/* Add/Edit form */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card w-full max-w-lg rounded-b-none p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+              <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Gideri Duzenle' : 'Yeni Gider'}</div>
                 <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>

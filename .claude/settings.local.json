@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/finans-app -type f -name \"*.sql\" 2>/dev/null | head -20)",
+      "Bash(find /c/finans-app -type f \\\\\\( -name \"README*\" -o -name \"schema*\" \\\\\\) 2>/dev/null | head -10)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(npx vercel:*)",
+      "Bash(node -e \"\nconst { createClient } = require\\('@supabase/supabase-js'\\);\nconst url = process.env.NEXT_PUBLIC_SUPABASE_URL;\nconst key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;\nif \\(!url || !key\\) { console.log\\('No env vars, checking .env.local'\\); process.exit\\(1\\); }\nconsole.log\\('URL:', url\\);\n\" 2>/dev/null || cat .env.local 2>/dev/null | head -2)",
+      "Bash(cd:*)",
+      "Bash(find /c/finans-app/.claude/worktrees/laughing-lewin/components -type f -name *.tsx -o -name *.ts)",
+      "Bash(git commit:*)",
+      "Bash(gh pr:*)",
+      "Bash(where gh:*)",
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "Bash(grep -E \"\\\\.\\(json|js|md\\)$\")",
+      "Bash(npm install:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(ls node_modules/.bin/next*)"
+    ]
+  }
+}

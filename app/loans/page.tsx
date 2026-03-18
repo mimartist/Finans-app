@@ -210,14 +210,14 @@ export default function LoansPage() {
 
   return (
     <div className="app-layout">
+      <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
       <BottomNav />
       <div className="app-main pb-24 page-enter">
         <div className="flex justify-between items-center px-5 pt-5 pb-4">
           <div>
-            <div className="text-[12px] font-medium" style={{ color: 'var(--muted)' }}>Modul</div>
-            <div className="text-xl font-bold mt-0.5">Krediler & Kartlar</div>
+            <div className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>Finans</div>
+            <div className="text-xl font-extrabold mt-0.5">Krediler & Kartlar</div>
           </div>
-          <button onClick={openAdd} className="btn-primary px-4 py-2 text-sm">+ Ekle</button>
         </div>
 
         <div className="flex gap-3 mx-4 mb-4">
@@ -242,7 +242,7 @@ export default function LoansPage() {
         {loans.length === 0 && (
           <div className="mx-4 card p-6 text-center text-sm mb-4" style={{ color: 'var(--muted)' }}>
             Henuz kredi eklenmemis.<br />
-            <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>+ Kredi Ekle</button>
+            <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>Kredi Ekle</button>
           </div>
         )}
 
@@ -457,7 +457,8 @@ export default function LoansPage() {
         {/* Loan Form Modal */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card w-full max-w-lg rounded-b-none p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+              <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Krediyi Duzenle' : 'Yeni Kredi'}</div>
                 <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
@@ -499,7 +500,8 @@ export default function LoansPage() {
         {/* Transaction Form Modal */}
         {txFormCardId !== null && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card w-full max-w-lg rounded-b-none p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+              <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{txEditId ? 'Harcamayi Duzenle' : 'Yeni Harcama'}</div>
                 <button onClick={closeTxForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>

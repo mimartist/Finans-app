@@ -173,14 +173,14 @@ export default function DebtsPage() {
 
   return (
     <div className="app-layout">
+      <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
       <BottomNav />
       <div className="app-main pb-24 page-enter">
         <div className="flex justify-between items-center px-5 pt-5 pb-4">
           <div>
-            <div className="text-[12px] font-medium" style={{ color: 'var(--muted)' }}>Modul</div>
-            <div className="text-xl font-bold mt-0.5">Alacak & Verecek</div>
+            <div className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>Finans</div>
+            <div className="text-xl font-extrabold mt-0.5">Alacak & Verecek</div>
           </div>
-          <button onClick={openAdd} className="btn-primary px-4 py-2 text-sm">+ Ekle</button>
         </div>
 
         {/* Summary pills */}
@@ -218,7 +218,7 @@ export default function DebtsPage() {
         {shown.length === 0 ? (
           <div className="mx-4 card p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
             Kayit bulunamadi.<br />
-            <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>+ Kayit Ekle</button>
+            <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>Kayit Ekle</button>
           </div>
         ) : (
           <div className="flex flex-col gap-1.5 mx-4">
@@ -421,7 +421,8 @@ export default function DebtsPage() {
         {/* Add/Edit Form */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card w-full max-w-lg rounded-b-none p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+              <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Kaydi Duzenle' : 'Yeni Kayit'}</div>
                 <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>

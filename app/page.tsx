@@ -2,7 +2,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, daysUntil, daysUntilLabel } from '@/lib/supabase'
+import { supabase, fmt, daysUntil, daysUntilLabel, isDemo } from '@/lib/supabase'
+import { getCatIcon, IconWallet, IconPieChart, IconTarget, IconBank, IconTrendUp, IconRefresh, IconCheck, IconDollar, IconBriefcase, IconShield, IconCalendar, IconCreditCard, IconSettings } from '@/components/Icons'
 import type { Account, Loan, RecurringExpense, ExchangeRate, DebtRecord } from '@/lib/supabase'
 
 type PaymentItem = {
@@ -14,20 +15,35 @@ type PaymentItem = {
 
 type MonthKey = { year: number; month: number }
 
-const MONTH_NAMES = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+const MONTH_NAMES = ['Ocak','Subat','Mart','Nisan','Mayis','Haziran','Temmuz','Agustos','Eylul','Ekim','Kasim','Aralik']
 
-function monthLabel(m: MonthKey) {
-  return `${MONTH_NAMES[m.month - 1]} ${m.year}`
-}
-
-function sameMonth(a: MonthKey, b: MonthKey) {
-  return a.year === b.year && a.month === b.month
-}
-
+function monthLabel(m: MonthKey) { return `${MONTH_NAMES[m.month-1]} ${m.year}` }
+function sameMonth(a: MonthKey, b: MonthKey) { return a.year === b.year && a.month === b.month }
 function monthOffset(base: MonthKey, offset: number): MonthKey {
   const d = new Date(base.year, base.month - 1 + offset, 1)
   return { year: d.getFullYear(), month: d.getMonth() + 1 }
 }
+
+// Mock data
+const MOCK_ACCOUNTS: Account[] = [
+  { id: 1, name: 'Ziraat TL', bank: 'Ziraat', type: 'vadesiz', currency: 'TRY', balance: 45200, is_active: true, updated_at: '' },
+  { id: 2, name: 'Garanti EUR', bank: 'Garanti', type: 'vadesiz', currency: 'EUR', balance: 3200, is_active: true, updated_at: '' },
+  { id: 3, name: 'Is Bankasi USD', bank: 'Is', type: 'vadesiz', currency: 'USD', balance: 1500, is_active: true, updated_at: '' },
+]
+const MOCK_LOANS: Loan[] = [
+  { id: 1, name: 'Konut Kredisi', bank: 'Ziraat', type: 'konut', currency: 'TRY', original_amount: 850000, remaining_amount: 620000, monthly_payment: 14500, payment_day: 15, total_installments: 120, paid_installments: 24, interest_rate: 1.89, start_date: '2024-01-15', end_date: '2034-01-15', is_active: true },
+]
+const MOCK_RECURRING: RecurringExpense[] = [
+  { id: 1, name: 'Elektrik', category: 'elektrik', amount: 350, currency: 'TRY', payment_day: 27, is_variable: true, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
+  { id: 2, name: 'SGK', category: 'sgk', amount: 9000, currency: 'TRY', payment_day: 28, is_variable: false, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
+  { id: 3, name: 'Muhasebe', category: 'muhasebe', amount: 3500, currency: 'TRY', payment_day: 28, is_variable: false, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
+  { id: 4, name: 'Internet', category: 'internet', amount: 560, currency: 'TRY', payment_day: 13, is_variable: false, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
+  { id: 5, name: 'Aidat', category: 'aidat', amount: 12000, currency: 'TRY', payment_day: 15, is_variable: false, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
+  { id: 6, name: 'Cep Telefonu', category: 'gsm', amount: 1100, currency: 'TRY', payment_day: 1, is_variable: false, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
+  { id: 7, name: 'Mimar Fatma', category: 'hizmet', amount: 30000, currency: 'TRY', payment_day: 30, is_variable: false, is_active: true, remind_days_before: 3, expense_type: 'one_time', expense_date: '2026-03-30' },
+  { id: 8, name: 'Su Faturasi', category: 'su', amount: 250, currency: 'TRY', payment_day: 15, is_variable: true, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
+]
+const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('T')[0], usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
 
 export default function Dashboard() {
   const now = new Date()
@@ -42,23 +58,22 @@ export default function Dashboard() {
   const [payments, setPayments] = useState<PaymentItem[]>([])
   const [allAlacak, setAllAlacak] = useState<DebtRecord[]>([])
   const [kriptoTry, setKriptoTry] = useState(0)
-
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(currentMonth)
   const [monthLoading, setMonthLoading] = useState(false)
-  const pillsRef = useRef<HTMLDivElement>(null)
 
   const isCurrent = sameMonth(selectedMonth, currentMonth)
   const isPast = selectedMonth.year < currentMonth.year || (selectedMonth.year === currentMonth.year && selectedMonth.month < currentMonth.month)
   const isFuture = selectedMonth.year > currentMonth.year || (selectedMonth.year === currentMonth.year && selectedMonth.month > currentMonth.month)
 
-  // Generate month pills: 3 past + current + 2 future
   const monthPills: MonthKey[] = []
-  for (let i = -3; i <= 2; i++) {
-    monthPills.push(monthOffset(currentMonth, i))
-  }
+  for (let i = -3; i <= 2; i++) monthPills.push(monthOffset(currentMonth, i))
 
-  // Load global data (accounts, rates, investments, loans, recurring, alacak)
   const loadGlobal = useCallback(async () => {
+    if (isDemo) {
+      setAccounts(MOCK_ACCOUNTS); setLoans(MOCK_LOANS); setRecurring(MOCK_RECURRING)
+      setAllAlacak([]); setRates(MOCK_RATES); setInvestTotalTry(85000); setKriptoTry(22000)
+      return { accs: MOCK_ACCOUNTS, lnsList: MOCK_LOANS, recList: MOCK_RECURRING }
+    }
     const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: recAlacak }, { data: cryptoSnaps }] = await Promise.all([
       supabase.from('accounts').select('*').eq('is_active', true),
       supabase.from('loans').select('*').eq('is_active', true),
@@ -66,169 +81,83 @@ export default function Dashboard() {
       supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
       supabase.from('investment_snapshots').select('investment_id, total_value_try, snapshot_date').order('snapshot_date', { ascending: false }),
       supabase.from('debt_records').select('*').eq('type', 'alacak').eq('is_settled', false),
-      supabase.from('investment_snapshots')
-        .select('*, investments!inner(platform, type, is_active)')
-        .eq('investments.is_active', true)
-        .in('investments.platform', ['Binance'])
-        .order('snapshot_date', { ascending: false }),
+      supabase.from('investment_snapshots').select('*, investments!inner(platform, type, is_active)').eq('investments.is_active', true).in('investments.platform', ['Binance']).order('snapshot_date', { ascending: false }),
     ])
-
-    setAccounts(acc || [])
-    setLoans(lns || [])
-    setRecurring(rec || [])
-    setAllAlacak(recAlacak || [])
-    setRates(rt?.[0] || null)
-
+    setAccounts(acc || []); setLoans(lns || []); setRecurring(rec || []); setAllAlacak(recAlacak || []); setRates(rt?.[0] || null)
     const seen = new Set<number>()
-    const latestSnaps = (snaps || []).filter((sn: any) => {
-      if (seen.has(sn.investment_id)) return false
-      seen.add(sn.investment_id)
-      return true
-    })
+    const latestSnaps = (snaps || []).filter((sn: any) => { if (seen.has(sn.investment_id)) return false; seen.add(sn.investment_id); return true })
     setInvestTotalTry(latestSnaps.reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
-
-    const latestByInvestment = (cryptoSnaps || []).reduce((acc: Record<number, any>, snap: any) => {
-      if (!acc[snap.investment_id]) acc[snap.investment_id] = snap
-      return acc
-    }, {} as Record<number, any>)
+    const latestByInvestment = (cryptoSnaps || []).reduce((acc: Record<number, any>, snap: any) => { if (!acc[snap.investment_id]) acc[snap.investment_id] = snap; return acc }, {} as Record<number, any>)
     setKriptoTry(Object.values(latestByInvestment).reduce((s: number, snap: any) => s + (snap.total_value_try || 0), 0))
-
     return { accs: acc || [], lnsList: lns || [], recList: rec || [] }
   }, [])
 
-  // Load month-specific data (paid items) and build payment list
   const loadMonth = useCallback(async (m: MonthKey, lnsList: Loan[], recList: RecurringExpense[]) => {
-    const { data: paid } = await supabase
-      .from('recurring_payments').select('*')
-      .eq('period_year', m.year).eq('period_month', m.month)
-      .eq('is_paid', true)
-
-    const paidList = paid || []
+    let paidList: any[] = []
+    if (!isDemo) {
+      const { data: paid } = await supabase.from('recurring_payments').select('*').eq('period_year', m.year).eq('period_month', m.month).eq('is_paid', true)
+      paidList = paid || []
+    }
     const now = new Date()
     const isCurrentMonth = m.year === now.getFullYear() && m.month === now.getMonth() + 1
-    const todayDay = isCurrentMonth ? now.getDate() : 32 // 32 means all days passed for past months
+    const todayDay = isCurrentMonth ? now.getDate() : 32
 
-    const loanItems: PaymentItem[] = lnsList
-      .filter(l => l.payment_day)
-      .map(l => {
-        const isPaid = paidList.some(p =>
-          p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id)
-        )
-        const isOverdue = isCurrentMonth && !isPaid && l.payment_day < todayDay
-        return {
-          id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency,
-          day: l.payment_day, type: 'kredi', source: 'loan' as const, sourceId: l.id,
-          days: isCurrentMonth ? daysUntil(l.payment_day) : 0, paid: isPaid, overdue: isOverdue,
-        }
-      })
-
-    const expItems: PaymentItem[] = recList
-      .filter(r => {
-        if (!r.payment_day || r.category === 'nakit') return false
-        // One-time expenses: only show in their specific month
-        if (r.expense_type === 'one_time' && r.expense_date) {
-          const d = new Date(r.expense_date)
-          return d.getFullYear() === m.year && d.getMonth() + 1 === m.month
-        }
-        // Recurring with end_date: don't show after end
-        if (r.end_date) {
-          const end = new Date(r.end_date)
-          const mDate = new Date(m.year, m.month - 1, 1)
-          if (mDate > end) return false
-        }
-        return true
-      })
-      .map(r => {
-        const isPaid = paidList.some(p => p.expense_id === r.id)
-        const isOverdue = isCurrentMonth && !isPaid && r.payment_day! < todayDay
-        return {
-          id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency,
-          day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id,
-          days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isOverdue,
-        }
-      })
-
-    const all = [...loanItems, ...expItems].sort((a, b) => {
-      if (a.paid !== b.paid) return a.paid ? 1 : -1
-      if (a.overdue !== b.overdue) return a.overdue ? -1 : 1
-      return a.day - b.day
+    const loanItems: PaymentItem[] = lnsList.filter(l => l.payment_day).map(l => {
+      const isPaid = paidList.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
+      return { id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, type: 'kredi', source: 'loan' as const, sourceId: l.id, days: isCurrentMonth ? daysUntil(l.payment_day) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && l.payment_day < todayDay }
     })
 
-    setPayments(all)
+    const expItems: PaymentItem[] = recList.filter(r => {
+      if (!r.payment_day || r.category === 'nakit') return false
+      if (r.expense_type === 'one_time' && r.expense_date) { const d = new Date(r.expense_date); return d.getFullYear() === m.year && d.getMonth() + 1 === m.month }
+      if (r.end_date) { const end = new Date(r.end_date); if (new Date(m.year, m.month - 1, 1) > end) return false }
+      return true
+    }).map(r => {
+      const isPaid = paidList.some(p => p.expense_id === r.id)
+      return { id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id, days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && r.payment_day! < todayDay }
+    })
+
+    setPayments([...loanItems, ...expItems].sort((a, b) => { if (a.paid !== b.paid) return a.paid ? 1 : -1; if (a.overdue !== b.overdue) return a.overdue ? -1 : 1; return a.day - b.day }))
   }, [])
 
-  // Initial load
-  useEffect(() => {
-    (async () => {
-      const { lnsList, recList } = await loadGlobal()
-      await loadMonth(currentMonth, lnsList, recList)
-      setLoading(false)
-    })()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { (async () => { const { lnsList, recList } = await loadGlobal(); await loadMonth(currentMonth, lnsList, recList); setLoading(false) })() }, []) // eslint-disable-line
 
-  // When selectedMonth changes (after initial load)
   const initialLoadDone = useRef(false)
-  useEffect(() => {
-    if (!initialLoadDone.current) {
-      initialLoadDone.current = true
-      return
-    }
-    if (loans.length === 0 && recurring.length === 0) return
-    setMonthLoading(true)
-    loadMonth(selectedMonth, loans, recurring).then(() => setMonthLoading(false))
-  }, [selectedMonth]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!initialLoadDone.current) { initialLoadDone.current = true; return }; if (loans.length === 0 && recurring.length === 0) return; setMonthLoading(true); loadMonth(selectedMonth, loans, recurring).then(() => setMonthLoading(false)) }, [selectedMonth]) // eslint-disable-line
 
-  // Reload everything (for rate refresh, payment actions)
-  const reloadAll = useCallback(async () => {
-    const { lnsList, recList } = await loadGlobal()
-    await loadMonth(selectedMonth, lnsList, recList)
-  }, [loadGlobal, loadMonth, selectedMonth])
+  const reloadAll = useCallback(async () => { const { lnsList, recList } = await loadGlobal(); await loadMonth(selectedMonth, lnsList, recList) }, [loadGlobal, loadMonth, selectedMonth])
 
-  const eurTry = rates?.eur_try || 0
-  const usdTry = rates?.usd_try || 0
-  const ratesToday = rates?.date === new Date().toISOString().split('T')[0]
+  const eurTry = rates?.eur_try || 0, usdTry = rates?.usd_try || 0
+  const toTry = (amount: number, currency: string) => currency === 'EUR' ? amount * eurTry : currency === 'USD' ? amount * usdTry : amount
 
-  const toTry = (amount: number, currency: string) => {
-    if (currency === 'EUR') return amount * eurTry
-    if (currency === 'USD') return amount * usdTry
-    return amount
-  }
-
-  const cashTry = accounts.reduce((sum, a) => sum + toTry(a.balance, a.currency), 0)
+  const cashTry = accounts.reduce((s, a) => s + toTry(a.balance, a.currency), 0)
   const alacakTry = allAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
   const totalAssetsTry = cashTry + investTotalTry + alacakTry
-
   const tryTotal = accounts.filter(a => a.currency === 'TRY').reduce((s, a) => s + a.balance, 0)
   const eurTotal = accounts.filter(a => a.currency === 'EUR' && a.type !== 'kripto').reduce((s, a) => s + a.balance, 0)
   const usdTotal = accounts.filter(a => a.currency === 'USD').reduce((s, a) => s + a.balance, 0)
-  const kriptoAccounts = accounts.filter(a => a.type === 'kripto')
-
-  const totalDebtTry = loans.reduce((sum, l) => sum + toTry(l.remaining_amount || 0, l.currency), 0)
+  const totalDebtTry = loans.reduce((s, l) => s + toTry(l.remaining_amount || 0, l.currency), 0)
   const monthlyTotalAll = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
   const recurringAlacak = allAlacak.filter(d => d.is_recurring)
   const monthlyIncome = recurringAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
-  const netMonthlyObligation = Math.max(0, monthlyTotalAll - monthlyIncome)
-  const runwayMonths = netMonthlyObligation > 0 ? (totalAssetsTry / netMonthlyObligation).toFixed(1) : '∞'
+  const netMonthly = Math.max(0, monthlyTotalAll - monthlyIncome)
+  const runwayMonths = netMonthly > 0 ? (totalAssetsTry / netMonthly).toFixed(1) : '∞'
   const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
 
-  // Month summary
   const unpaidPayments = payments.filter(p => !p.paid)
   const paidPayments = payments.filter(p => p.paid)
   const overduePayments = payments.filter(p => p.overdue)
-  const totalObligationTry = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
-  const paidTotalTry = paidPayments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
-  const remainingTotalTry = unpaidPayments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
-  const paidPct = totalObligationTry > 0 ? Math.round((paidTotalTry / totalObligationTry) * 100) : 0
+  const totalObligation = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
+  const paidTotal = paidPayments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
+  const remainingTotal = unpaidPayments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
+  const paidPct = totalObligation > 0 ? Math.round((paidTotal / totalObligation) * 100) : 0
 
-  // Bar chart
   const chartData = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date()
-    d.setMonth(d.getMonth() - (5 - i))
+    const d = new Date(); d.setMonth(d.getMonth() - (5 - i))
     return { name: d.toLocaleDateString('tr-TR', { month: 'short' }), tutar: Math.round(monthlyTotalAll * (0.85 + Math.random() * 0.3)) }
   })
   if (chartData.length > 0) chartData[chartData.length - 1].tutar = Math.round(monthlyTotalAll)
 
-  // Payment modal
   const [payModal, setPayModal] = useState<PaymentItem | null>(null)
   const [payAccountId, setPayAccountId] = useState<number | null>(null)
   const [paying, setPaying] = useState(false)
@@ -236,155 +165,56 @@ export default function Dashboard() {
   async function handlePay() {
     if (!payModal || !payAccountId) return
     setPaying(true)
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth() + 1
-    const today = now.toISOString().split('T')[0]
-    const paidDate = today
-
-    if (payModal.source === 'recurring') {
-      const { error } = await supabase.from('recurring_payments').insert({
-        expense_id: payModal.sourceId,
-        period_year: year, period_month: month,
-        amount: payModal.amount, is_paid: true, paid_date: paidDate,
-      })
-      if (error) { alert('Hata: ' + error.message); setPaying(false); return }
+    if (!isDemo) {
+      const year = now.getFullYear(), month = now.getMonth() + 1, today = now.toISOString().split('T')[0]
+      if (payModal.source === 'recurring') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: payModal.sourceId, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today }); if (error) { alert('Hata: ' + error.message); setPaying(false); return } }
+      if (payModal.source === 'loan') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: null, notes: `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today }); if (error) { alert('Hata: ' + error.message); setPaying(false); return }; const loan = loans.find(l => l.id === payModal.sourceId); if (loan) await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId) }
+      const account = accounts.find(a => a.id === payAccountId)
+      if (account) { let deduct = payModal.amount; if (payModal.currency !== account.currency) { const tryAmt = toTry(payModal.amount, payModal.currency); deduct = account.currency === 'EUR' ? tryAmt / eurTry : account.currency === 'USD' ? tryAmt / usdTry : tryAmt }; await supabase.from('accounts').update({ balance: account.balance - deduct }).eq('id', payAccountId); setAccounts(prev => prev.map(a => a.id === payAccountId ? { ...a, balance: a.balance - deduct } : a)) }
     }
-
-    if (payModal.source === 'loan') {
-      const { error } = await supabase.from('recurring_payments').insert({
-        expense_id: null,
-        notes: `loan_${payModal.sourceId}`,
-        period_year: year, period_month: month,
-        amount: payModal.amount, is_paid: true, paid_date: paidDate,
-      })
-      if (error) { alert('Hata: ' + error.message); setPaying(false); return }
-
-      const loan = loans.find(l => l.id === payModal.sourceId)
-      if (loan) {
-        await supabase.from('loans').update({
-          paid_installments: loan.paid_installments + 1,
-          remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount),
-        }).eq('id', payModal.sourceId)
-      }
-    }
-
-    const account = accounts.find(a => a.id === payAccountId)
-    if (account) {
-      let deductAmount = payModal.amount
-      if (payModal.currency !== account.currency) {
-        const amountTry = toTry(payModal.amount, payModal.currency)
-        if (account.currency === 'EUR') deductAmount = amountTry / eurTry
-        else if (account.currency === 'USD') deductAmount = amountTry / usdTry
-        else deductAmount = amountTry
-      }
-      await supabase.from('accounts').update({ balance: account.balance - deductAmount }).eq('id', payAccountId)
-      setAccounts(prev => prev.map(a => a.id === payAccountId ? { ...a, balance: a.balance - deductAmount } : a))
-    }
-
-    setPayments(prev => prev.map(p =>
-      p.source === payModal.source && p.sourceId === payModal.sourceId
-        ? { ...p, paid: true, overdue: false }
-        : p
-    ))
-
-    setPaying(false)
-    setPayModal(null)
-    setPayAccountId(null)
-    reloadAll()
+    setPayments(prev => prev.map(p => p.source === payModal.source && p.sourceId === payModal.sourceId ? { ...p, paid: true, overdue: false } : p))
+    setPaying(false); setPayModal(null); setPayAccountId(null)
+    if (!isDemo) reloadAll()
   }
 
   const hour = now.getHours()
-  const greeting = hour < 12 ? 'Gunaydin' : hour < 18 ? 'Iyi gunler' : 'Iyi aksamlar'
+  const greeting = hour < 12 ? 'Gunaydin' : hour < 18 ? 'Iyi Gunler' : 'Iyi Aksamlar'
   const selMonthShort = MONTH_NAMES[selectedMonth.month - 1].substring(0, 3)
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>
-        <div className="text-sm">Yukleniyor...</div>
+  if (loading) return (
+    <div className="flex items-center justify-center h-screen" style={{ color: 'var(--muted)' }}>
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-extrabold text-white" style={{ background: 'linear-gradient(135deg, #2b2d6e, #4a4db0)' }}>F</div>
+        <div className="text-sm font-medium">Yukleniyor...</div>
       </div>
-    )
-  }
+    </div>
+  )
 
   const renderPaymentItem = (p: PaymentItem) => {
     const isUrgent = isCurrent && !p.paid && !p.overdue && p.days <= 3
-    let leftBorder = 'var(--accent)'
-    let badgeBg = 'var(--bg4)'
-    let badgeColor = 'var(--muted)'
-    if (p.paid) { leftBorder = '#4ade9a'; badgeBg = 'rgba(74,222,154,0.08)'; badgeColor = '#059669' }
-    else if (p.overdue) { leftBorder = '#f59e0b'; badgeBg = 'rgba(245,158,11,0.08)'; badgeColor = '#d97706' }
-    else if (isUrgent) { leftBorder = '#dc2626'; badgeBg = 'rgba(220,38,38,0.08)'; badgeColor = '#dc2626' }
-    else if (isFuture) { leftBorder = '#3b82f6'; badgeBg = 'rgba(59,130,246,0.06)'; badgeColor = '#3b82f6' }
+    let statusColor = 'var(--muted)'
+    if (p.paid) { statusColor = '#30a46c' }
+    else if (p.overdue) { statusColor = '#e5a000' }
+    else if (isUrgent) { statusColor = '#e5484d' }
 
     return (
-      <div key={p.id}
-        className="px-4 py-3 flex items-center gap-3"
-        style={{
-          background: p.paid ? 'rgba(74,222,154,0.03)' : 'var(--bg3)',
-          borderRadius: 12, boxShadow: 'var(--shadow)',
-          border: '1px solid var(--border)',
-          borderLeft: `3px solid ${leftBorder}`,
-        }}>
-        <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0" style={{ background: badgeBg }}>
-          {p.paid ? (
-            <div className="text-lg" style={{ color: '#4ade9a' }}>✓</div>
-          ) : (
-            <>
-              <div className="text-[11px] font-bold leading-none" style={{ color: badgeColor }}>{p.day}</div>
-              <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>{selMonthShort}</div>
-            </>
-          )}
+      <div key={p.id} className="tx-item" style={{ opacity: p.paid ? 0.5 : 1 }}>
+        <div className="tx-icon">
+          {p.paid ? <IconCheck color="#30a46c" size={20} strokeWidth={2.5} /> : getCatIcon(p.type, { color: '#2b2d6e', size: 20 })}
         </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate" style={{
-            color: p.paid ? 'var(--muted)' : 'var(--text)',
-            textDecoration: p.paid ? 'line-through' : 'none',
-          }}>{p.name}</div>
-          <div className="text-[11px] mt-0.5" style={{
-            color: p.paid ? '#059669' : p.overdue ? '#d97706' : isUrgent ? '#dc2626' : isFuture ? '#3b82f6' : 'var(--muted)',
-          }}>
-            {p.paid ? 'Odendi' : p.overdue ? 'Gecmis - Odendi?' : isFuture ? 'Planlanan' : isPast && !p.paid ? 'Odenmedi' : daysUntilLabel(p.days)}
+        <div className="tx-info">
+          <div className="tx-name" style={{ textDecoration: p.paid ? 'line-through' : 'none' }}>{p.name}</div>
+          <div className="tx-detail" style={{ color: statusColor }}>
+            {p.paid ? 'Odendi' : p.overdue ? `Gecikti · ${p.day} ${selMonthShort}` : `${p.day} ${selMonthShort} · ${daysUntilLabel(p.days)}`}
           </div>
         </div>
-
-        <div className="text-right flex items-center gap-2">
-          <div>
-            <div className="mono text-sm font-semibold" style={{
-              color: p.paid ? '#4ade9a' : 'var(--text)',
-              textDecoration: p.paid ? 'line-through' : 'none',
-            }}>
-              {fmt(p.amount, p.currency)}
-              {isCurrent && !p.paid && p.currency === 'EUR' && <span className="text-[10px] font-normal" style={{ color: 'var(--muted)' }}> ({fmt(p.amount * eurTry)})</span>}
-            </div>
-          </div>
-          {p.paid ? (
-            <span className="px-2 py-1 rounded-lg text-[10px] font-semibold"
-              style={{ background: 'rgba(74,222,154,0.1)', color: '#059669' }}>
-              Odendi
-            </span>
-          ) : isCurrent && p.overdue ? (
+        <div className="tx-amount">
+          <div className="tx-value" style={{ color: p.paid ? '#30a46c' : 'var(--text)', textDecoration: p.paid ? 'line-through' : 'none' }}>{fmt(p.amount, p.currency)}</div>
+          {isCurrent && !p.paid && (
             <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
-              className="px-2 py-1 rounded-lg text-[10px] font-semibold flex-shrink-0"
-              style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', border: '1px solid rgba(245,158,11,0.3)' }}>
-              Onayla
+              className="tx-badge" style={{ background: p.overdue ? 'rgba(229,160,0,0.08)' : 'rgba(43,45,110,0.06)', color: p.overdue ? '#e5a000' : '#2b2d6e', border: 'none', cursor: 'pointer' }}>
+              {p.overdue ? 'Onayla' : 'Ode'}
             </button>
-          ) : isCurrent ? (
-            <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
-              className="px-2 py-1 rounded-lg text-[10px] font-semibold flex-shrink-0"
-              style={{ background: 'rgba(5,150,105,0.08)', color: '#059669', border: '1px solid rgba(5,150,105,0.2)' }}>
-              Yapildi
-            </button>
-          ) : isPast ? (
-            <span className="px-2 py-1 rounded-lg text-[10px] font-semibold"
-              style={{ background: 'rgba(245,158,11,0.06)', color: '#d97706' }}>
-              Odenmedi
-            </span>
-          ) : (
-            <span className="px-2 py-1 rounded-lg text-[10px] font-semibold"
-              style={{ background: 'rgba(59,130,246,0.06)', color: '#3b82f6' }}>
-              Planlanan
-            </span>
           )}
         </div>
       </div>
@@ -393,287 +223,237 @@ export default function Dashboard() {
 
   return (
     <div className="app-layout">
+      {/* Background blobs */}
+      <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
       <BottomNav />
       <div className="app-main pb-24 page-enter">
-        {/* Header */}
-        <div className="flex justify-between items-center px-5 pt-5 pb-4">
-          <div>
-            <div className="text-[12px] font-medium" style={{ color: 'var(--muted)' }}>{greeting}</div>
-            <div className="text-xl font-bold mt-0.5" style={{ color: 'var(--text)' }}>Atakan Ormanli</div>
+        {/* ===== HEADER ===== */}
+        <div className="flex justify-between items-center px-5 pt-6 pb-2">
+          <div className="flex items-center gap-3">
+            <img src="https://i.pravatar.cc/80?img=68" alt="avatar" className="w-11 h-11 rounded-full object-cover"
+              style={{ border: '2.5px solid var(--border)' }} />
+            <div>
+              <span className="text-lg" style={{ color: 'var(--text)' }}>Merhaba </span>
+              <span className="text-lg font-extrabold" style={{ color: 'var(--text)' }}>Atakan!</span>
+            </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={async () => {
-              setLoading(true)
-              await fetch('/api/update-rates')
-              await reloadAll()
-              setLoading(false)
-            }} className="w-9 h-9 rounded-lg flex items-center justify-center text-base"
-              style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}
-              title="Kurlari Guncelle">↻</button>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
-              style={{ background: '#0d9488' }}>AK</div>
-          </div>
-        </div>
-
-        {/* Rate warning */}
-        {!ratesToday && (
-          <div className="mx-4 mb-3 px-4 py-2.5 rounded-lg flex items-center gap-2 text-[12px]"
-            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#d97706' }}>
-            <span>Doviz kuru guncel degil</span>
-            <button onClick={async () => { setLoading(true); await fetch('/api/update-rates'); await reloadAll(); setLoading(false) }}
-              className="ml-auto font-semibold underline">Guncelle</button>
-          </div>
-        )}
-
-        {/* Month Selector */}
-        <div className="mx-4 mb-4">
-          <div ref={pillsRef} className="flex gap-2 overflow-x-auto no-scrollbar py-1" style={{ scrollbarWidth: 'none' }}>
-            <button
-              onClick={() => setSelectedMonth(monthOffset(monthPills[0], -1))}
-              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium"
-              style={{ background: 'var(--bg4)', color: 'var(--muted)' }}>
-              ‹
+            <button onClick={async () => { if (isDemo) return; setLoading(true); await fetch('/api/update-rates'); await reloadAll(); setLoading(false) }}
+              className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ background: 'var(--bg4)' }}>
+              <IconRefresh color="#2b2d6e" size={18} strokeWidth={2} />
             </button>
-            {monthPills.map(m => {
-              const active = sameMonth(m, selectedMonth)
-              const isCurr = sameMonth(m, currentMonth)
-              return (
-                <button
-                  key={`${m.year}-${m.month}`}
-                  onClick={() => setSelectedMonth(m)}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium whitespace-nowrap"
-                  style={{
-                    background: active ? '#0d9488' : 'var(--bg4)',
-                    color: active ? '#fff' : 'var(--muted)',
-                    border: active ? 'none' : '1px solid var(--border)',
-                  }}>
-                  {MONTH_NAMES[m.month - 1].substring(0, 3)} {m.year !== currentMonth.year ? m.year : ''}
-                  {isCurr && !active ? ' ●' : isCurr && active ? ' ●' : ''}
-                </button>
-              )
-            })}
-            <button
-              onClick={() => setSelectedMonth(monthOffset(monthPills[monthPills.length - 1], 1))}
-              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium"
-              style={{ background: 'var(--bg4)', color: 'var(--muted)' }}>
-              ›
+            <button className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ background: 'var(--bg4)' }}>
+              <IconSettings color="#2b2d6e" size={18} strokeWidth={2} />
             </button>
           </div>
         </div>
 
-        {/* Month context banner */}
-        {isPast && (
-          <div className="mx-4 mb-3 px-4 py-2.5 rounded-lg flex items-center gap-2 text-[12px]"
-            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#d97706' }}>
-            <span>Gecmis Ay — {monthLabel(selectedMonth)}</span>
-            <span className="ml-auto mono font-semibold">Bu ay toplam odenen: {fmt(paidTotalTry)}</span>
+        {/* ===== HERO CARD ===== */}
+        <div className="mx-4 mt-3 card-hero p-6" style={{ position: 'relative', zIndex: 1 }}>
+          <div className="flex items-center justify-between mb-1" style={{ position: 'relative', zIndex: 2 }}>
+            <div className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)' }}>Toplam Varlik</div>
+            <IconWallet color="rgba(255,255,255,0.3)" size={20} />
           </div>
-        )}
-        {isFuture && (
-          <div className="mx-4 mb-3 px-4 py-2.5 rounded-lg flex items-center gap-2 text-[12px]"
-            style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6' }}>
-            <span>Planlanan — {monthLabel(selectedMonth)}</span>
-            <span className="ml-auto mono font-semibold">Tahmini toplam: {fmt(totalObligationTry)}</span>
+          <div className="mono text-3xl font-extrabold mb-5" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalAssetsTry)}</div>
+          <div className="flex gap-2" style={{ position: 'relative', zIndex: 2 }}>
+            {[
+              { label: 'TRY', value: fmt(tryTotal) },
+              { label: 'EUR', value: fmt(eurTotal, 'EUR') },
+              { label: 'USD', value: fmt(usdTotal, 'USD') },
+            ].map(c => (
+              <div key={c.label} className="flex-1 rounded-full py-2 px-3 text-center"
+                style={{ border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)' }}>
+                <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>{c.label}</div>
+                <div className="mono text-[11px] font-bold mt-0.5">{c.value}</div>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
 
-        {/* Summary Grid — always current data */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mx-4 mb-4">
-          <div className="card-lg p-5 md:col-span-2">
-            <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Varlik</div>
-            <div className="mono text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmt(totalAssetsTry)}</div>
-            <div className="flex flex-col gap-1 mt-2 text-[12px]" style={{ color: 'var(--muted)' }}>
-              <div className="flex justify-between">
-                <span>Nakit</span>
-                <span className="mono font-semibold amt-blue">{fmt(cashTry)}</span>
-              </div>
-              {investTotalTry > 0 && (
-                <div className="flex justify-between">
-                  <span>Yatirimlar</span>
-                  <span className="mono font-semibold amt-blue">{fmt(investTotalTry)}</span>
-                </div>
-              )}
-              {alacakTry > 0 && (
-                <div className="flex justify-between">
-                  <span>Alacaklar <span className="text-[10px]">(beklenen)</span></span>
-                  <span className="mono font-semibold amt-green">{fmt(alacakTry)}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span>Borc</span>
-                <span className="mono font-semibold amt-red">-{fmt(totalDebtTry)}</span>
-              </div>
-              <div className="flex justify-between pt-1 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
-                <span className="font-semibold" style={{ color: 'var(--text)' }}>TOPLAM</span>
-                <span className="mono font-bold" style={{ color: 'var(--text)' }}>{fmt(totalAssetsTry)}</span>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-4">
+        {/* ===== DUAL COLUMNS: Varliklar | Harcamalar ===== */}
+        <div className="grid grid-cols-2 gap-3 mx-4 mt-4">
+          {/* Left: Varliklar */}
+          <div className="card p-4">
+            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#2b2d6e' }}>Varliklar</div>
+            <div className="flex flex-col gap-3">
               {[
-                { key: 'TRY', icon: '🇹🇷', value: fmt(tryTotal), label: 'Toplam TL', total: tryTotal },
-                { key: 'EUR', icon: '🇪🇺', value: fmt(eurTotal, 'EUR'), label: 'Toplam EUR', total: eurTotal },
-                { key: 'USD', icon: '🇺🇸', value: fmt(usdTotal, 'USD'), label: 'Toplam USD', total: usdTotal },
-                { key: 'KRP', icon: '₿', value: kriptoTry > 0 ? fmt(kriptoTry) : '—', label: 'KRİPTO', total: kriptoTry },
-              ].map(p => (
-                <div key={p.key} className="flex-1 rounded-lg p-2.5" style={{ background: 'var(--bg4)', opacity: p.total === 0 ? 0.4 : 1 }}>
-                  <div className="text-xs mb-1" style={{ color: 'var(--muted)' }}>{p.icon}</div>
-                  <div className="mono text-sm font-semibold amt-blue">{p.value}</div>
-                  <div className="text-[10px] uppercase tracking-wide mt-0.5" style={{ color: 'var(--muted)' }}>{p.label}</div>
+                { label: 'Nakit', value: cashTry, color: '#2b2d6e' },
+                { label: 'Yatirim', value: investTotalTry, color: '#4a4db0' },
+                { label: 'Alacak', value: alacakTry, color: '#6366f1' },
+              ].filter(r => r.value > 0).map(r => (
+                <div key={r.label}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: r.color }} />
+                      <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{r.label}</span>
+                    </div>
+                    <span className="mono text-[11px] font-bold" style={{ color: r.color }}>{fmt(r.value)}</span>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* Right: Harcamalar */}
           <div className="card p-4">
-            <div className="text-[12px] font-medium uppercase tracking-wide mb-2" style={{ color: 'var(--muted)' }}>Runway</div>
-            <div className="mono text-2xl font-bold amt-blue">{runwayMonths} <span className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Ay</span></div>
-            <div className="progress-wrap mt-3 mb-2">
-              <div className="progress-bar" style={{ width: `${runwayPct}%`, background: runwayPct > 50 ? '#059669' : runwayPct > 25 ? '#d97706' : '#dc2626' }} />
-            </div>
-            <div className="flex justify-between text-[11px]" style={{ color: 'var(--muted)' }}>
-              <span>0</span><span>24 ay</span>
-            </div>
-            <div className="text-[10px] mt-2" style={{ color: 'var(--muted)' }}>
-              {monthlyIncome > 0 ? 'Varliklar / (giderler - gelirler)' : 'Tum varliklarinla kac ay idare edebilirsin'}
+            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#e5484d' }}>Yukumluluk</div>
+            <div className="flex flex-col gap-3">
+              {[
+                { label: 'Toplam Borc', value: totalDebtTry, color: '#e5484d' },
+                { label: 'Aylik Gider', value: monthlyTotalAll, color: '#d97706' },
+              ].map(r => (
+                <div key={r.label}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: r.color }} />
+                      <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{r.label}</span>
+                    </div>
+                    <span className="mono text-[11px] font-bold" style={{ color: r.color }}>{fmt(r.value)}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="pt-2 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold" style={{ color: 'var(--text)' }}>Runway</span>
+                  <span className="mono text-[11px] font-extrabold" style={{ color: '#2b2d6e' }}>{runwayMonths} Ay</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Expense Chart */}
-        <div className="mx-4 mb-4 card p-4">
-          <div className="text-[12px] font-semibold mb-3" style={{ color: 'var(--text)' }}>Aylik Gider Trendi</div>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={chartData} barSize={28}>
+        {/* ===== CHART ===== */}
+        <div className="mx-4 mt-4 card p-4">
+          <div className="text-xs font-bold mb-2" style={{ color: 'var(--text)' }}>Aylik Gider Trendi</div>
+          <ResponsiveContainer width="100%" height={120}>
+            <BarChart data={chartData} barSize={20}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={50}
-                tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
-              <Tooltip formatter={(v: number) => [fmt(v), 'Tutar']} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
-              <Bar dataKey="tutar" fill="#0d9488" radius={[4, 4, 0, 0]} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8790a5' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: '#8790a5' }} axisLine={false} tickLine={false} width={40} tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
+              <Tooltip formatter={(v: number) => [fmt(v), 'Tutar']} contentStyle={{ borderRadius: 12, border: '1px solid var(--border)', fontSize: 12 }} />
+              <Bar dataKey="tutar" fill="url(#navyGrad)" radius={[4, 4, 0, 0]} />
+              <defs><linearGradient id="navyGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2b2d6e" /><stop offset="100%" stopColor="#4a4db0" /></linearGradient></defs>
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Month Summary Card */}
-        <div className="mx-4 mb-4 card p-4" style={{ opacity: monthLoading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
-          <div className="text-[12px] font-semibold mb-3" style={{ color: 'var(--text)' }}>
-            {isPast ? `${monthLabel(selectedMonth)} Ozet` : isFuture ? `${monthLabel(selectedMonth)} Planlanan` : 'Bu Ay Ozet'}
-          </div>
-          <div className="flex justify-between text-[12px] mb-2">
-            <span style={{ color: 'var(--muted)' }}>{isFuture ? 'Tahmini yukumluluk' : 'Toplam yukumluluk'}</span>
-            <span className="mono font-semibold">{fmt(totalObligationTry)}</span>
-          </div>
-          <div className="flex justify-between text-[12px] mb-2">
-            <span style={{ color: 'var(--muted)' }}>Odenen</span>
-            <span className="mono font-semibold amt-green">{fmt(paidTotalTry)}</span>
-          </div>
-          <div className="flex justify-between text-[12px] mb-3">
-            <span style={{ color: 'var(--muted)' }}>{isFuture ? 'Planlanmis' : 'Kalan'}</span>
-            <span className="mono font-semibold amt-red">{fmt(remainingTotalTry)}</span>
-          </div>
-          <div className="progress-wrap mb-1">
-            <div className="progress-bar" style={{ width: `${paidPct}%`, background: '#059669' }} />
-          </div>
-          <div className="flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
-            <span>%{paidPct} tamamlandi</span>
-            <span>{paidPayments.length}/{payments.length} odeme {isFuture ? 'planlanmis' : 'tamamlandi'}</span>
+        {/* ===== MONTH SELECTOR ===== */}
+        <div className="mx-4 mt-4 mb-3">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+            {monthPills.map(m => {
+              const active = sameMonth(m, selectedMonth)
+              const isCurr = sameMonth(m, currentMonth)
+              return (
+                <button key={`${m.year}-${m.month}`} onClick={() => setSelectedMonth(m)}
+                  className="flex-shrink-0 px-4 py-2.5 rounded-full text-xs font-semibold whitespace-nowrap"
+                  style={{
+                    background: active ? 'linear-gradient(135deg, #2b2d6e, #3d3f8f)' : 'transparent',
+                    color: active ? '#fff' : 'var(--text2)',
+                    border: active ? '1.5px solid transparent' : '1.5px solid var(--border2)',
+                    boxShadow: active ? '0 2px 6px rgba(43,45,110,0.2)' : 'none',
+                    transition: 'all 0.2s',
+                  }}>
+                  {MONTH_NAMES[m.month - 1].substring(0, 3)} {m.year !== currentMonth.year ? m.year : ''}{isCurr ? ' •' : ''}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* Payment Lists */}
-        <div style={{ opacity: monthLoading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
-          {/* Bekleyen / Planlanan Odemeler */}
-          <div className="px-5 mb-2">
-            <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: isFuture ? '#3b82f6' : 'var(--muted)' }}>
-              {isFuture ? 'Planlanan Odemeler' : isPast ? 'Odenmemis' : 'Bekleyen Odemeler'}
-              {isCurrent && overduePayments.length > 0 && <span style={{ color: '#d97706' }}> · {overduePayments.length} gecmis</span>}
+        {/* ===== MONTH SUMMARY — nested card style ===== */}
+        <div className="mx-4 mb-4" style={{
+          background: 'linear-gradient(145deg, #eef0f8, #e8ecf6)',
+          borderRadius: 20,
+          padding: '16px 14px',
+          border: '1.5px solid #d8ddef',
+          opacity: monthLoading ? 0.5 : 1,
+          transition: 'opacity 0.2s',
+        }}>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-3 px-1">
+            <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>{isPast ? monthLabel(selectedMonth) : isFuture ? monthLabel(selectedMonth) : 'Bu Ay'}</span>
+            <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>{paidPayments.length}/{payments.length} odeme</span>
+          </div>
+
+          {/* Inner nested cards — Toplam / Odenen */}
+          <div className="flex gap-2.5 mb-2.5">
+            <div className="flex-1" style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 3px rgba(43,45,110,0.04)' }}>
+              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Toplam</div>
+              <div className="mono text-lg font-extrabold mt-1" style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>{fmt(totalObligation)}</div>
+            </div>
+            <div className="flex-1" style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 3px rgba(43,45,110,0.04)' }}>
+              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Odenen</div>
+              <div className="mono text-lg font-extrabold mt-1 amt-green" style={{ letterSpacing: '-0.03em' }}>{fmt(paidTotal)}</div>
             </div>
           </div>
-          {unpaidPayments.length === 0 ? (
-            <div className="mx-4 card p-4 text-center text-sm" style={{ color: isPast ? '#d97706' : '#059669' }}>
-              {isPast ? 'Tum odemeler tamamlanmis' : isFuture ? 'Henuz odeme yok' : 'Tum odemeler tamamlandi bu ay'}
+
+          {/* Bottom row — Kalan + progress */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '12px 16px', boxShadow: '0 1px 3px rgba(43,45,110,0.04)' }}>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#e5484d' }}>Kalan</div>
+                <div className="mono text-sm font-extrabold amt-red" style={{ letterSpacing: '-0.03em' }}>{fmt(remainingTotal)}</div>
+              </div>
+              <div className="text-right">
+                <div className="mono text-xl font-extrabold" style={{ color: '#2b2d6e', letterSpacing: '-0.03em' }}>%{paidPct}</div>
+                <div className="text-[9px]" style={{ color: 'var(--muted)' }}>tamamlandi</div>
+              </div>
             </div>
-          ) : (
-            <div className="flex flex-col gap-2 mx-4">
-              {unpaidPayments.map(p => renderPaymentItem(p))}
+            <div className="progress-wrap">
+              <div className="progress-bar" style={{ width: `${paidPct}%`, background: 'linear-gradient(90deg, #2b2d6e, #4a4db0)' }} />
+            </div>
+          </div>
+        </div>
+
+        {/* ===== PAYMENT LIST ===== */}
+        <div style={{ opacity: monthLoading ? 0.5 : 1 }}>
+          {unpaidPayments.length > 0 && (
+            <>
+              <div className="flex items-center justify-between mx-5 mb-3">
+                <span className="text-xs font-bold">{isFuture ? 'Planlanan' : isPast ? 'Odenmemis' : 'Bekleyen Odemeler'}</span>
+                {overduePayments.length > 0 && <span className="badge badge-amber">{overduePayments.length} gecmis</span>}
+              </div>
+              <div className="tx-list mx-4 mb-4">{unpaidPayments.map(renderPaymentItem)}</div>
+            </>
+          )}
+          {unpaidPayments.length === 0 && (
+            <div className="mx-4 mb-4 card p-6 text-center">
+              <IconCheck color="#30a46c" size={28} strokeWidth={2.5} />
+              <div className="text-sm font-semibold mt-2" style={{ color: '#30a46c' }}>Tum odemeler tamamlandi</div>
             </div>
           )}
-
-          {/* Tamamlanan Odemeler */}
           {paidPayments.length > 0 && (
             <>
-              <div className="px-5 mt-4 mb-2 flex items-center gap-2">
-                <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: '#059669' }}>Tamamlanan Odemeler</div>
-                <div className="flex-1 h-px" style={{ background: 'rgba(74,222,154,0.3)' }} />
-                <div className="text-[10px] font-medium" style={{ color: '#059669' }}>{paidPayments.length} odeme</div>
+              <div className="flex items-center justify-between mx-5 mb-3">
+                <span className="text-xs font-bold" style={{ color: '#30a46c' }}>Tamamlanan</span>
+                <span className="text-[10px] font-medium" style={{ color: '#30a46c' }}>{paidPayments.length} odeme</span>
               </div>
-              <div className="flex flex-col gap-2 mx-4">
-                {paidPayments.map(p => renderPaymentItem(p))}
-              </div>
-            </>
-          )}
-
-          {/* Bekleyen Gelirler (Recurring Alacak) — only show for current month */}
-          {isCurrent && recurringAlacak.length > 0 && (
-            <>
-              <div className="px-5 mt-4 mb-2 flex items-center gap-2">
-                <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: '#0d9488' }}>Bekleyen Gelirler</div>
-                <div className="flex-1 h-px" style={{ background: 'rgba(13,148,136,0.2)' }} />
-                <div className="text-[10px] font-medium" style={{ color: '#0d9488' }}>+{fmt(monthlyIncome)}/ay</div>
-              </div>
-              <div className="flex flex-col gap-2 mx-4">
-                {recurringAlacak.map(d => (
-                  <div key={d.id} className="px-4 py-3 flex items-center gap-3"
-                    style={{ background: 'var(--bg3)', borderRadius: 12, boxShadow: 'var(--shadow)', border: '1px solid var(--border)', borderLeft: '3px solid #0d9488' }}>
-                    <div className="w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0" style={{ background: 'rgba(13,148,136,0.08)' }}>
-                      {d.expected_day ? (
-                        <>
-                          <div className="text-[11px] font-bold leading-none" style={{ color: '#0d9488' }}>{d.expected_day}</div>
-                          <div className="text-[7px] font-semibold uppercase leading-none mt-0.5" style={{ color: 'var(--muted)' }}>{selMonthShort}</div>
-                        </>
-                      ) : (
-                        <div className="text-base">🔄</div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{d.person_name}</div>
-                      <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
-                        {d.frequency === 'aylik' ? 'Aylik' : d.frequency === 'haftalik' ? 'Haftalik' : d.frequency === '2haftada1' ? '2 Haftada 1' : 'Duzenli'} gelir
-                      </div>
-                    </div>
-                    <div className="mono text-sm font-semibold amt-green">+{fmt(d.amount, d.currency)}</div>
-                  </div>
-                ))}
-              </div>
+              <div className="tx-list mx-4 mb-4">{paidPayments.map(renderPaymentItem)}</div>
             </>
           )}
         </div>
 
-        {/* Pay confirmation modal */}
+        {/* ===== PAY MODAL ===== */}
         {payModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-1">
-                {payModal.overdue ? 'Gecmis Odemeyi Onayla' : 'Odeme Yap'}
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(30,31,84,0.5)' }}
+            onClick={e => { if (e.target === e.currentTarget) { setPayModal(null); setPayAccountId(null) } }}>
+            <div className="card p-6 w-full max-w-sm scale-in">
+              <div className="text-base font-bold mb-1">{payModal.overdue ? 'Gecmis Odemeyi Onayla' : 'Odeme Yap'}</div>
+              <div className="text-sm mb-5" style={{ color: 'var(--muted)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text)' }}>{payModal.name}</span>
+                <span className="mono ml-2 font-bold">{fmt(payModal.amount, payModal.currency)}</span>
               </div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>
-                <span className="font-medium" style={{ color: 'var(--text)' }}>{payModal.name}</span> — {fmt(payModal.amount, payModal.currency)}
-                {payModal.currency === 'EUR' && <span> ({fmt(payModal.amount * eurTry)})</span>}
-                {payModal.overdue && <div className="text-[11px] mt-1" style={{ color: '#d97706' }}>Bu odemenin vadesi gecmis (ayin {payModal.day}'i)</div>}
-              </div>
-              <div className="mb-4">
-                <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Hangi hesaptan?</label>
+              <div className="mb-5">
+                <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Hangi hesaptan?</label>
                 <select value={payAccountId || ''} onChange={e => setPayAccountId(Number(e.target.value))} className="input">
-                  {accounts.map(a => (
-                    <option key={a.id} value={a.id}>{a.name} — {fmt(a.balance, a.currency)}</option>
-                  ))}
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name} — {fmt(a.balance, a.currency)}</option>)}
                 </select>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => { setPayModal(null); setPayAccountId(null) }} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
-                <button onClick={handlePay} disabled={paying || !payAccountId} className="btn-primary flex-1 py-2.5 text-sm">
-                  {paying ? 'Kaydediliyor...' : 'Onayla'}
-                </button>
+              <div className="flex gap-3">
+                <button onClick={() => { setPayModal(null); setPayAccountId(null) }} className="btn-outline flex-1 py-3 text-sm">Iptal</button>
+                <button onClick={handlePay} disabled={paying || !payAccountId} className="btn-primary flex-1 py-3 text-sm">{paying ? 'Kaydediliyor...' : 'Onayla'}</button>
               </div>
             </div>
           </div>
