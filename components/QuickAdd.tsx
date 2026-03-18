@@ -14,6 +14,7 @@ export default function QuickAdd({ onClose }: Props) {
     payment_day: '',
   })
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [photo, setPhoto] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
@@ -30,7 +31,7 @@ export default function QuickAdd({ onClose }: Props) {
 
   async function handleSave() {
     if (!form.name || !form.amount) return
-    setSaving(true)
+    setSaving(true); setSaveError(null)
 
     if (type === 'expense') {
       const payload: any = {
@@ -44,9 +45,19 @@ export default function QuickAdd({ onClose }: Props) {
       } else {
         payload.payment_day = parseInt(form.payment_day) || null
       }
-      await supabase.from('recurring_expenses').insert(payload)
+      let result = await supabase.from('recurring_expenses').insert(payload)
+      if (result.error) {
+        // Retry without new columns if they don't exist yet
+        if (result.error.message?.includes('column') || result.error.code === '42703') {
+          const { expense_type, expense_date, end_date, ...fallback } = payload
+          result = await supabase.from('recurring_expenses').insert(fallback)
+        }
+        if (result.error) {
+          setSaveError(`Hata: ${result.error.message}`)
+          setSaving(false); return
+        }
+      }
     }
-    // income type placeholder for future
 
     setSaving(false)
     onClose()
@@ -189,6 +200,9 @@ export default function QuickAdd({ onClose }: Props) {
               )}
             </div>
 
+            {saveError && (
+              <div className="mt-3 p-2.5 rounded-lg text-[12px]" style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>{saveError}</div>
+            )}
             <button onClick={handleSave} disabled={saving || !form.name || !form.amount}
               className="btn-primary w-full mt-4 py-3 text-sm font-semibold">
               {saving ? 'Kaydediliyor...' : 'Kaydet'}
