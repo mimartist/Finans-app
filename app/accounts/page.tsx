@@ -344,12 +344,48 @@ export default function AccountsPage() {
         )}
 
         {/* ===== TAB: YATIRIMLAR ===== */}
-        {tab === 'yatirimlar' && (
+        {tab === 'yatirimlar' && (() => {
+          const totalPortfoy = investments.reduce((s, i) => s + (i.total_value_try || toTry(i.total_value || 0, i.currency)), 0)
+          const totalCost = investments.reduce((s, i) => s + toTry(i.cost_basis || 0, i.currency), 0)
+          const totalPnl = totalPortfoy - totalCost
+          const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0
+          const winners = investments.filter(i => (i.pnl || 0) >= 0).length
+          const losers = investments.filter(i => (i.pnl || 0) < 0).length
+          return (
           <>
             <div className="mx-4 mb-4 card-hero p-5" style={{ position: 'relative', zIndex: 1 }}>
               <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>Toplam Portfoy</div>
               <div className="mono text-2xl font-extrabold mt-1" style={{ position: 'relative', zIndex: 2 }}>
-                {fmt(investments.reduce((s, i) => s + toTry(i.total_value || 0, i.currency), 0))}
+                {fmt(totalPortfoy)}
+              </div>
+              {/* P&L Summary */}
+              <div className="flex gap-2 mt-4" style={{ position: 'relative', zIndex: 2 }}>
+                <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+                  style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
+                  <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>MALİYET</div>
+                  <div className="mono text-[11px] font-bold mt-0.5">{fmt(totalCost)}</div>
+                </div>
+                <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+                  style={{ border: `1px solid ${totalPnl >= 0 ? 'rgba(134,239,172,0.25)' : 'rgba(255,138,138,0.25)'}`, background: totalPnl >= 0 ? 'rgba(134,239,172,0.08)' : 'rgba(255,138,138,0.08)' }}>
+                  <div className="text-[9px] font-medium" style={{ color: totalPnl >= 0 ? 'rgba(134,239,172,0.7)' : 'rgba(255,138,138,0.7)' }}>
+                    {totalPnl >= 0 ? 'KAR' : 'ZARAR'}
+                  </div>
+                  <div className="mono text-[11px] font-bold mt-0.5" style={{ color: totalPnl >= 0 ? '#86efac' : '#ff8a8a' }}>
+                    {totalPnl >= 0 ? '+' : ''}{fmt(totalPnl)}
+                  </div>
+                </div>
+                <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+                  style={{ border: `1px solid ${totalPnl >= 0 ? 'rgba(134,239,172,0.25)' : 'rgba(255,138,138,0.25)'}`, background: totalPnl >= 0 ? 'rgba(134,239,172,0.08)' : 'rgba(255,138,138,0.08)' }}>
+                  <div className="text-[9px] font-medium" style={{ color: totalPnl >= 0 ? 'rgba(134,239,172,0.7)' : 'rgba(255,138,138,0.7)' }}>
+                    GETIRI
+                  </div>
+                  <div className="mono text-[11px] font-bold mt-0.5" style={{ color: totalPnl >= 0 ? '#86efac' : '#ff8a8a' }}>
+                    {totalPnl >= 0 ? '+' : ''}{totalPnlPct.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+              <div className="text-[10px] mt-3 text-center" style={{ color: 'rgba(255,255,255,0.35)', position: 'relative', zIndex: 2 }}>
+                {investments.length} yatirim · {winners} karda · {losers} zararda
               </div>
             </div>
 
@@ -378,7 +414,7 @@ export default function AccountsPage() {
               })}
             </div>
           </>
-        )}
+        ); })()}
 
         {/* ===== TAB: ALACAK / VERECEK ===== */}
         {tab === 'alacak' && (
