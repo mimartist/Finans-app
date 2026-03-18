@@ -2,10 +2,23 @@
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, isDemo } from '@/lib/supabase'
-import type { Account, ExchangeRate, DebtRecord } from '@/lib/supabase'
+import type { Account, ExchangeRate, DebtRecord, Investment } from '@/lib/supabase'
 import { IconWallet, IconTrendUp, IconArrowsExchange, IconPlus } from '@/components/Icons'
 
 type Tab = 'hesaplar' | 'yatirimlar' | 'alacak'
+
+type InvestmentWithSnapshot = Investment & {
+  latest_price?: number
+  total_value?: number
+  total_value_try?: number
+  cost_basis?: number
+  pnl?: number
+  pnl_pct?: number
+  snapshot_date?: string
+}
+
+const emptyInvForm = { name: '', type: 'hisse', symbol: '', quantity: '', avg_cost: '', currency: 'TRY', platform: '' }
+const emptyDebtForm = { person_name: '', type: 'alacak' as 'alacak' | 'verecek', amount: '', currency: 'TRY', description: '', due_date: '' }
 
 // Mock data
 const MOCK_ACCOUNTS: Account[] = [
@@ -14,10 +27,10 @@ const MOCK_ACCOUNTS: Account[] = [
   { id: 3, name: 'Is Bankasi USD', bank: 'Is Bankasi', type: 'vadesiz', currency: 'USD', balance: 1500, is_active: true, updated_at: '' },
   { id: 4, name: 'Vakifbank Vadeli', bank: 'Vakifbank', type: 'vadeli', currency: 'TRY', balance: 120000, is_active: true, updated_at: '' },
 ]
-const MOCK_INVESTMENTS = [
-  { id: 1, name: 'BİST Hisse', type: 'hisse', platform: 'Midas', currency: 'TRY', value: 52000, pnl: 3200, pnlPct: 6.5 },
-  { id: 2, name: 'Bitcoin', type: 'kripto', platform: 'Binance', currency: 'USD', value: 8500, pnl: 1200, pnlPct: 16.4 },
-  { id: 3, name: 'Altin', type: 'altin', platform: 'Ziraat', currency: 'TRY', value: 33000, pnl: -800, pnlPct: -2.4 },
+const MOCK_INVESTMENTS: InvestmentWithSnapshot[] = [
+  { id: 1, name: 'BIST Hisse', type: 'hisse', symbol: 'BIST', quantity: 100, avg_cost: 488, currency: 'TRY', platform: 'Midas', is_active: true, total_value: 52000, cost_basis: 48800, pnl: 3200, pnl_pct: 6.5 },
+  { id: 2, name: 'Bitcoin', type: 'kripto', symbol: 'BTC', quantity: 0.1, avg_cost: 73000, currency: 'USD', platform: 'Binance', is_active: true, total_value: 8500, cost_basis: 7300, pnl: 1200, pnl_pct: 16.4 },
+  { id: 3, name: 'Altin', type: 'altin', symbol: 'XAU', quantity: 10, avg_cost: 3380, currency: 'TRY', platform: 'Ziraat', is_active: true, total_value: 33000, cost_basis: 33800, pnl: -800, pnl_pct: -2.4 },
 ]
 const MOCK_DEBTS: DebtRecord[] = [
   { id: 1, person_name: 'Ahmet Yilmaz', type: 'alacak', amount: 15000, currency: 'TRY', description: 'Ofis kirasi', transaction_date: '2026-01-15', due_date: '2026-03-30', is_settled: false, is_recurring: true, frequency: 'aylik', expected_day: 15 },
@@ -49,32 +62,67 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [rates, setRates] = useState<ExchangeRate | null>(null)
   const [debts, setDebts] = useState<DebtRecord[]>([])
+  const [investments, setInvestments] = useState<InvestmentWithSnapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedBanks, setExpandedBanks] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
+  // Investment edit/delete state
+  const [editInv, setEditInv] = useState<InvestmentWithSnapshot | null>(null)
+  const [invForm, setInvForm] = useState(emptyInvForm)
+  const [invSaving, setInvSaving] = useState(false)
+  const [invDeleteConfirm, setInvDeleteConfirm] = useState(false)
+
+  // Debt edit/delete state
+  const [editDebt, setEditDebt] = useState<DebtRecord | null>(null)
+  const [debtForm, setDebtForm] = useState(emptyDebtForm)
+  const [debtSaving, setDebtSaving] = useState(false)
+  const [debtDeleteConfirm, setDebtDeleteConfirm] = useState(false)
+
+  async function loadData() {
     if (isDemo) {
       setAccounts(MOCK_ACCOUNTS)
       setRates(MOCK_RATES)
       setDebts(MOCK_DEBTS)
+      setInvestments(MOCK_INVESTMENTS)
       setLoading(false)
       return
     }
-    (async () => {
-      const [{ data: acc }, { data: rt }, { data: dbt }] = await Promise.all([
-        supabase.from('accounts').select('*').eq('is_active', true).order('bank'),
-        supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
-        supabase.from('debt_records').select('*').eq('is_settled', false),
-      ])
-      setAccounts(acc || [])
-      setRates(rt?.[0] || null)
-      setDebts(dbt || [])
-      // Expand all banks by default
-      const banks = new Set((acc || []).map((a: Account) => a.bank))
-      setExpandedBanks(banks)
-      setLoading(false)
-    })()
-  }, [])
+    const [{ data: acc }, { data: rt }, { data: dbt }, { data: inv }, { data: snaps }] = await Promise.all([
+      supabase.from('accounts').select('*').eq('is_active', true).order('bank'),
+      supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1),
+      supabase.from('debt_records').select('*').eq('is_settled', false),
+      supabase.from('investments').select('*').eq('is_active', true),
+      supabase.from('investment_snapshots').select('*').order('snapshot_date', { ascending: false }),
+    ])
+    const currentRates = rt?.[0] || null
+    setAccounts(acc || [])
+    setRates(currentRates)
+    setDebts(dbt || [])
+
+    // Enrich investments with snapshot data
+    const enriched = (inv || []).map((i: Investment) => {
+      const snap = (snaps || []).find((s: any) => s.investment_id === i.id)
+      const costBasis = (i.avg_cost || 0) * (i.quantity || 0)
+      const currentVal = snap?.total_value || costBasis
+      const pnl = currentVal - costBasis
+      const pnlPct = costBasis > 0 ? (pnl / costBasis) * 100 : 0
+      let totalValueTry = snap?.total_value_try
+      if (!totalValueTry && currentRates) {
+        if (i.currency === 'EUR') totalValueTry = currentVal * (currentRates.eur_try || 1)
+        else if (i.currency === 'USD') totalValueTry = currentVal * (currentRates.usd_try || 1)
+        else totalValueTry = currentVal
+      }
+      return { ...i, latest_price: snap?.price, total_value: currentVal, total_value_try: totalValueTry || currentVal, cost_basis: costBasis, pnl, pnl_pct: pnlPct, snapshot_date: snap?.snapshot_date }
+    })
+    setInvestments(enriched)
+
+    // Expand all banks by default
+    const banks = new Set((acc || []).map((a: Account) => a.bank))
+    setExpandedBanks(banks)
+    setLoading(false)
+  }
+
+  useEffect(() => { loadData() }, [])
 
   const eurTry = rates?.eur_try || 0
   const usdTry = rates?.usd_try || 0
@@ -108,6 +156,57 @@ export default function AccountsPage() {
       return next
     })
   }
+
+  // Investment edit handlers
+  function openInvEdit(inv: InvestmentWithSnapshot) {
+    setEditInv(inv)
+    setInvForm({ name: inv.name, type: inv.type, symbol: inv.symbol || '', quantity: String(inv.quantity || ''), avg_cost: String(inv.avg_cost || ''), currency: inv.currency, platform: inv.platform || '' })
+    setInvDeleteConfirm(false)
+  }
+  function closeInvEdit() { setEditInv(null); setInvForm(emptyInvForm); setInvDeleteConfirm(false) }
+
+  async function handleInvSave() {
+    if (!editInv || !invForm.name || !invForm.quantity) return
+    if (isDemo) { closeInvEdit(); return }
+    setInvSaving(true)
+    const payload = { name: invForm.name, type: invForm.type, symbol: invForm.symbol || null, quantity: parseFloat(invForm.quantity) || 0, avg_cost: parseFloat(invForm.avg_cost) || 0, currency: invForm.currency, platform: invForm.platform || null, is_active: true }
+    await supabase.from('investments').update(payload).eq('id', editInv.id)
+    setInvSaving(false); closeInvEdit(); await loadData()
+  }
+
+  async function handleInvDelete() {
+    if (!editInv) return
+    if (isDemo) { closeInvEdit(); return }
+    await supabase.from('investments').update({ is_active: false }).eq('id', editInv.id)
+    closeInvEdit(); await loadData()
+  }
+
+  // Debt edit handlers
+  function openDebtEdit(d: DebtRecord) {
+    setEditDebt(d)
+    setDebtForm({ person_name: d.person_name, type: d.type, amount: String(d.amount), currency: d.currency, description: d.description || '', due_date: d.due_date || '' })
+    setDebtDeleteConfirm(false)
+  }
+  function closeDebtEdit() { setEditDebt(null); setDebtForm(emptyDebtForm); setDebtDeleteConfirm(false) }
+
+  async function handleDebtSave() {
+    if (!editDebt || !debtForm.person_name || !debtForm.amount) return
+    if (isDemo) { closeDebtEdit(); return }
+    setDebtSaving(true)
+    const payload = { person_name: debtForm.person_name, type: debtForm.type, amount: parseFloat(debtForm.amount) || 0, currency: debtForm.currency, description: debtForm.description || null, due_date: debtForm.due_date || null }
+    await supabase.from('debt_records').update(payload).eq('id', editDebt.id)
+    setDebtSaving(false); closeDebtEdit(); await loadData()
+  }
+
+  async function handleDebtDelete() {
+    if (!editDebt) return
+    if (isDemo) { closeDebtEdit(); return }
+    await supabase.from('debt_records').delete().eq('id', editDebt.id)
+    closeDebtEdit(); await loadData()
+  }
+
+  const setInv = (k: string, v: string) => setInvForm(f => ({ ...f, [k]: v }))
+  const setDbt = (k: string, v: string) => setDebtForm(f => ({ ...f, [k]: v }))
 
   const tabs: { key: Tab; label: string; Icon: any }[] = [
     { key: 'hesaplar', label: 'Hesaplar', Icon: IconWallet },
@@ -250,28 +349,33 @@ export default function AccountsPage() {
             <div className="mx-4 mb-4 card-hero p-5" style={{ position: 'relative', zIndex: 1 }}>
               <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>Toplam Portfoy</div>
               <div className="mono text-2xl font-extrabold mt-1" style={{ position: 'relative', zIndex: 2 }}>
-                {fmt(MOCK_INVESTMENTS.reduce((s, i) => s + (i.currency === 'USD' ? i.value * usdTry : i.value), 0))}
+                {fmt(investments.reduce((s, i) => s + toTry(i.total_value || 0, i.currency), 0))}
               </div>
             </div>
 
             <div className="flex flex-col gap-2 mx-4">
-              {MOCK_INVESTMENTS.map(inv => (
-                <div key={inv.id} className="tx-item">
-                  <div className="tx-icon" style={{ background: inv.pnl >= 0 ? 'rgba(48,164,108,0.06)' : 'rgba(229,72,77,0.06)' }}>
-                    <IconTrendUp color={inv.pnl >= 0 ? '#30a46c' : '#e5484d'} size={18} />
-                  </div>
-                  <div className="tx-info">
-                    <div className="tx-name">{inv.name}</div>
-                    <div className="tx-detail">{inv.platform} · {inv.type}</div>
-                  </div>
-                  <div className="tx-amount">
-                    <div className="tx-value" style={{ color: '#2b2d6e' }}>{fmt(inv.value, inv.currency)}</div>
-                    <div className="tx-badge" style={{ background: inv.pnl >= 0 ? 'rgba(48,164,108,0.08)' : 'rgba(229,72,77,0.08)', color: inv.pnl >= 0 ? '#30a46c' : '#e5484d' }}>
-                      {inv.pnl >= 0 ? '+' : ''}{inv.pnlPct}%
+              {investments.map(inv => {
+                const pnl = inv.pnl || 0
+                const pnlPct = inv.pnl_pct || 0
+                const currentVal = inv.total_value || 0
+                return (
+                  <div key={inv.id} className="tx-item" style={{ cursor: 'pointer' }} onClick={() => openInvEdit(inv)}>
+                    <div className="tx-icon" style={{ background: pnl >= 0 ? 'rgba(48,164,108,0.06)' : 'rgba(229,72,77,0.06)' }}>
+                      <IconTrendUp color={pnl >= 0 ? '#30a46c' : '#e5484d'} size={18} />
+                    </div>
+                    <div className="tx-info">
+                      <div className="tx-name">{inv.name}</div>
+                      <div className="tx-detail">{inv.platform || '—'} · {inv.type}</div>
+                    </div>
+                    <div className="tx-amount">
+                      <div className="tx-value" style={{ color: '#2b2d6e' }}>{fmt(currentVal, inv.currency)}</div>
+                      <div className="tx-badge" style={{ background: pnl >= 0 ? 'rgba(48,164,108,0.08)' : 'rgba(229,72,77,0.08)', color: pnl >= 0 ? '#30a46c' : '#e5484d' }}>
+                        {pnl >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </>
         )}
@@ -297,7 +401,7 @@ export default function AccountsPage() {
                 <div className="mx-5 mb-2 text-xs font-bold" style={{ color: '#30a46c' }}>Alacaklar</div>
                 <div className="flex flex-col gap-2 mx-4 mb-4">
                   {alacaklar.map(d => (
-                    <div key={d.id} className="tx-item">
+                    <div key={d.id} className="tx-item" style={{ cursor: 'pointer' }} onClick={() => openDebtEdit(d)}>
                       <div className="tx-icon" style={{ background: 'rgba(48,164,108,0.06)' }}>
                         <span className="text-sm font-bold" style={{ color: '#30a46c' }}>{d.person_name.charAt(0)}</span>
                       </div>
@@ -321,7 +425,7 @@ export default function AccountsPage() {
                 <div className="mx-5 mb-2 text-xs font-bold" style={{ color: '#e5484d' }}>Verecekler</div>
                 <div className="flex flex-col gap-2 mx-4 mb-4">
                   {verecekler.map(d => (
-                    <div key={d.id} className="tx-item">
+                    <div key={d.id} className="tx-item" style={{ cursor: 'pointer' }} onClick={() => openDebtEdit(d)}>
                       <div className="tx-icon" style={{ background: 'rgba(229,72,77,0.06)' }}>
                         <span className="text-sm font-bold" style={{ color: '#e5484d' }}>{d.person_name.charAt(0)}</span>
                       </div>
@@ -339,6 +443,134 @@ export default function AccountsPage() {
               </>
             )}
           </>
+        )}
+        {/* ===== INVESTMENT EDIT MODAL ===== */}
+        {editInv && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={closeInvEdit}>
+            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+              <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-sm font-semibold">Yatirimi Duzenle</div>
+                <button onClick={closeInvEdit} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Yatirim Adi</label>
+                  <input value={invForm.name} onChange={e => setInv('name', e.target.value)} className="input" />
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <select value={invForm.type} onChange={e => setInv('type', e.target.value)} className="input">
+                      <option value="hisse">Hisse</option><option value="fon">Fon</option><option value="altin">Altin</option>
+                      <option value="doviz">Doviz</option><option value="kripto">Kripto</option><option value="diger">Diger</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Sembol</label>
+                    <input value={invForm.symbol} onChange={e => setInv('symbol', e.target.value)} className="input" />
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Miktar</label>
+                    <input value={invForm.quantity} onChange={e => setInv('quantity', e.target.value)} type="number" step="any" className="input mono" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ort. Maliyet</label>
+                    <input value={invForm.avg_cost} onChange={e => setInv('avg_cost', e.target.value)} type="number" step="any" className="input mono" />
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <select value={invForm.currency} onChange={e => setInv('currency', e.target.value)} className="input">
+                      <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Platform</label>
+                    <input value={invForm.platform} onChange={e => setInv('platform', e.target.value)} className="input" />
+                  </div>
+                </div>
+              </div>
+              <button onClick={handleInvSave} disabled={invSaving || !invForm.name || !invForm.quantity}
+                className="btn-primary w-full mt-4 py-3">{invSaving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+              {!invDeleteConfirm ? (
+                <button onClick={() => setInvDeleteConfirm(true)}
+                  style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: 'none' }}
+                  className="w-full mt-2 py-3 rounded-xl text-sm font-semibold">Sil</button>
+              ) : (
+                <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
+                  <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu yatirimi silmek istediginize emin misiniz?</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setInvDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--bg4)', color: 'var(--text)' }}>Iptal</button>
+                    <button onClick={handleInvDelete} className="flex-1 py-2 rounded-lg text-sm font-semibold" style={{ background: '#dc2626', color: '#fff' }}>Evet, Sil</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ===== DEBT EDIT MODAL ===== */}
+        {editDebt && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={closeDebtEdit}>
+            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+              <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-sm font-semibold">Kaydi Duzenle</div>
+                <button onClick={closeDebtEdit} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kisi Adi</label>
+                  <input value={debtForm.person_name} onChange={e => setDbt('person_name', e.target.value)} className="input" />
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <select value={debtForm.type} onChange={e => setDbt('type', e.target.value)} className="input">
+                      <option value="alacak">Alacak</option><option value="verecek">Verecek</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <select value={debtForm.currency} onChange={e => setDbt('currency', e.target.value)} className="input">
+                      <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tutar</label>
+                  <input value={debtForm.amount} onChange={e => setDbt('amount', e.target.value)} type="number" step="any" className="input mono" />
+                </div>
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Aciklama</label>
+                  <input value={debtForm.description} onChange={e => setDbt('description', e.target.value)} className="input" />
+                </div>
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Vade Tarihi</label>
+                  <input value={debtForm.due_date} onChange={e => setDbt('due_date', e.target.value)} type="date" className="input" />
+                </div>
+              </div>
+              <button onClick={handleDebtSave} disabled={debtSaving || !debtForm.person_name || !debtForm.amount}
+                className="btn-primary w-full mt-4 py-3">{debtSaving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+              {!debtDeleteConfirm ? (
+                <button onClick={() => setDebtDeleteConfirm(true)}
+                  style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: 'none' }}
+                  className="w-full mt-2 py-3 rounded-xl text-sm font-semibold">Sil</button>
+              ) : (
+                <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
+                  <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu kaydi silmek istediginize emin misiniz?</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setDebtDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--bg4)', color: 'var(--text)' }}>Iptal</button>
+                    <button onClick={handleDebtDelete} className="flex-1 py-2 rounded-lg text-sm font-semibold" style={{ background: '#dc2626', color: '#fff' }}>Evet, Sil</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

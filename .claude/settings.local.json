@@ -18,7 +18,12 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(ls node_modules/.bin/next*)",
       "Bash(where node:*)",
-      "Bash(where npx:*)"
+      "Bash(where npx:*)",
+      "Bash(dir \"C:\\\\finans-app\\\\.env*\")",
+      "Bash(dir \"C:\\\\finans-app\\\\.claude\\\\worktrees\\\\laughing-lewin\\\\.env*\")",
+      "WebSearch",
+      "Bash(npx tsc:*)",
+      "Bash(npx next:*)"
     ]
   }
 }
