@@ -21,6 +21,7 @@ export default function RecurringPage() {
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
   async function load() {
@@ -60,7 +61,7 @@ export default function RecurringPage() {
 
   async function handleSave() {
     if (!form.name || !form.amount) return
-    setSaving(true)
+    setSaving(true); setSaveError(null)
     const payload: any = {
       name: form.name, category: form.category, subcategory: form.subcategory || null,
       amount: parseFloat(form.amount) || 0, currency: form.currency,
@@ -77,8 +78,25 @@ export default function RecurringPage() {
       payload.end_date = form.end_date || null
       payload.expense_date = null
     }
-    if (editId) { await supabase.from('recurring_expenses').update(payload).eq('id', editId) }
-    else { await supabase.from('recurring_expenses').insert(payload) }
+    let result
+    if (editId) { result = await supabase.from('recurring_expenses').update(payload).eq('id', editId) }
+    else { result = await supabase.from('recurring_expenses').insert(payload) }
+    if (result.error) {
+      console.error('Save error:', result.error)
+      // Retry without new columns if they don't exist yet
+      if (result.error.message?.includes('column') || result.error.code === '42703') {
+        const { expense_type, expense_date, end_date, ...fallback } = payload
+        if (editId) { result = await supabase.from('recurring_expenses').update(fallback).eq('id', editId) }
+        else { result = await supabase.from('recurring_expenses').insert(fallback) }
+        if (result.error) {
+          setSaveError(`Hata: ${result.error.message}`)
+          setSaving(false); return
+        }
+      } else {
+        setSaveError(`Hata: ${result.error.message}`)
+        setSaving(false); return
+      }
+    }
     setSaving(false); closeForm(); await load()
   }
 
@@ -350,6 +368,9 @@ export default function RecurringPage() {
                   <span style={{ color: 'var(--muted)' }}>Degisken tutar</span>
                 </label>
               </div>
+              {saveError && (
+                <div className="mt-3 p-2.5 rounded-lg text-[12px]" style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>{saveError}</div>
+              )}
               <button onClick={handleSave} disabled={saving || !form.name || !form.amount}
                 className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Guncelle' : 'Ekle'}</button>
             </div>
