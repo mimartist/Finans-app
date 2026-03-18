@@ -126,25 +126,45 @@ export default function Dashboard() {
       return { id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id, days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && r.payment_day! < todayDay }
     })
 
-    // Credit card statements: this month's statement is always paid NEXT month on due_day
+    // Credit card statements: only show if payment falls in the selected month
+    // If due_day already passed this month → payment is next month, so don't show in current month
     const ccItems: PaymentItem[] = ccStatements.filter(s => (s.total_amount || 0) > 0).map(s => {
       const card = ccCards.find((c: any) => c.id === s.card_id)
       const dueDay = card?.due_day || 10
-      // Payment is always next month after statement period
-      const nextMonth = m.month === 12 ? 1 : m.month + 1
-      const nextYear = m.month === 12 ? m.year + 1 : m.year
-      const payDate = new Date(nextYear, nextMonth - 1, dueDay)
-      const today = new Date(); today.setHours(0, 0, 0, 0)
-      const diffDays = Math.ceil((payDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      // Check if due_day falls in selected month or rolls to next month
+      const today = new Date()
+      const selDate = new Date(m.year, m.month - 1, 1)
+      const isSelCurrent = m.year === today.getFullYear() && m.month === today.getMonth() + 1
+      // For current month: if due_day >= today → this month. If due_day < today → next month (don't show)
+      // For other months: show if statement period+1 matches selected month
+      let showInMonth = false
+      let paymentMonth = m.month
+      let paymentYear = m.year
+      if (isSelCurrent) {
+        if (dueDay >= today.getDate()) {
+          showInMonth = true // due_day hasn't passed yet → payment is this month
+        }
+        // If due_day < today → payment rolled to next month, show in next month view
+      } else {
+        // For non-current month views: show if statement's payment would fall in this month
+        // Statement period is m, payment could be same or next month
+        // Check if this is the "next month" for a statement where due_day < statement close
+        const prevMonth = m.month === 1 ? 12 : m.month - 1
+        const prevYear = m.month === 1 ? m.year - 1 : m.year
+        // Show if we have a statement from previous month whose due_day < that month's current day
+        showInMonth = true // For future months, show the CC items
+      }
+      if (!showInMonth) return null
+      const days = isSelCurrent ? daysUntil(dueDay) : 0
       const isPaid = s.is_paid || false
       return {
         id: `cc_${s.id}`, name: card?.name || 'Kredi Karti', amount: s.total_amount || 0,
         currency: 'TRY', day: dueDay, type: 'kredi_karti',
         source: 'recurring' as const, sourceId: s.id,
-        days: diffDays,
-        paid: isPaid, overdue: !isPaid && diffDays < 0,
+        days,
+        paid: isPaid, overdue: false,
       }
-    })
+    }).filter(Boolean) as PaymentItem[]
 
     setPayments([...loanItems, ...expItems, ...ccItems].sort((a, b) => { if (a.paid !== b.paid) return a.paid ? 1 : -1; if (a.overdue !== b.overdue) return a.overdue ? -1 : 1; return a.day - b.day }))
   }, [])
