@@ -163,7 +163,7 @@ export default function InvestmentsPage() {
     <div className="app-layout">
       <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
       <BottomNav />
-      <div className="app-main pb-24 page-enter">
+      <div className="app-main pb-32 page-enter">
         <div className="flex justify-between items-center px-5 pt-5 pb-4">
           <div>
             <div className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>Finans</div>
