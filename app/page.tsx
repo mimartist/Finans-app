@@ -226,7 +226,7 @@ export default function Dashboard() {
       {/* Background blobs */}
       <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
       <BottomNav />
-      <div className="app-main pb-24 page-enter">
+      <div className="app-main pb-32 page-enter">
         {/* ===== HEADER ===== */}
         <div className="flex justify-between items-center px-5 pt-6 pb-2">
           <div className="flex items-center gap-3">

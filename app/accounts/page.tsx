@@ -76,7 +76,7 @@ export default function AccountsPage() {
   return (
     <div className="app-layout">
       <BottomNav />
-      <div className="app-main pb-24 page-enter">
+      <div className="app-main pb-32 page-enter">
         {/* Header */}
         <div className="flex justify-between items-center px-5 pt-6 pb-4">
           <div>
