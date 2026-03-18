@@ -69,6 +69,7 @@ export const CATEGORY_ICON_MAP: Record<string, (p: IconProps) => JSX.Element> = 
   yemek: IconUtensils,
   genel: IconBox,
   nakit: IconWallet,
+  kredi_karti: IconCreditCard,
 }
 
 export function getCatIcon(category: string, props?: IconProps) {
