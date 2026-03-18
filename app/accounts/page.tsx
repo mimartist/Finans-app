@@ -26,12 +26,26 @@ const MOCK_DEBTS: DebtRecord[] = [
 ]
 const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('T')[0], usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
 
+// Bank brand colors
+const BANK_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
+  'Denizbank': { bg: 'rgba(0,83,159,0.06)', text: '#00539f', icon: '🏦' },
+  'Garanti BBVA': { bg: 'rgba(0,130,66,0.06)', text: '#008242', icon: '🏛️' },
+  'Halkbank': { bg: 'rgba(0,73,144,0.06)', text: '#004990', icon: '🏦' },
+  'N26': { bg: 'rgba(72,209,204,0.06)', text: '#36a3a0', icon: '💳' },
+  'Sparkasse': { bg: 'rgba(255,0,0,0.06)', text: '#cc0000', icon: '🔴' },
+  'Ziraat': { bg: 'rgba(0,123,62,0.06)', text: '#007b3e', icon: '🌾' },
+  'Vakifbank': { bg: 'rgba(0,51,153,0.06)', text: '#003399', icon: '🏛️' },
+  'Is Bankasi': { bg: 'rgba(0,56,147,0.06)', text: '#003893', icon: '🏦' },
+}
+const getBank = (bank: string) => BANK_COLORS[bank] || { bg: 'rgba(43,45,110,0.06)', text: '#2b2d6e', icon: '🏦' }
+
 export default function AccountsPage() {
   const [tab, setTab] = useState<Tab>('hesaplar')
   const [accounts, setAccounts] = useState<Account[]>([])
   const [rates, setRates] = useState<ExchangeRate | null>(null)
   const [debts, setDebts] = useState<DebtRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [expandedBanks, setExpandedBanks] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (isDemo) {
@@ -50,6 +64,9 @@ export default function AccountsPage() {
       setAccounts(acc || [])
       setRates(rt?.[0] || null)
       setDebts(dbt || [])
+      // Expand all banks by default
+      const banks = new Set((acc || []).map((a: Account) => a.bank))
+      setExpandedBanks(banks)
       setLoading(false)
     })()
   }, [])
@@ -58,13 +75,39 @@ export default function AccountsPage() {
   const usdTry = rates?.usd_try || 0
   const toTry = (amount: number, currency: string) => currency === 'EUR' ? amount * eurTry : currency === 'USD' ? amount * usdTry : amount
   const totalBalance = accounts.reduce((s, a) => s + toTry(a.balance, a.currency), 0)
+  const tryTotal = accounts.filter(a => a.currency === 'TRY').reduce((s, a) => s + a.balance, 0)
+  const eurTotal = accounts.filter(a => a.currency === 'EUR').reduce((s, a) => s + a.balance, 0)
+  const usdTotal = accounts.filter(a => a.currency === 'USD').reduce((s, a) => s + a.balance, 0)
   const alacaklar = debts.filter(d => d.type === 'alacak')
   const verecekler = debts.filter(d => d.type === 'verecek')
+
+  // Group accounts by bank
+  const bankGroups = accounts.reduce((groups, acc) => {
+    const bank = acc.bank || 'Diger'
+    if (!groups[bank]) groups[bank] = []
+    groups[bank].push(acc)
+    return groups
+  }, {} as Record<string, Account[]>)
+
+  const bankTotals = Object.entries(bankGroups).map(([bank, accs]) => ({
+    bank,
+    accounts: accs,
+    total: accs.reduce((s, a) => s + toTry(a.balance, a.currency), 0),
+  })).sort((a, b) => b.total - a.total)
+
+  const toggleBank = (bank: string) => {
+    setExpandedBanks(prev => {
+      const next = new Set(prev)
+      if (next.has(bank)) next.delete(bank)
+      else next.add(bank)
+      return next
+    })
+  }
 
   const tabs: { key: Tab; label: string; Icon: any }[] = [
     { key: 'hesaplar', label: 'Hesaplar', Icon: IconWallet },
     { key: 'yatirimlar', label: 'Yatirimlar', Icon: IconTrendUp },
-    { key: 'alacak', label: 'Alacak / Verecek', Icon: IconArrowsExchange },
+    { key: 'alacak', label: 'Alacak/Verecek', Icon: IconArrowsExchange },
   ]
 
   if (loading) return (
@@ -85,18 +128,18 @@ export default function AccountsPage() {
           </div>
         </div>
 
-        {/* Tab Selector — pill style */}
+        {/* Tab Selector — single card with 3 tabs */}
         <div className="mx-4 mb-4">
-          <div className="flex gap-2 p-1 rounded-full" style={{ background: 'var(--bg4)' }}>
+          <div className="flex p-1 rounded-2xl" style={{ background: 'var(--bg2)', border: '1.5px solid var(--border)', boxShadow: 'var(--shadow)' }}>
             {tabs.map(t => (
               <button key={t.key} onClick={() => setTab(t.key)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-xs font-semibold transition-all"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[11px] font-semibold transition-all"
                 style={{
                   background: tab === t.key ? 'linear-gradient(135deg, #2b2d6e, #3d3f8f)' : 'transparent',
                   color: tab === t.key ? '#fff' : 'var(--muted)',
                   boxShadow: tab === t.key ? '0 2px 8px rgba(43,45,110,0.25)' : 'none',
                 }}>
-                <t.Icon color={tab === t.key ? '#fff' : 'var(--muted)'} size={14} />
+                <t.Icon color={tab === t.key ? '#fff' : 'var(--muted)'} size={13} />
                 {t.label}
               </button>
             ))}
@@ -106,30 +149,87 @@ export default function AccountsPage() {
         {/* ===== TAB: HESAPLAR ===== */}
         {tab === 'hesaplar' && (
           <>
-            {/* Total */}
+            {/* Hero card with currency breakdown */}
             <div className="mx-4 mb-4 card-hero p-5" style={{ position: 'relative', zIndex: 1 }}>
               <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>Toplam Bakiye</div>
-              <div className="mono text-2xl font-extrabold mt-1" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalBalance)}</div>
-              <div className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>{accounts.length} aktif hesap</div>
+              <div className="mono text-2xl font-extrabold mt-1 mb-4" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalBalance)}</div>
+              <div className="flex gap-2" style={{ position: 'relative', zIndex: 2 }}>
+                {[
+                  { label: 'TRY', value: fmt(tryTotal), sub: '' },
+                  { label: 'EUR', value: fmt(eurTotal, 'EUR'), sub: eurTotal > 0 ? fmt(eurTotal * eurTry) : '' },
+                  { label: 'USD', value: fmt(usdTotal, 'USD'), sub: usdTotal > 0 ? fmt(usdTotal * usdTry) : '' },
+                ].map(c => (
+                  <div key={c.label} className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+                    style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
+                    <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>{c.label}</div>
+                    <div className="mono text-[11px] font-bold mt-0.5">{c.value}</div>
+                    {c.sub && <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{c.sub}</div>}
+                  </div>
+                ))}
+              </div>
+              <div className="text-[10px] mt-3 text-center" style={{ color: 'rgba(255,255,255,0.35)', position: 'relative', zIndex: 2 }}>
+                {accounts.length} hesap · {Object.keys(bankGroups).length} banka
+              </div>
             </div>
 
-            {/* Account list */}
-            <div className="flex flex-col gap-2 mx-4">
-              {accounts.map(a => (
-                <div key={a.id} className="tx-item">
-                  <div className="tx-icon" style={{ background: a.currency === 'TRY' ? 'rgba(43,45,110,0.06)' : a.currency === 'EUR' ? 'rgba(99,102,241,0.06)' : 'rgba(48,164,108,0.06)' }}>
-                    <IconWallet color={a.currency === 'TRY' ? '#2b2d6e' : a.currency === 'EUR' ? '#6366f1' : '#30a46c'} size={18} />
+            {/* Bank grouped accounts */}
+            <div className="flex flex-col gap-3 mx-4">
+              {bankTotals.map(({ bank, accounts: bankAccounts, total }) => {
+                const colors = getBank(bank)
+                const isExpanded = expandedBanks.has(bank)
+                return (
+                  <div key={bank} className="rounded-2xl overflow-hidden" style={{ border: '1.5px solid var(--border)', background: 'var(--bg2)', boxShadow: 'var(--shadow)' }}>
+                    {/* Bank header — clickable */}
+                    <button onClick={() => toggleBank(bank)}
+                      className="w-full flex items-center gap-3 px-4 py-3.5"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-sm"
+                        style={{ background: colors.bg }}>
+                        {colors.icon}
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="text-[13px] font-bold" style={{ color: 'var(--text)' }}>{bank}</div>
+                        <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{bankAccounts.length} hesap</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="mono text-[13px] font-bold" style={{ color: colors.text }}>{fmt(total)}</div>
+                      </div>
+                      <div className="ml-1 text-[11px] transition-transform" style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</div>
+                    </button>
+
+                    {/* Account items inside bank */}
+                    <div style={{
+                      maxHeight: isExpanded ? bankAccounts.length * 70 + 16 : 0,
+                      overflow: 'hidden',
+                      transition: 'max-height 0.3s ease',
+                    }}>
+                      <div className="px-3 pb-3 flex flex-col gap-1.5">
+                        {bankAccounts.map(a => (
+                          <div key={a.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                            style={{ background: 'rgba(43,45,110,0.03)' }}>
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ background: a.currency === 'EUR' ? 'rgba(99,102,241,0.08)' : a.currency === 'USD' ? 'rgba(48,164,108,0.08)' : 'rgba(43,45,110,0.08)' }}>
+                              <span className="text-[10px] font-bold" style={{ color: a.currency === 'EUR' ? '#6366f1' : a.currency === 'USD' ? '#30a46c' : '#2b2d6e' }}>
+                                {a.currency === 'EUR' ? '€' : a.currency === 'USD' ? '$' : '₺'}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[12px] font-medium truncate" style={{ color: 'var(--text)' }}>{a.name}</div>
+                              <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{a.type === 'vadeli' ? 'Vadeli' : 'Vadesiz'}</div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <div className="mono text-[12px] font-bold" style={{ color: 'var(--text)' }}>{fmt(a.balance, a.currency)}</div>
+                              {a.currency !== 'TRY' && a.balance > 0 && (
+                                <div className="mono text-[9px]" style={{ color: 'var(--muted)' }}>{fmt(toTry(a.balance, a.currency))}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <div className="tx-info">
-                    <div className="tx-name">{a.name}</div>
-                    <div className="tx-detail">{a.bank} · {a.type === 'vadeli' ? 'Vadeli' : 'Vadesiz'}</div>
-                  </div>
-                  <div className="tx-amount">
-                    <div className="tx-value" style={{ color: '#2b2d6e' }}>{fmt(a.balance, a.currency)}</div>
-                    {a.currency !== 'TRY' && <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{fmt(toTry(a.balance, a.currency))}</div>}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </>
         )}
@@ -171,13 +271,13 @@ export default function AccountsPage() {
           <>
             {/* Summary pills */}
             <div className="flex gap-2 mx-4 mb-4">
-              <div className="flex-1 rounded-full py-2.5 px-3 text-center" style={{ border: '1.5px solid rgba(48,164,108,0.3)' }}>
+              <div className="flex-1 rounded-2xl py-3 px-3 text-center" style={{ border: '1.5px solid rgba(48,164,108,0.2)', background: 'rgba(48,164,108,0.03)' }}>
                 <div className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: '#30a46c' }}>Alacak</div>
-                <div className="mono text-[11px] font-bold mt-0.5" style={{ color: '#30a46c' }}>{fmt(alacaklar.reduce((s, d) => s + d.amount, 0))}</div>
+                <div className="mono text-sm font-bold mt-0.5" style={{ color: '#30a46c' }}>{fmt(alacaklar.reduce((s, d) => s + toTry(d.amount, d.currency), 0))}</div>
               </div>
-              <div className="flex-1 rounded-full py-2.5 px-3 text-center" style={{ border: '1.5px solid rgba(229,72,77,0.3)' }}>
+              <div className="flex-1 rounded-2xl py-3 px-3 text-center" style={{ border: '1.5px solid rgba(229,72,77,0.2)', background: 'rgba(229,72,77,0.03)' }}>
                 <div className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: '#e5484d' }}>Verecek</div>
-                <div className="mono text-[11px] font-bold mt-0.5" style={{ color: '#e5484d' }}>{fmt(verecekler.reduce((s, d) => s + d.amount, 0))}</div>
+                <div className="mono text-sm font-bold mt-0.5" style={{ color: '#e5484d' }}>{fmt(verecekler.reduce((s, d) => s + toTry(d.amount, d.currency), 0))}</div>
               </div>
             </div>
 
