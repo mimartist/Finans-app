@@ -95,9 +95,17 @@ export default function Dashboard() {
 
   const loadMonth = useCallback(async (m: MonthKey, lnsList: Loan[], recList: RecurringExpense[]) => {
     let paidList: any[] = []
+    let ccStatements: any[] = []
+    let ccCards: any[] = []
     if (!isDemo) {
-      const { data: paid } = await supabase.from('recurring_payments').select('*').eq('period_year', m.year).eq('period_month', m.month).eq('is_paid', true)
+      const [{ data: paid }, { data: stmts }, { data: crds }] = await Promise.all([
+        supabase.from('recurring_payments').select('*').eq('period_year', m.year).eq('period_month', m.month).eq('is_paid', true),
+        supabase.from('credit_card_statements').select('*').eq('period_year', m.year).eq('period_month', m.month),
+        supabase.from('credit_cards').select('*').eq('is_active', true),
+      ])
       paidList = paid || []
+      ccStatements = stmts || []
+      ccCards = crds || []
     }
     const now = new Date()
     const isCurrentMonth = m.year === now.getFullYear() && m.month === now.getMonth() + 1
@@ -118,7 +126,21 @@ export default function Dashboard() {
       return { id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id, days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && r.payment_day! < todayDay }
     })
 
-    setPayments([...loanItems, ...expItems].sort((a, b) => { if (a.paid !== b.paid) return a.paid ? 1 : -1; if (a.overdue !== b.overdue) return a.overdue ? -1 : 1; return a.day - b.day }))
+    // Credit card statements as payment items
+    const ccItems: PaymentItem[] = ccStatements.filter(s => (s.total_amount || 0) > 0).map(s => {
+      const card = ccCards.find((c: any) => c.id === s.card_id)
+      const payDay = card?.payment_day || 10
+      const isPaid = s.is_paid || false
+      return {
+        id: `cc_${s.id}`, name: card?.name || 'Kredi Karti', amount: s.total_amount || 0,
+        currency: 'TRY', day: payDay, type: 'kredi_karti',
+        source: 'recurring' as const, sourceId: s.id,
+        days: isCurrentMonth ? daysUntil(payDay) : 0,
+        paid: isPaid, overdue: isCurrentMonth && !isPaid && payDay < todayDay,
+      }
+    })
+
+    setPayments([...loanItems, ...expItems, ...ccItems].sort((a, b) => { if (a.paid !== b.paid) return a.paid ? 1 : -1; if (a.overdue !== b.overdue) return a.overdue ? -1 : 1; return a.day - b.day }))
   }, [])
 
   useEffect(() => { (async () => { const { lnsList, recList } = await loadGlobal(); await loadMonth(currentMonth, lnsList, recList); setLoading(false) })() }, []) // eslint-disable-line
