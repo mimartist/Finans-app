@@ -126,17 +126,23 @@ export default function Dashboard() {
       return { id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id, days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && r.payment_day! < todayDay }
     })
 
-    // Credit card statements as payment items
+    // Credit card statements: this month's statement is always paid NEXT month on due_day
     const ccItems: PaymentItem[] = ccStatements.filter(s => (s.total_amount || 0) > 0).map(s => {
       const card = ccCards.find((c: any) => c.id === s.card_id)
-      const payDay = card?.due_day || 10
+      const dueDay = card?.due_day || 10
+      // Payment is always next month after statement period
+      const nextMonth = m.month === 12 ? 1 : m.month + 1
+      const nextYear = m.month === 12 ? m.year + 1 : m.year
+      const payDate = new Date(nextYear, nextMonth - 1, dueDay)
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      const diffDays = Math.ceil((payDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
       const isPaid = s.is_paid || false
       return {
         id: `cc_${s.id}`, name: card?.name || 'Kredi Karti', amount: s.total_amount || 0,
-        currency: 'TRY', day: payDay, type: 'kredi_karti',
+        currency: 'TRY', day: dueDay, type: 'kredi_karti',
         source: 'recurring' as const, sourceId: s.id,
-        days: isCurrentMonth ? daysUntil(payDay) : 0,
-        paid: isPaid, overdue: isCurrentMonth && !isPaid && payDay < todayDay,
+        days: diffDays,
+        paid: isPaid, overdue: !isPaid && diffDays < 0,
       }
     })
 
@@ -228,7 +234,17 @@ export default function Dashboard() {
         <div className="tx-info">
           <div className="tx-name" style={{ textDecoration: p.paid ? 'line-through' : 'none' }}>{p.name}</div>
           <div className="tx-detail" style={{ color: statusColor }}>
-            {p.paid ? 'Odendi' : p.overdue ? `Gecikti · ${p.day} ${selMonthShort}` : `${p.day} ${selMonthShort} · ${daysUntilLabel(p.days)}`}
+            {p.paid ? 'Odendi' : (() => {
+              if (p.type === 'kredi_karti') {
+                // CC: days is actual diff from today, calculate real date
+                const payDate = new Date(); payDate.setDate(payDate.getDate() + p.days)
+                const payMonthStr = payDate.toLocaleDateString('tr-TR', { month: 'short' })
+                const dateStr = `${p.day} ${payMonthStr}`
+                return p.overdue ? `Gecikti · ${dateStr}` : `${dateStr} · ${daysUntilLabel(p.days)}`
+              }
+              // Regular expenses/loans: use selected month short name
+              return p.overdue ? `Gecikti · ${p.day} ${selMonthShort}` : `${p.day} ${selMonthShort} · ${daysUntilLabel(p.days)}`
+            })()}
           </div>
         </div>
         <div className="tx-amount">
