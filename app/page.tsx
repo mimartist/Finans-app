@@ -123,7 +123,21 @@ export default function Dashboard() {
       })
 
     const expItems: PaymentItem[] = recList
-      .filter(r => r.payment_day && r.category !== 'nakit')
+      .filter(r => {
+        if (!r.payment_day || r.category === 'nakit') return false
+        // One-time expenses: only show in their specific month
+        if (r.expense_type === 'one_time' && r.expense_date) {
+          const d = new Date(r.expense_date)
+          return d.getFullYear() === m.year && d.getMonth() + 1 === m.month
+        }
+        // Recurring with end_date: don't show after end
+        if (r.end_date) {
+          const end = new Date(r.end_date)
+          const mDate = new Date(m.year, m.month - 1, 1)
+          if (mDate > end) return false
+        }
+        return true
+      })
       .map(r => {
         const isPaid = paidList.some(p => p.expense_id === r.id)
         const isOverdue = isCurrentMonth && !isPaid && r.payment_day! < todayDay
