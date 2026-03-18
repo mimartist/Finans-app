@@ -211,7 +211,7 @@ export default function AccountsPage() {
   const tabs: { key: Tab; label: string; Icon: any }[] = [
     { key: 'hesaplar', label: 'Hesaplar', Icon: IconWallet },
     { key: 'yatirimlar', label: 'Yatirimlar', Icon: IconTrendUp },
-    { key: 'alacak', label: 'Alacak/Verecek', Icon: IconArrowsExchange },
+    { key: 'alacak', label: 'Alacak/Borc', Icon: IconArrowsExchange },
   ]
 
   if (loading) return (
@@ -416,19 +416,42 @@ export default function AccountsPage() {
           </>
         ); })()}
 
-        {/* ===== TAB: ALACAK / VERECEK ===== */}
-        {tab === 'alacak' && (
+        {/* ===== TAB: ALACAK / BORC ===== */}
+        {tab === 'alacak' && (() => {
+          const totalAlacak = alacaklar.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+          const totalVerecek = verecekler.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+          const netBalance = totalAlacak - totalVerecek
+          const overdueAlacak = alacaklar.filter(d => d.due_date && new Date(d.due_date) < new Date()).length
+          const upcomingAlacak = alacaklar.filter(d => d.due_date && new Date(d.due_date) >= new Date()).length
+          return (
           <>
-            {/* Summary pills */}
-            <div className="flex gap-2 mx-4 mb-4">
-              <div className="flex-1 rounded-2xl py-3 px-3 text-center" style={{ border: '1.5px solid rgba(48,164,108,0.2)', background: 'rgba(48,164,108,0.03)' }}>
-                <div className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: '#30a46c' }}>Alacak</div>
-                <div className="mono text-sm font-bold mt-0.5" style={{ color: '#30a46c' }}>{fmt(alacaklar.reduce((s, d) => s + toTry(d.amount, d.currency), 0))}</div>
+            {/* Hero card */}
+            <div className="mx-4 mb-4 card-hero p-5" style={{ position: 'relative', zIndex: 1 }}>
+              <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>Net Bakiye</div>
+              <div className="mono text-2xl font-extrabold mt-1" style={{ position: 'relative', zIndex: 2, color: netBalance >= 0 ? '#86efac' : '#ff8a8a' }}>
+                {netBalance >= 0 ? '+' : ''}{fmt(netBalance)}
               </div>
-              <div className="flex-1 rounded-2xl py-3 px-3 text-center" style={{ border: '1.5px solid rgba(229,72,77,0.2)', background: 'rgba(229,72,77,0.03)' }}>
-                <div className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: '#e5484d' }}>Verecek</div>
-                <div className="mono text-sm font-bold mt-0.5" style={{ color: '#e5484d' }}>{fmt(verecekler.reduce((s, d) => s + toTry(d.amount, d.currency), 0))}</div>
+              <div className="flex gap-2 mt-4" style={{ position: 'relative', zIndex: 2 }}>
+                <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+                  style={{ border: '1px solid rgba(134,239,172,0.25)', background: 'rgba(134,239,172,0.08)' }}>
+                  <div className="text-[9px] font-medium" style={{ color: 'rgba(134,239,172,0.7)' }}>ALACAK</div>
+                  <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#86efac' }}>{fmt(totalAlacak)}</div>
+                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{alacaklar.length} kisi</div>
+                </div>
+                <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
+                  style={{ border: '1px solid rgba(255,138,138,0.25)', background: 'rgba(255,138,138,0.08)' }}>
+                  <div className="text-[9px] font-medium" style={{ color: 'rgba(255,138,138,0.7)' }}>BORC</div>
+                  <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#ff8a8a' }}>{fmt(totalVerecek)}</div>
+                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{verecekler.length} kisi</div>
+                </div>
               </div>
+              {(overdueAlacak > 0 || upcomingAlacak > 0) && (
+                <div className="text-[10px] mt-3 text-center" style={{ color: 'rgba(255,255,255,0.35)', position: 'relative', zIndex: 2 }}>
+                  {overdueAlacak > 0 && <span style={{ color: 'rgba(255,138,138,0.7)' }}>{overdueAlacak} gecikmiş</span>}
+                  {overdueAlacak > 0 && upcomingAlacak > 0 && ' · '}
+                  {upcomingAlacak > 0 && <span>{upcomingAlacak} yaklaşan</span>}
+                </div>
+              )}
             </div>
 
             {/* Alacaklar */}
@@ -458,7 +481,7 @@ export default function AccountsPage() {
             {/* Verecekler */}
             {verecekler.length > 0 && (
               <>
-                <div className="mx-5 mb-2 text-xs font-bold" style={{ color: '#e5484d' }}>Verecekler</div>
+                <div className="mx-5 mb-2 text-xs font-bold" style={{ color: '#e5484d' }}>Borclar</div>
                 <div className="flex flex-col gap-2 mx-4 mb-4">
                   {verecekler.map(d => (
                     <div key={d.id} className="tx-item" style={{ cursor: 'pointer' }} onClick={() => openDebtEdit(d)}>
@@ -479,7 +502,7 @@ export default function AccountsPage() {
               </>
             )}
           </>
-        )}
+        ); })()}
         {/* ===== INVESTMENT EDIT MODAL ===== */}
         {editInv && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={closeInvEdit}>
