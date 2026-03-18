@@ -80,17 +80,18 @@ export default function BottomNav() {
 
       {/* Mobile Bottom Nav — floating pill, 20px from bottom */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bottom-nav-mobile"
-        style={{ display: 'flex', justifyContent: 'center', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}>
+        style={{ display: 'flex', justifyContent: 'center', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', paddingLeft: 30, paddingRight: 30 }}>
 
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'space-evenly',
           borderRadius: 9999,
           background: 'linear-gradient(135deg, #1e1f54, #2b2d6e)',
           boxShadow: '0 8px 32px rgba(30,31,84,0.4)',
-          padding: '6px 6px',
-          gap: 2,
+          padding: '6px 12px',
+          gap: 0,
+          width: '100%',
         }}>
           <NavBtn href="/" Icon={IconHome} active={pathname === '/'} />
           <NavBtn href="/accounts" Icon={IconBank} active={isAccountsActive} />
