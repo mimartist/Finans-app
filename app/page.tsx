@@ -3,8 +3,10 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, daysUntil, daysUntilLabel, isDemo } from '@/lib/supabase'
-import { getCatIcon, IconWallet, IconPieChart, IconTarget, IconBank, IconTrendUp, IconRefresh, IconCheck, IconDollar, IconBriefcase, IconShield, IconCalendar, IconCreditCard, IconSettings } from '@/components/Icons'
-import type { Account, Loan, RecurringExpense, ExchangeRate, DebtRecord } from '@/lib/supabase'
+import { getCatIcon, IconWallet, IconPieChart, IconTarget, IconBank, IconTrendUp, IconRefresh, IconCheck, IconDollar, IconBriefcase, IconShield, IconCalendar, IconCreditCard, IconSettings, IconCash } from '@/components/Icons'
+import NotificationBell from '@/components/NotificationBell'
+import type { Account, Loan, RecurringExpense, ExchangeRate, DebtRecord, CreditCard } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 type PaymentItem = {
   id: string
@@ -46,12 +48,14 @@ const MOCK_RECURRING: RecurringExpense[] = [
 const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('T')[0], usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
 
 export default function Dashboard() {
+  const router = useRouter()
   const now = new Date()
   const currentMonth: MonthKey = { year: now.getFullYear(), month: now.getMonth() + 1 }
 
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loans, setLoans] = useState<Loan[]>([])
   const [recurring, setRecurring] = useState<RecurringExpense[]>([])
+  const [creditCards, setCreditCards] = useState<CreditCard[]>([])
   const [rates, setRates] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(true)
   const [investTotalTry, setInvestTotalTry] = useState(0)
@@ -75,7 +79,7 @@ export default function Dashboard() {
       setAllAlacak([]); setRates(MOCK_RATES); setInvestTotalTry(85000); setKriptoTry(22000)
       return { accs: MOCK_ACCOUNTS, lnsList: MOCK_LOANS, recList: MOCK_RECURRING }
     }
-    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: recAlacak }, { data: cryptoSnaps }] = await Promise.all([
+    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: recAlacak }, { data: cryptoSnaps }, { data: crds }] = await Promise.all([
       supabase.from('accounts').select('*').eq('is_active', true),
       supabase.from('loans').select('*').eq('is_active', true),
       supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
@@ -83,8 +87,9 @@ export default function Dashboard() {
       supabase.from('investment_snapshots').select('investment_id, total_value_try, snapshot_date').order('snapshot_date', { ascending: false }),
       supabase.from('debt_records').select('*').eq('type', 'alacak').eq('is_settled', false),
       supabase.from('investment_snapshots').select('*, investments!inner(platform, type, is_active)').eq('investments.is_active', true).in('investments.platform', ['Binance']).order('snapshot_date', { ascending: false }),
+      supabase.from('credit_cards').select('*').eq('is_active', true),
     ])
-    setAccounts(acc || []); setLoans(lns || []); setRecurring(rec || []); setAllAlacak(recAlacak || []); setRates(rt?.[0] || null)
+    setAccounts(acc || []); setLoans(lns || []); setRecurring(rec || []); setAllAlacak(recAlacak || []); setRates(rt?.[0] || null); setCreditCards(crds || [])
     const seen = new Set<number>()
     const latestSnaps = (snaps || []).filter((sn: any) => { if (seen.has(sn.investment_id)) return false; seen.add(sn.investment_id); return true })
     setInvestTotalTry(latestSnaps.reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
@@ -209,20 +214,40 @@ export default function Dashboard() {
 
   const [payModal, setPayModal] = useState<PaymentItem | null>(null)
   const [payAccountId, setPayAccountId] = useState<number | null>(null)
+  const [payMethod, setPayMethod] = useState<'hesap' | 'kredi_karti' | 'nakit'>('hesap')
+  const [payCardId, setPayCardId] = useState<number | null>(null)
   const [paying, setPaying] = useState(false)
 
   async function handlePay() {
-    if (!payModal || !payAccountId) return
+    if (!payModal) return
+    if (payMethod === 'hesap' && !payAccountId) return
+    if (payMethod === 'kredi_karti' && !payCardId) return
     setPaying(true)
     if (!isDemo) {
       const year = now.getFullYear(), month = now.getMonth() + 1, today = now.toISOString().split('T')[0]
-      if (payModal.source === 'recurring') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: payModal.sourceId, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today }); if (error) { alert('Hata: ' + error.message); setPaying(false); return } }
-      if (payModal.source === 'loan') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: null, notes: `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today }); if (error) { alert('Hata: ' + error.message); setPaying(false); return }; const loan = loans.find(l => l.id === payModal.sourceId); if (loan) await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId) }
-      const account = accounts.find(a => a.id === payAccountId)
-      if (account) { let deduct = payModal.amount; if (payModal.currency !== account.currency) { const tryAmt = toTry(payModal.amount, payModal.currency); deduct = account.currency === 'EUR' ? tryAmt / eurTry : account.currency === 'USD' ? tryAmt / usdTry : tryAmt }; await supabase.from('accounts').update({ balance: account.balance - deduct }).eq('id', payAccountId); setAccounts(prev => prev.map(a => a.id === payAccountId ? { ...a, balance: a.balance - deduct } : a)) }
+      const paymentNotes = payMethod === 'nakit' ? 'nakit' : payMethod === 'kredi_karti' ? `kk_${payCardId}` : undefined
+      if (payModal.source === 'recurring') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: payModal.sourceId, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(paymentNotes ? { notes: paymentNotes } : {}) }); if (error) { alert('Hata: ' + error.message); setPaying(false); return } }
+      if (payModal.source === 'loan') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: null, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today }); if (error) { alert('Hata: ' + error.message); setPaying(false); return }; const loan = loans.find(l => l.id === payModal.sourceId); if (loan) await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId) }
+
+      if (payMethod === 'hesap' && payAccountId) {
+        const account = accounts.find(a => a.id === payAccountId)
+        if (account) { let deduct = payModal.amount; if (payModal.currency !== account.currency) { const tryAmt = toTry(payModal.amount, payModal.currency); deduct = account.currency === 'EUR' ? tryAmt / eurTry : account.currency === 'USD' ? tryAmt / usdTry : tryAmt }; await supabase.from('accounts').update({ balance: account.balance - deduct }).eq('id', payAccountId); setAccounts(prev => prev.map(a => a.id === payAccountId ? { ...a, balance: a.balance - deduct } : a)) }
+      } else if (payMethod === 'kredi_karti' && payCardId) {
+        // Add as credit card transaction
+        const stmtMonth = month, stmtYear = year
+        const { data: existingStmt } = await supabase.from('credit_card_statements').select('*').eq('card_id', payCardId).eq('period_year', stmtYear).eq('period_month', stmtMonth)
+        if (existingStmt && existingStmt.length > 0) {
+          await supabase.from('credit_card_transactions').insert({ card_id: payCardId, statement_id: existingStmt[0].id, transaction_date: today, description: payModal.name, category: payModal.type, amount: payModal.amount, currency: payModal.currency })
+          await supabase.from('credit_card_statements').update({ total_amount: (existingStmt[0].total_amount || 0) + payModal.amount }).eq('id', existingStmt[0].id)
+        } else {
+          const { data: newStmt } = await supabase.from('credit_card_statements').insert({ card_id: payCardId, period_year: stmtYear, period_month: stmtMonth, total_amount: payModal.amount, minimum_payment: 0, is_paid: false }).select().single()
+          if (newStmt) await supabase.from('credit_card_transactions').insert({ card_id: payCardId, statement_id: newStmt.id, transaction_date: today, description: payModal.name, category: payModal.type, amount: payModal.amount, currency: payModal.currency })
+        }
+      }
+      // nakit: no account deduction, just record the payment
     }
     setPayments(prev => prev.map(p => p.source === payModal.source && p.sourceId === payModal.sourceId ? { ...p, paid: true, overdue: false } : p))
-    setPaying(false); setPayModal(null); setPayAccountId(null)
+    setPaying(false); setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null)
     if (!isDemo) reloadAll()
   }
 
@@ -270,7 +295,7 @@ export default function Dashboard() {
         <div className="tx-amount">
           <div className="tx-value" style={{ color: p.paid ? '#30a46c' : 'var(--text)', textDecoration: p.paid ? 'line-through' : 'none' }}>{fmt(p.amount, p.currency)}</div>
           {isCurrent && !p.paid && (
-            <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null) }}
+            <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
               className="tx-badge" style={{ background: p.overdue ? 'rgba(229,160,0,0.08)' : 'rgba(43,45,110,0.06)', color: p.overdue ? '#e5a000' : '#2b2d6e', border: 'none', cursor: 'pointer' }}>
               {p.overdue ? 'Onayla' : 'Ode'}
             </button>
@@ -302,7 +327,8 @@ export default function Dashboard() {
               style={{ background: 'var(--bg4)' }}>
               <IconRefresh color="#2b2d6e" size={18} strokeWidth={2} />
             </button>
-            <button className="w-10 h-10 rounded-full flex items-center justify-center"
+            <NotificationBell payments={payments} />
+            <button onClick={() => router.push('/settings')} className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ background: 'var(--bg4)' }}>
               <IconSettings color="#2b2d6e" size={18} strokeWidth={2} />
             </button>
@@ -554,22 +580,59 @@ export default function Dashboard() {
         {/* ===== PAY MODAL ===== */}
         {payModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(30,31,84,0.5)' }}
-            onClick={e => { if (e.target === e.currentTarget) { setPayModal(null); setPayAccountId(null) } }}>
+            onClick={e => { if (e.target === e.currentTarget) { setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) } }}>
             <div className="card p-6 w-full max-w-sm scale-in">
               <div className="text-base font-bold mb-1">{payModal.overdue ? 'Gecmis Odemeyi Onayla' : 'Odeme Yap'}</div>
-              <div className="text-sm mb-5" style={{ color: 'var(--muted)' }}>
+              <div className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text)' }}>{payModal.name}</span>
                 <span className="mono ml-2 font-bold">{fmt(payModal.amount, payModal.currency)}</span>
               </div>
-              <div className="mb-5">
-                <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Hangi hesaptan?</label>
-                <select value={payAccountId || ''} onChange={e => setPayAccountId(Number(e.target.value))} className="input">
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name} — {fmt(a.balance, a.currency)}</option>)}
-                </select>
+
+              {/* Payment method tabs */}
+              <div className="flex gap-1.5 mb-4 p-1 rounded-xl" style={{ background: 'var(--bg4)' }}>
+                {([['hesap', 'Hesaptan', IconBank], ['kredi_karti', 'Kredi Karti', IconCreditCard], ['nakit', 'Nakit', IconCash]] as const).map(([val, label, Icon]) => (
+                  <button key={val} onClick={() => setPayMethod(val)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold transition-all"
+                    style={{
+                      background: payMethod === val ? 'var(--bg2)' : 'transparent',
+                      boxShadow: payMethod === val ? 'var(--shadow)' : 'none',
+                      color: payMethod === val ? '#2b2d6e' : 'var(--muted)',
+                    }}>
+                    <Icon size={14} color={payMethod === val ? '#2b2d6e' : '#8790a5'} strokeWidth={2} />
+                    {label}
+                  </button>
+                ))}
               </div>
+
+              {/* Payment source selection */}
+              {payMethod === 'hesap' && (
+                <div className="mb-4">
+                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Hangi hesaptan?</label>
+                  <select value={payAccountId || ''} onChange={e => setPayAccountId(Number(e.target.value))} className="input">
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name} — {fmt(a.balance, a.currency)}</option>)}
+                  </select>
+                </div>
+              )}
+              {payMethod === 'kredi_karti' && (
+                <div className="mb-4">
+                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Hangi kart?</label>
+                  <select value={payCardId || ''} onChange={e => setPayCardId(Number(e.target.value))} className="input">
+                    <option value="">Kart secin...</option>
+                    {creditCards.map(c => <option key={c.id} value={c.id}>{c.name} ({c.bank})</option>)}
+                  </select>
+                </div>
+              )}
+              {payMethod === 'nakit' && (
+                <div className="mb-4 p-3 rounded-xl text-[12px]" style={{ background: 'rgba(99,102,241,0.06)', color: '#6366f1' }}>
+                  Nakit odeme olarak kaydedilecek. Hesap bakiyesinden dusulmez.
+                </div>
+              )}
+
               <div className="flex gap-3">
-                <button onClick={() => { setPayModal(null); setPayAccountId(null) }} className="btn-outline flex-1 py-3 text-sm">Iptal</button>
-                <button onClick={handlePay} disabled={paying || !payAccountId} className="btn-primary flex-1 py-3 text-sm">{paying ? 'Kaydediliyor...' : 'Onayla'}</button>
+                <button onClick={() => { setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) }} className="btn-outline flex-1 py-3 text-sm">Iptal</button>
+                <button onClick={handlePay}
+                  disabled={paying || (payMethod === 'hesap' && !payAccountId) || (payMethod === 'kredi_karti' && !payCardId)}
+                  className="btn-primary flex-1 py-3 text-sm">{paying ? 'Kaydediliyor...' : 'Onayla'}</button>
               </div>
             </div>
           </div>

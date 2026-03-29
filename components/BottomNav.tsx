@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import QuickAdd from './QuickAdd'
-import { IconHome, IconBank, IconCreditCard, IconCalendar, IconPlus } from './Icons'
+import { IconHome, IconBank, IconCreditCard, IconCalendar, IconPlus, IconSettings } from './Icons'
 
 const ACTIVE = '#ffffff'
 const INACTIVE = 'rgba(255,255,255,0.35)'
@@ -75,6 +75,12 @@ export default function BottomNav() {
             <IconPlus color="#fff" size={20} strokeWidth={2.5} />
             <span>Hizli Ekle</span>
           </button>
+          <Link href="/settings"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium mt-auto"
+            style={{ color: pathname === '/settings' ? '#2b2d6e' : 'var(--muted)', background: pathname === '/settings' ? 'rgba(43,45,110,0.06)' : 'transparent', textDecoration: 'none', marginTop: 'auto' }}>
+            <IconSettings color={pathname === '/settings' ? '#2b2d6e' : '#b0b7c3'} size={20} strokeWidth={2.2} />
+            <span>Ayarlar</span>
+          </Link>
         </nav>
       </aside>
 

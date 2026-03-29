@@ -19,6 +19,7 @@ type InvestmentWithSnapshot = Investment & {
 
 const emptyInvForm = { name: '', type: 'hisse', symbol: '', quantity: '', avg_cost: '', currency: 'TRY', platform: '', current_price: '' }
 const emptyDebtForm = { person_name: '', type: 'alacak' as 'alacak' | 'verecek', amount: '', currency: 'TRY', description: '', due_date: '' }
+const emptyAccForm = { name: '', bank: '', type: 'vadesiz', currency: 'TRY', balance: '' }
 
 // Mock data
 const MOCK_ACCOUNTS: Account[] = [
@@ -78,6 +79,13 @@ export default function AccountsPage() {
   const [debtSaving, setDebtSaving] = useState(false)
   const [debtDeleteConfirm, setDebtDeleteConfirm] = useState(false)
 
+  // Account edit state
+  const [editAcc, setEditAcc] = useState<Account | null>(null)
+  const [showAccForm, setShowAccForm] = useState(false)
+  const [accForm, setAccForm] = useState(emptyAccForm)
+  const [accSaving, setAccSaving] = useState(false)
+  const [accDeleteConfirm, setAccDeleteConfirm] = useState(false)
+
   async function loadData() {
     if (isDemo) {
       setAccounts(MOCK_ACCOUNTS)
@@ -123,6 +131,32 @@ export default function AccountsPage() {
   }
 
   useEffect(() => { loadData() }, [])
+
+  // Account CRUD
+  function openAccAdd() { setEditAcc(null); setAccForm(emptyAccForm); setShowAccForm(true); setAccDeleteConfirm(false) }
+  function openAccEdit(acc: Account) {
+    setEditAcc(acc)
+    setAccForm({ name: acc.name, bank: acc.bank, type: acc.type, currency: acc.currency, balance: String(acc.balance) })
+    setShowAccForm(true); setAccDeleteConfirm(false)
+  }
+  function closeAccForm() { setShowAccForm(false); setEditAcc(null); setAccForm(emptyAccForm); setAccDeleteConfirm(false) }
+  async function handleAccSave() {
+    if (!accForm.name || !accForm.bank) return
+    setAccSaving(true)
+    const payload = { name: accForm.name, bank: accForm.bank, type: accForm.type, currency: accForm.currency, balance: parseFloat(accForm.balance) || 0, is_active: true }
+    if (!isDemo) {
+      if (editAcc) { await supabase.from('accounts').update(payload).eq('id', editAcc.id) }
+      else { await supabase.from('accounts').insert(payload) }
+    }
+    setAccSaving(false); closeAccForm(); await loadData()
+  }
+  async function handleAccDelete() {
+    if (!editAcc) return
+    setAccSaving(true)
+    if (!isDemo) await supabase.from('accounts').update({ is_active: false }).eq('id', editAcc.id)
+    setAccSaving(false); closeAccForm(); await loadData()
+  }
+  const setAcc = (k: string, v: string) => setAccForm(f => ({ ...f, [k]: v }))
 
   const eurTry = rates?.eur_try || 0
   const usdTry = rates?.usd_try || 0
@@ -330,7 +364,7 @@ export default function AccountsPage() {
                     }}>
                       <div className="px-3 pb-3 flex flex-col gap-1.5">
                         {bankAccounts.map(a => (
-                          <div key={a.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                          <div key={a.id} onClick={() => openAccEdit(a)} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:brightness-95 transition-all"
                             style={{ background: 'rgba(43,45,110,0.03)' }}>
                             <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                               style={{ background: a.currency === 'EUR' ? 'rgba(99,102,241,0.08)' : a.currency === 'USD' ? 'rgba(48,164,108,0.08)' : 'rgba(43,45,110,0.08)' }}>
@@ -356,7 +390,73 @@ export default function AccountsPage() {
                 )
               })}
             </div>
+
+            {/* Add account button */}
+            <button onClick={openAccAdd}
+              className="w-full mt-3 py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+              style={{ background: 'rgba(43,45,110,0.06)', color: '#2b2d6e', border: '1.5px dashed rgba(43,45,110,0.2)' }}>
+              <IconPlus size={16} color="#2b2d6e" strokeWidth={2.5} />
+              Yeni Hesap Ekle
+            </button>
           </>
+        )}
+
+        {/* Account Form Modal */}
+        {showAccForm && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}
+            onClick={e => { if (e.target === e.currentTarget) closeAccForm() }}>
+            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+              <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-sm font-semibold">{editAcc ? 'Hesabi Duzenle' : 'Yeni Hesap'}</div>
+                <button onClick={closeAccForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Hesap Adi</label>
+                  <input value={accForm.name} onChange={e => setAcc('name', e.target.value)} placeholder="Orn: Ziraat TL" className="input" />
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Banka</label>
+                    <input value={accForm.bank} onChange={e => setAcc('bank', e.target.value)} placeholder="Orn: Ziraat" className="input" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <select value={accForm.type} onChange={e => setAcc('type', e.target.value)} className="input">
+                      <option value="vadesiz">Vadesiz</option><option value="vadeli">Vadeli</option><option value="yatirim">Yatirim</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Bakiye</label>
+                    <input value={accForm.balance} onChange={e => setAcc('balance', e.target.value)} type="number" placeholder="0" className="input mono" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <select value={accForm.currency} onChange={e => setAcc('currency', e.target.value)} className="input">
+                      <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <button onClick={handleAccSave} disabled={accSaving || !accForm.name || !accForm.bank}
+                className="btn-primary w-full mt-4 py-3">{accSaving ? 'Kaydediliyor...' : editAcc ? 'Guncelle' : 'Ekle'}</button>
+              {editAcc && !accDeleteConfirm && (
+                <button onClick={() => setAccDeleteConfirm(true)} className="w-full mt-2 py-2.5 text-sm font-medium" style={{ color: '#e5484d', background: 'transparent', border: 'none', cursor: 'pointer' }}>Hesabi Sil</button>
+              )}
+              {accDeleteConfirm && (
+                <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(229,72,77,0.06)' }}>
+                  <div className="text-[12px] mb-2 font-medium" style={{ color: '#e5484d' }}>Bu hesabi silmek istediginize emin misiniz?</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setAccDeleteConfirm(false)} className="btn-outline flex-1 py-2 text-xs">Iptal</button>
+                    <button onClick={handleAccDelete} className="btn-danger flex-1 py-2 text-xs">Sil</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* ===== TAB: YATIRIMLAR ===== */}

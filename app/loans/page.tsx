@@ -4,6 +4,7 @@ import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, daysUntil, daysUntilLabel } from '@/lib/supabase'
 import type { Loan, CreditCard, CreditCardStatement, CreditCardTransaction, ExchangeRate } from '@/lib/supabase'
 import { EXPENSE_CATEGORIES, CATEGORY_GROUPS } from '@/lib/categories'
+import OcrUpload from '@/components/OcrUpload'
 
 const emptyLoan = {
   name: '', bank: '', type: 'ihtiyac', currency: 'TRY', original_amount: '',
@@ -395,12 +396,13 @@ export default function LoansPage() {
                 </div>
 
                 {/* Action buttons */}
-                <div className="px-4 pb-3 flex gap-2">
+                <div className="px-4 pb-3 flex flex-wrap gap-2">
                   <button onClick={() => openTxForm(card.id)}
                     className="text-[11px] font-medium px-3 py-1.5 rounded-lg"
                     style={{ background: 'rgba(13,148,136,0.08)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.2)' }}>
                     + Harcama Ekle
                   </button>
+                  <OcrUpload cardId={card.id} onComplete={load} />
                   {cardTxs.length > 0 && (
                     <button onClick={() => toggleExpand(card.id)}
                       className="text-[11px] font-medium px-3 py-1.5 rounded-lg"

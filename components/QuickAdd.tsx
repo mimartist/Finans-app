@@ -22,6 +22,8 @@ export default function QuickAdd({ onClose }: Props) {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [photo, setPhoto] = useState<string | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
 
@@ -34,6 +36,31 @@ export default function QuickAdd({ onClose }: Props) {
     const reader = new FileReader()
     reader.onload = () => setPhoto(reader.result as string)
     reader.readAsDataURL(file)
+  }
+
+  async function handleScan() {
+    if (!photo) return
+    setScanning(true); setScanError(null)
+    try {
+      const res = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: photo, type: 'fis' }),
+      })
+      const data = await res.json()
+      if (data.success && data.transactions?.length > 0) {
+        const tx = data.transactions[0]
+        set('name', tx.description || '')
+        set('amount', String(tx.amount || ''))
+        set('category', tx.category || 'diger')
+        if (tx.transaction_date) set('expense_date', tx.transaction_date)
+      } else {
+        setScanError(data.error || 'Fis okunamadi')
+      }
+    } catch (err: any) {
+      setScanError(err.message || 'Baglanti hatasi')
+    }
+    setScanning(false)
   }
 
   async function handleSave() {
@@ -204,15 +231,28 @@ export default function QuickAdd({ onClose }: Props) {
               </button>
             </div>
 
-            {/* Photo preview */}
+            {/* Photo preview + OCR scan */}
             {photo && (
-              <div className="relative mb-4 rounded-xl overflow-hidden">
-                <img src={photo} alt="Fis" className="w-full" style={{ maxHeight: 160, objectFit: 'cover' }} />
-                <div className="absolute top-2 right-2">
-                  <button onClick={() => setPhoto(null)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center"
-                    style={{ background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 12, border: 'none' }}>✕</button>
+              <div className="mb-4">
+                <div className="relative rounded-xl overflow-hidden">
+                  <img src={photo} alt="Fis" className="w-full" style={{ maxHeight: 160, objectFit: 'cover' }} />
+                  <div className="absolute top-2 right-2">
+                    <button onClick={() => { setPhoto(null); setScanError(null) }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center"
+                      style={{ background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 12, border: 'none' }}>✕</button>
+                  </div>
                 </div>
+                <button onClick={handleScan} disabled={scanning}
+                  className="w-full mt-2 py-2.5 rounded-xl text-[12px] font-bold flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #818cf8)', color: '#fff', border: 'none', cursor: 'pointer', opacity: scanning ? 0.6 : 1 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M2 7V2h5" /><path d="M22 7V2h-5" /><path d="M2 17v5h5" /><path d="M22 17v5h-5" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  {scanning ? 'Taraniyor...' : 'Fisi Tara (OCR)'}
+                </button>
+                {scanError && (
+                  <div className="mt-2 text-[11px] font-medium px-3 py-1.5 rounded-lg" style={{ background: 'rgba(229,72,77,0.06)', color: '#e5484d' }}>{scanError}</div>
+                )}
               </div>
             )}
 
