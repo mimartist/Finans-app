@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useUser } from './AuthProvider'
 
 const DONE_KEY = 'finans_onboarding_done'
 
@@ -23,6 +24,7 @@ function ProgressBar({ current }: { current: number }) {
 
 export default function Onboarding({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { user } = useUser()
   const [show, setShow] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [step, setStep] = useState<Step>('welcome')
@@ -58,10 +60,23 @@ export default function Onboarding({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     setMounted(true)
+    // OAuth ile giriş yapan kullanıcılar (Google vb.) onboarding'i atla
+    if (user?.app_metadata?.provider === 'google') {
+      localStorage.setItem(DONE_KEY, '1')
+      // Google'dan gelen ismi settings'e kaydet
+      const fullName = user.user_metadata?.full_name || user.user_metadata?.name || ''
+      if (fullName) {
+        try {
+          const s = JSON.parse(localStorage.getItem('finans_settings') || '{}')
+          if (!s.userName) localStorage.setItem('finans_settings', JSON.stringify({ ...s, userName: fullName.split(' ')[0] }))
+        } catch {}
+      }
+      return
+    }
     if (!localStorage.getItem(DONE_KEY)) {
       setShow(true)
     }
-  }, [])
+  }, [user])
 
   function finish() {
     localStorage.setItem(DONE_KEY, '1')
