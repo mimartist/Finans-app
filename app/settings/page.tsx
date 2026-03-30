@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import { supabase, isDemo } from '@/lib/supabase'
 import { IconSettings, IconRefresh } from '@/components/Icons'
+import { useAppLock } from '@/components/AppLock'
 
 type Settings = {
   userName: string
@@ -43,7 +44,19 @@ export default function SettingsPage() {
   const [rateMsg, setRateMsg] = useState('')
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => { setSettings(loadSettings()) }, [])
+  // PIN yönetimi
+  const { isPinSet, setPin, removePin } = useAppLock()
+  const [pinModal, setPinModal] = useState<'set' | 'change' | 'remove' | null>(null)
+  const [pinInput, setPinInput] = useState('')
+  const [pinConfirm, setPinConfirm] = useState('')
+  const [pinOld, setPinOld] = useState('')
+  const [pinMsg, setPinMsg] = useState('')
+  const [pinHasValue, setPinHasValue] = useState(false)
+
+  useEffect(() => {
+    setSettings(loadSettings())
+    setPinHasValue(isPinSet())
+  }, [])
 
   function update(key: keyof Settings, value: any) {
     const next = { ...settings, [key]: value }
@@ -51,6 +64,22 @@ export default function SettingsPage() {
     saveSettings(next)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handlePinSave() {
+    if (!pinInput || pinInput.length < 4) { setPinMsg('En az 4 karakter olmalı'); return }
+    if (pinInput !== pinConfirm) { setPinMsg('Şifreler eşleşmiyor'); return }
+    await setPin(pinInput)
+    setPinHasValue(true)
+    setPinModal(null); setPinInput(''); setPinConfirm(''); setPinOld(''); setPinMsg('')
+    setSaved(true); setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handlePinRemove() {
+    removePin()
+    setPinHasValue(false)
+    setPinModal(null); setPinInput(''); setPinConfirm(''); setPinOld(''); setPinMsg('')
+    setSaved(true); setTimeout(() => setSaved(false), 2000)
   }
 
   async function updateRates() {
@@ -187,6 +216,35 @@ export default function SettingsPage() {
             </Row>
           </Section>
 
+          {/* Güvenlik */}
+          <Section title="Güvenlik">
+            <Row label="Uygulama Şifresi"
+              desc={pinHasValue ? 'Şifre aktif — uygulama kilitli' : 'Şifre yok — herkese açık'}>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{
+                    background: pinHasValue ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.08)',
+                    color: pinHasValue ? '#059669' : '#dc2626',
+                  }}>
+                  {pinHasValue ? '🔒 Aktif' : '🔓 Açık'}
+                </span>
+                <button
+                  onClick={() => { setPinModal(pinHasValue ? 'change' : 'set'); setPinMsg(''); setPinInput(''); setPinConfirm(''); setPinOld('') }}
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg"
+                  style={{ background: 'rgba(43,45,110,0.08)', color: '#2b2d6e' }}>
+                  {pinHasValue ? 'Değiştir' : 'Şifre Koy'}
+                </button>
+                {pinHasValue && (
+                  <button onClick={() => setPinModal('remove')}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg"
+                    style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>
+                    Kaldır
+                  </button>
+                )}
+              </div>
+            </Row>
+          </Section>
+
           {/* Veri */}
           <Section title="Veri">
             <Row label="Doviz Kurlarini Guncelle" desc="TCMB, CoinGecko, Yahoo Finance">
@@ -224,6 +282,64 @@ export default function SettingsPage() {
           </Section>
         </div>
       </div>
+
+      {/* PIN Modal */}
+      {pinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
+          <div className="card p-5 w-full max-w-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(43,45,110,0.08)' }}>
+                🔐
+              </div>
+              <div>
+                <div className="text-sm font-bold">
+                  {pinModal === 'set' ? 'Şifre Belirle' : pinModal === 'change' ? 'Şifre Değiştir' : 'Şifreyi Kaldır'}
+                </div>
+                <div className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                  {pinModal === 'remove' ? 'Emin misiniz?' : 'En az 4 karakter'}
+                </div>
+              </div>
+            </div>
+
+            {pinModal !== 'remove' ? (
+              <div className="flex flex-col gap-3">
+                {pinModal === 'change' && (
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Mevcut Şifre</label>
+                    <input type="password" value={pinOld} onChange={e => setPinOld(e.target.value)}
+                      placeholder="••••" className="input" autoComplete="current-password" />
+                  </div>
+                )}
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Yeni Şifre</label>
+                  <input type="password" value={pinInput} onChange={e => { setPinInput(e.target.value); setPinMsg('') }}
+                    placeholder="••••" className="input" autoComplete="new-password" />
+                </div>
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Şifre Tekrar</label>
+                  <input type="password" value={pinConfirm} onChange={e => { setPinConfirm(e.target.value); setPinMsg('') }}
+                    placeholder="••••" className="input" autoComplete="new-password" />
+                </div>
+                {pinMsg && <div className="text-[11px] font-medium" style={{ color: '#dc2626' }}>{pinMsg}</div>}
+                <div className="flex gap-2 mt-1">
+                  <button onClick={() => setPinModal(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
+                  <button onClick={handlePinSave} className="btn-primary flex-1 py-2.5 text-sm">Kaydet</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="text-[13px] py-2 text-center rounded-lg" style={{ background: 'rgba(220,38,38,0.06)', color: '#dc2626' }}>
+                  Şifre kaldırılırsa uygulama herkese açık olur
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setPinModal(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
+                  <button onClick={handlePinRemove} className="btn-danger flex-1 py-2.5 text-sm">Kaldır</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
