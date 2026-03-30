@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 const DONE_KEY = 'finans_onboarding_done'
@@ -21,6 +22,7 @@ function ProgressBar({ current }: { current: number }) {
 }
 
 export default function Onboarding({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   const [show, setShow] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [step, setStep] = useState<Step>('welcome')
@@ -130,7 +132,7 @@ export default function Onboarding({ children }: { children: React.ReactNode }) 
   function next() { setStep(STEPS[stepIdx + 1]) }
   function back() { setStep(STEPS[stepIdx - 1]) }
 
-  if (!mounted || !show) return <>{children}</>
+  if (!mounted || !show || pathname === '/auth') return <>{children}</>
 
   return (
     <>
