@@ -43,6 +43,8 @@ export default function SettingsPage() {
   const [rateUpdating, setRateUpdating] = useState(false)
   const [rateMsg, setRateMsg] = useState('')
   const [saved, setSaved] = useState(false)
+  const [seeding, setSeeding] = useState(false)
+  const [seedMsg, setSeedMsg] = useState('')
 
   // PIN yönetimi
   const { isPinSet, setPin, removePin } = useAppLock()
@@ -84,6 +86,18 @@ export default function SettingsPage() {
     setPinHasValue(false)
     setPinModal(null); setPinInput(''); setPinConfirm(''); setPinOld(''); setPinMsg('')
     setSaved(true); setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function seedDemo() {
+    if (!confirm('Mevcut tüm veriler silinip demo veriler yüklenecek. Emin misiniz?')) return
+    setSeeding(true); setSeedMsg('')
+    try {
+      const res = await fetch('/api/seed-demo', { method: 'POST' })
+      const data = await res.json()
+      setSeedMsg(data.success ? '✓ Demo veriler yüklendi! Sayfa yenileniyor...' : 'Hata: ' + data.error)
+      if (data.success) setTimeout(() => window.location.href = '/', 1500)
+    } catch { setSeedMsg('Bağlantı hatası') }
+    setSeeding(false)
   }
 
   async function updateRates() {
@@ -247,6 +261,22 @@ export default function SettingsPage() {
                 )}
               </div>
             </Row>
+          </Section>
+
+          {/* Geliştirici / Demo */}
+          <Section title="Geliştirici">
+            <Row label="Demo Verilerini Yükle" desc="Tüm sayfaları test etmek için örnek veri seti">
+              <button onClick={seedDemo} disabled={seeding}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold"
+                style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: 'none', cursor: 'pointer', opacity: seeding ? 0.5 : 1 }}>
+                {seeding ? 'Yükleniyor...' : '🧪 Demo Yükle'}
+              </button>
+            </Row>
+            {seedMsg && (
+              <div className="px-4 py-2 text-[11px] font-medium" style={{ color: seedMsg.includes('Hata') ? '#e5484d' : '#30a46c' }}>
+                {seedMsg}
+              </div>
+            )}
           </Section>
 
           {/* Veri */}
