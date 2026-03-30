@@ -326,13 +326,15 @@ export default function DebtsPage() {
                       {/* Tahsilat / Ödeme hızlı buton */}
                       <button
                         onClick={e => { e.stopPropagation(); setPayModal(d); setPayAmount(String(d.amount)); setCollectAccountId('') }}
-                        className="flex-shrink-0 px-2 py-1.5 rounded-lg text-[10px] font-bold"
+                        className="flex-shrink-0 rounded-lg text-[11px] font-bold"
                         style={{
-                          background: d.type === 'alacak' ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.07)',
-                          color: d.type === 'alacak' ? '#059669' : '#dc2626',
-                          border: `1px solid ${d.type === 'alacak' ? 'rgba(5,150,105,0.25)' : 'rgba(220,38,38,0.2)'}`,
+                          padding: '6px 10px',
+                          background: d.type === 'alacak' ? '#059669' : '#dc2626',
+                          color: '#fff',
+                          border: 'none',
+                          whiteSpace: 'nowrap',
                         }}>
-                        {d.type === 'alacak' ? 'Tahsil' : 'Öde'}
+                        {d.type === 'alacak' ? '💰 Tahsil' : '💸 Öde'}
                       </button>
                       <span className="text-[12px] cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : d.id)}
                         style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>›</span>
