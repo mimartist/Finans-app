@@ -79,6 +79,12 @@ export default function AccountsPage() {
   const [debtSaving, setDebtSaving] = useState(false)
   const [debtDeleteConfirm, setDebtDeleteConfirm] = useState(false)
 
+  // Tahsilat modal state
+  const [collectModal, setCollectModal] = useState<DebtRecord | null>(null)
+  const [collectAmount, setCollectAmount] = useState('')
+  const [collectAccountId, setCollectAccountId] = useState<number | ''>('')
+  const [collecting, setCollecting] = useState(false)
+
   // Account edit state
   const [editAcc, setEditAcc] = useState<Account | null>(null)
   const [showAccForm, setShowAccForm] = useState(false)
@@ -257,6 +263,35 @@ export default function AccountsPage() {
 
   const setInv = (k: string, v: string) => setInvForm(f => ({ ...f, [k]: v }))
   const setDbt = (k: string, v: string) => setDebtForm(f => ({ ...f, [k]: v }))
+
+  async function handleCollect() {
+    if (!collectModal || !collectAmount) return
+    setCollecting(true)
+    const amt = parseFloat(collectAmount) || 0
+    const newPaid = (collectModal.paid_amount || 0) + amt
+    const newRemaining = collectModal.amount - amt
+    const isSettled = newRemaining <= 0
+
+    const { error } = await supabase.from('debt_records').update({
+      amount: Math.max(0, newRemaining),
+      paid_amount: newPaid,
+      is_settled: isSettled,
+    }).eq('id', collectModal.id)
+    if (error) { alert('Hata: ' + error.message); setCollecting(false); return }
+
+    // Hesap bakiyesini güncelle
+    if (collectAccountId) {
+      const acc = accounts.find(a => a.id === collectAccountId)
+      if (acc) {
+        const newBalance = collectModal.type === 'alacak' ? acc.balance + amt : acc.balance - amt
+        await supabase.from('accounts').update({ balance: Math.max(0, newBalance) }).eq('id', collectAccountId)
+      }
+    }
+
+    setCollecting(false)
+    setCollectModal(null); setCollectAmount(''); setCollectAccountId('')
+    await loadData()
+  }
 
   const tabs: { key: Tab; label: string; Icon: any }[] = [
     { key: 'hesaplar', label: 'Hesaplar', Icon: IconWallet },
@@ -575,21 +610,37 @@ export default function AccountsPage() {
               <>
                 <div className="mx-5 mb-2 text-xs font-bold" style={{ color: '#30a46c' }}>Alacaklar</div>
                 <div className="flex flex-col gap-2 mx-4 mb-4">
-                  {alacaklar.map(d => (
-                    <div key={d.id} className="tx-item" style={{ cursor: 'pointer' }} onClick={() => openDebtEdit(d)}>
-                      <div className="tx-icon" style={{ background: 'rgba(48,164,108,0.06)' }}>
-                        <span className="text-sm font-bold" style={{ color: '#30a46c' }}>{d.person_name.charAt(0)}</span>
+                  {alacaklar.map(d => {
+                    const paidAmt = d.paid_amount || 0
+                    const totalAmt = d.total_amount || (paidAmt + d.amount)
+                    const paidPct = totalAmt > 0 ? Math.round((paidAmt / totalAmt) * 100) : 0
+                    return (
+                      <div key={d.id} className="tx-item" style={{ cursor: 'pointer' }}>
+                        <div className="tx-icon" style={{ background: 'rgba(48,164,108,0.06)' }} onClick={() => openDebtEdit(d)}>
+                          <span className="text-sm font-bold" style={{ color: '#30a46c' }}>{d.person_name.charAt(0)}</span>
+                        </div>
+                        <div className="tx-info" onClick={() => openDebtEdit(d)}>
+                          <div className="tx-name">{d.person_name}</div>
+                          <div className="tx-detail">
+                            {d.description || 'Alacak'}{d.is_recurring ? ' · Düzenli' : ''}
+                            {paidAmt > 0 && <span style={{ color: '#f97316', marginLeft: 4 }}>· %{paidPct} tahsil</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="tx-amount" onClick={() => openDebtEdit(d)}>
+                            <div className="tx-value amt-green">+{fmt(d.amount, d.currency)}</div>
+                            {d.due_date && <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{new Date(d.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</div>}
+                          </div>
+                          <button
+                            onClick={e => { e.stopPropagation(); setCollectModal(d); setCollectAmount(String(d.amount)); setCollectAccountId('') }}
+                            className="flex-shrink-0 rounded-lg text-[10px] font-bold"
+                            style={{ padding: '5px 9px', background: '#059669', color: '#fff', border: 'none', whiteSpace: 'nowrap' }}>
+                            💰 Tahsil
+                          </button>
+                        </div>
                       </div>
-                      <div className="tx-info">
-                        <div className="tx-name">{d.person_name}</div>
-                        <div className="tx-detail">{d.description || 'Alacak'}{d.is_recurring ? ' · Duzenli' : ''}</div>
-                      </div>
-                      <div className="tx-amount">
-                        <div className="tx-value amt-green">+{fmt(d.amount, d.currency)}</div>
-                        {d.due_date && <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{new Date(d.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</div>}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </>
             )}
@@ -600,17 +651,25 @@ export default function AccountsPage() {
                 <div className="mx-5 mb-2 text-xs font-bold" style={{ color: '#e5484d' }}>Borclar</div>
                 <div className="flex flex-col gap-2 mx-4 mb-4">
                   {verecekler.map(d => (
-                    <div key={d.id} className="tx-item" style={{ cursor: 'pointer' }} onClick={() => openDebtEdit(d)}>
-                      <div className="tx-icon" style={{ background: 'rgba(229,72,77,0.06)' }}>
+                    <div key={d.id} className="tx-item" style={{ cursor: 'pointer' }}>
+                      <div className="tx-icon" style={{ background: 'rgba(229,72,77,0.06)' }} onClick={() => openDebtEdit(d)}>
                         <span className="text-sm font-bold" style={{ color: '#e5484d' }}>{d.person_name.charAt(0)}</span>
                       </div>
-                      <div className="tx-info">
+                      <div className="tx-info" onClick={() => openDebtEdit(d)}>
                         <div className="tx-name">{d.person_name}</div>
                         <div className="tx-detail">{d.description || 'Verecek'}</div>
                       </div>
-                      <div className="tx-amount">
-                        <div className="tx-value amt-red">-{fmt(d.amount, d.currency)}</div>
-                        {d.due_date && <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{new Date(d.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</div>}
+                      <div className="flex items-center gap-2">
+                        <div className="tx-amount" onClick={() => openDebtEdit(d)}>
+                          <div className="tx-value amt-red">-{fmt(d.amount, d.currency)}</div>
+                          {d.due_date && <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{new Date(d.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</div>}
+                        </div>
+                        <button
+                          onClick={e => { e.stopPropagation(); setCollectModal(d); setCollectAmount(String(d.amount)); setCollectAccountId('') }}
+                          className="flex-shrink-0 rounded-lg text-[10px] font-bold"
+                          style={{ padding: '5px 9px', background: '#dc2626', color: '#fff', border: 'none', whiteSpace: 'nowrap' }}>
+                          💸 Öde
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -745,6 +804,80 @@ export default function AccountsPage() {
         )}
 
         {/* ===== DEBT EDIT MODAL ===== */}
+        {/* ===== TAHSİLAT MODAL ===== */}
+        {collectModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
+            <div className="card p-5 w-full max-w-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                  style={{ background: collectModal.type === 'alacak' ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.08)' }}>
+                  {collectModal.type === 'alacak' ? '💰' : '💸'}
+                </div>
+                <div>
+                  <div className="text-sm font-bold">{collectModal.type === 'alacak' ? 'Tahsilat Al' : 'Ödeme Yap'}</div>
+                  <div className="text-[11px]" style={{ color: 'var(--muted)' }}>{collectModal.person_name}</div>
+                </div>
+              </div>
+
+              {/* Kalan tutar */}
+              <div className="rounded-lg px-3 py-2 mb-4 flex justify-between items-center"
+                style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}>
+                <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Kalan tutar</span>
+                <span className="mono font-bold text-[14px]" style={{ color: collectModal.type === 'alacak' ? '#059669' : '#dc2626' }}>
+                  {fmt(collectModal.amount, collectModal.currency)}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>
+                    {collectModal.type === 'alacak' ? 'Tahsilat Tutarı' : 'Ödeme Tutarı'}
+                  </label>
+                  <div className="flex gap-2">
+                    <input value={collectAmount} onChange={e => setCollectAmount(e.target.value)}
+                      placeholder="0" type="number" className="input mono flex-1" />
+                    <button onClick={() => setCollectAmount(String(collectModal.amount))}
+                      className="px-3 rounded-lg text-[11px] font-semibold flex-shrink-0"
+                      style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
+                      Tamamı
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>
+                    {collectModal.type === 'alacak' ? 'Hangi Hesaba Geçti?' : 'Hangi Hesaptan Ödendi?'}
+                  </label>
+                  <select value={collectAccountId}
+                    onChange={e => setCollectAccountId(e.target.value ? Number(e.target.value) : '')}
+                    className="input">
+                    <option value="">— Hesap seçme (sadece kaydet) —</option>
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} ({a.bank}) — {fmt(a.balance, a.currency)}</option>
+                    ))}
+                  </select>
+                  {collectAccountId && (
+                    <div className="mt-1 text-[10px]" style={{ color: 'var(--muted)' }}>
+                      {collectModal.type === 'alacak'
+                        ? `✓ Bakiye +${fmt(parseFloat(collectAmount) || 0)} artacak`
+                        : `✓ Bakiye -${fmt(parseFloat(collectAmount) || 0)} azalacak`}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => { setCollectModal(null); setCollectAmount(''); setCollectAccountId('') }}
+                  className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
+                <button onClick={handleCollect}
+                  disabled={collecting || !collectAmount || parseFloat(collectAmount) <= 0}
+                  className="btn-primary flex-1 py-2.5 text-sm">
+                  {collecting ? 'Kaydediliyor...' : 'Onayla'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {editDebt && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={closeDebtEdit}>
             <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
