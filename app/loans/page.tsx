@@ -17,6 +17,10 @@ const emptyTx = {
   description: '', category: '', amount: '', currency: 'TRY',
 }
 
+const emptyCard = {
+  name: '', bank: '', credit_limit: '', currency: 'TRY', due_day: '', statement_day: '',
+}
+
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([])
   const [cards, setCards] = useState<CreditCard[]>([])
@@ -31,6 +35,13 @@ export default function LoansPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [paidLoans, setPaidLoans] = useState<any[]>([])
   const [userId, setUserId] = useState<string | null>(null)
+
+  // Credit card form state
+  const [showCardForm, setShowCardForm] = useState(false)
+  const [editCardId, setEditCardId] = useState<number | null>(null)
+  const [cardForm, setCardForm] = useState(emptyCard)
+  const [cardSaving, setCardSaving] = useState(false)
+  const [cardDeleteConfirm, setCardDeleteConfirm] = useState<number | null>(null)
 
   // Credit card transaction state
   const [txFormCardId, setTxFormCardId] = useState<number | null>(null)
@@ -108,6 +119,43 @@ export default function LoansPage() {
   async function handleDelete(id: number) {
     await supabase.from('loans').update({ is_active: false }).eq('id', id)
     setDeleteConfirm(null); await load()
+  }
+
+  function openCardAdd() { setEditCardId(null); setCardForm(emptyCard); setShowCardForm(true) }
+  function openCardEdit(card: CreditCard) {
+    setEditCardId(card.id)
+    setCardForm({
+      name: card.name, bank: card.bank,
+      credit_limit: String((card as any).credit_limit || (card as any).limit_amount || ''),
+      currency: (card as any).currency || 'TRY',
+      due_day: String(card.due_day || ''),
+      statement_day: String(card.statement_day || ''),
+    })
+    setShowCardForm(true)
+  }
+  function closeCardForm() { setShowCardForm(false); setEditCardId(null); setCardForm(emptyCard) }
+
+  async function handleCardSave() {
+    if (!cardForm.name || !cardForm.bank) return
+    setCardSaving(true)
+    const dueDay = parseInt(cardForm.due_day) || 1
+    const payload = {
+      name: cardForm.name, bank: cardForm.bank,
+      credit_limit: parseFloat(cardForm.credit_limit) || 0,
+      currency: cardForm.currency,
+      due_day: dueDay,
+      statement_day: parseInt(cardForm.statement_day) || Math.max(1, dueDay - 10),
+      is_active: true,
+      ...(userId ? { user_id: userId } : {}),
+    }
+    if (editCardId) { await supabase.from('credit_cards').update(payload).eq('id', editCardId) }
+    else { await supabase.from('credit_cards').insert(payload) }
+    setCardSaving(false); closeCardForm(); await load()
+  }
+
+  async function handleCardDelete(id: number) {
+    await supabase.from('credit_cards').update({ is_active: false }).eq('id', id)
+    setCardDeleteConfirm(null); await load()
   }
 
   // Credit card transaction handlers
@@ -227,6 +275,18 @@ export default function LoansPage() {
           <div>
             <div className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>Finans</div>
             <div className="text-xl font-extrabold mt-0.5">Krediler & Kartlar</div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={openCardAdd}
+              className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
+              style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
+              + Kart
+            </button>
+            <button onClick={openAdd}
+              className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
+              style={{ background: 'var(--accent)', color: '#fff' }}>
+              + Kredi
+            </button>
           </div>
         </div>
 
@@ -388,19 +448,25 @@ export default function LoansPage() {
                     <div className="text-sm font-medium">{card.name}</div>
                     <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>Ekstre: {card.statement_day}'i · Son odeme: {card.due_day}'i</div>
                   </div>
-                  <div className="text-right">
-                    {stmt ? (
-                      <>
-                        <div className={isCardPaid ? 'mono text-sm font-semibold' : 'mono text-sm font-semibold amt-amber'} style={isCardPaid ? { color: '#4ade9a' } : undefined}>{fmt(stmt.total_amount)}</div>
-                        {isCardPaid ? (
-                          <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Odendi</div>
-                        ) : (
-                          <div className="text-[11px] mt-0.5" style={{ color: days && days <= 3 ? '#dc2626' : 'var(--muted)' }}>{days !== null ? daysUntilLabel(days) : ''}</div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-[11px]" style={{ color: 'var(--muted)' }}>ekstre girilmedi</div>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      {stmt ? (
+                        <>
+                          <div className={isCardPaid ? 'mono text-sm font-semibold' : 'mono text-sm font-semibold amt-amber'} style={isCardPaid ? { color: '#4ade9a' } : undefined}>{fmt(stmt.total_amount)}</div>
+                          {isCardPaid ? (
+                            <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Odendi</div>
+                          ) : (
+                            <div className="text-[11px] mt-0.5" style={{ color: days && days <= 3 ? '#dc2626' : 'var(--muted)' }}>{days !== null ? daysUntilLabel(days) : ''}</div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-[11px]" style={{ color: 'var(--muted)' }}>ekstre girilmedi</div>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => openCardEdit(card)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
+                      <button onClick={() => setCardDeleteConfirm(card.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
+                    </div>
                   </div>
                 </div>
 
@@ -568,6 +634,68 @@ export default function LoansPage() {
               </div>
               <button onClick={handleTxSave} disabled={txSaving || !txForm.description || !txForm.amount}
                 className="btn-primary w-full mt-4 py-3">{txSaving ? 'Kaydediliyor...' : txEditId ? 'Guncelle' : 'Ekle'}</button>
+            </div>
+          </div>
+        )}
+        {/* Card Form Modal */}
+        {showCardForm && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
+            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+              <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-sm font-semibold">{editCardId ? 'Karti Duzenle' : 'Yeni Kredi Karti'}</div>
+                <button onClick={closeCardForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kart Adi</label>
+                    <input value={cardForm.name} onChange={e => setCardForm(f => ({ ...f, name: e.target.value }))} placeholder="Orn: Bonus, Miles" className="input" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Banka</label>
+                    <input value={cardForm.bank} onChange={e => setCardForm(f => ({ ...f, bank: e.target.value }))} placeholder="Orn: Garanti" className="input" />
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Limit</label>
+                    <input value={cardForm.credit_limit} onChange={e => setCardForm(f => ({ ...f, credit_limit: e.target.value }))} type="number" placeholder="0" className="input mono" />
+                  </div>
+                  <div className="w-28">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <select value={cardForm.currency} onChange={e => setCardForm(f => ({ ...f, currency: e.target.value }))} className="input">
+                      <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Son Odeme Gunu</label>
+                    <input value={cardForm.due_day} onChange={e => setCardForm(f => ({ ...f, due_day: e.target.value }))} type="number" placeholder="1-31" min="1" max="31" className="input" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ekstre Gunu</label>
+                    <input value={cardForm.statement_day} onChange={e => setCardForm(f => ({ ...f, statement_day: e.target.value }))} type="number" placeholder="1-31" min="1" max="31" className="input" />
+                  </div>
+                </div>
+              </div>
+              <button onClick={handleCardSave} disabled={cardSaving || !cardForm.name || !cardForm.bank}
+                className="btn-primary w-full mt-4 py-3">{cardSaving ? 'Kaydediliyor...' : editCardId ? 'Guncelle' : 'Ekle'}</button>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Card Confirm */}
+        {cardDeleteConfirm !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
+            <div className="card p-5 w-full max-w-sm">
+              <div className="text-sm font-semibold mb-2">Karti Sil</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu karti silmek istediginize emin misiniz?</div>
+              <div className="flex gap-2">
+                <button onClick={() => setCardDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => handleCardDelete(cardDeleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
+              </div>
             </div>
           </div>
         )}
