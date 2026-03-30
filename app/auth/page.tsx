@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -8,6 +8,21 @@ type Mode = 'login' | 'signup' | 'reset'
 export default function AuthPage() {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>('login')
+
+  // Giriş yapıldıysa (OAuth veya email) dashboard'a yönlendir
+  useEffect(() => {
+    // Mevcut session kontrolü
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace('/')
+    })
+    // OAuth callback veya giriş olayını dinle
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+        router.replace('/')
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
