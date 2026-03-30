@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt } from '@/lib/supabase'
-import type { DebtRecord } from '@/lib/supabase'
+import type { DebtRecord, Account } from '@/lib/supabase'
 
 const freqLabels: Record<string, string> = { aylik: 'Aylik', haftalik: 'Haftalik', '2haftada1': '2 Haftada 1', duzensiz: 'Duzensiz' }
 
@@ -50,16 +50,20 @@ export default function DebtsPage() {
   const [payAmount, setPayAmount] = useState('')
   const [paying, setPaying] = useState(false)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [collectAccountId, setCollectAccountId] = useState<number | ''>('')
+  const [accounts, setAccounts] = useState<Account[]>([])
 
   const [eurTry, setEurTry] = useState(0)
   const [usdTry, setUsdTry] = useState(0)
 
   async function load() {
-    const [{ data }, { data: rt }] = await Promise.all([
+    const [{ data }, { data: rt }, { data: accs }] = await Promise.all([
       supabase.from('debt_records').select('*').eq('is_settled', false).order('due_date', { nullsFirst: false }),
       supabase.from('exchange_rates').select('eur_try, usd_try').order('date', { ascending: false }).limit(1),
+      supabase.from('accounts').select('*').eq('is_active', true).order('name'),
     ])
     setDebts(data || [])
+    setAccounts(accs || [])
     if (rt?.[0]?.eur_try) setEurTry(rt[0].eur_try)
     if (rt?.[0]?.usd_try) setUsdTry(rt[0].usd_try)
     setLoading(false)
@@ -152,6 +156,7 @@ export default function DebtsPage() {
     const newRemaining = payModal.amount - amt
     const isSettled = newRemaining <= 0
 
+    // 1) Debt kaydını güncelle
     const { error } = await supabase.from('debt_records').update({
       amount: Math.max(0, newRemaining),
       paid_amount: newPaid,
@@ -159,12 +164,26 @@ export default function DebtsPage() {
     }).eq('id', payModal.id)
     if (error) { alert('Hata: ' + error.message); setPaying(false); return }
 
+    // 2) Hesap bakiyesini güncelle (seçildiyse)
+    if (collectAccountId) {
+      const acc = accounts.find(a => a.id === collectAccountId)
+      if (acc) {
+        // Alacak tahsilatı → hesaba para giriyor (+)
+        // Verecek ödemesi → hesaptan para çıkıyor (-)
+        const newBalance = payModal.type === 'alacak'
+          ? acc.balance + amt
+          : acc.balance - amt
+        await supabase.from('accounts').update({ balance: Math.max(0, newBalance) }).eq('id', collectAccountId)
+        setAccounts(prev => prev.map(a => a.id === collectAccountId ? { ...a, balance: Math.max(0, newBalance) } : a))
+      }
+    }
+
     if (isSettled) {
       setDebts(prev => prev.filter(d => d.id !== payModal.id))
     } else {
       setDebts(prev => prev.map(d => d.id === payModal.id ? { ...d, amount: Math.max(0, newRemaining), paid_amount: newPaid } : d))
     }
-    setPaying(false); setPayModal(null); setPayAmount('')
+    setPaying(false); setPayModal(null); setPayAmount(''); setCollectAccountId('')
   }
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
@@ -232,6 +251,7 @@ export default function DebtsPage() {
               const paidAmt = d.paid_amount || 0
               const hasParts = d.is_recurring || paidAmt > 0
               const paidPct = totalAmt > 0 ? Math.round((paidAmt / totalAmt) * 100) : 0
+              const isFullyPaid = paidPct >= 100
 
               let borderLeft = '3px solid var(--border)'
               if (isOverdue) borderLeft = '3px solid #dc2626'
@@ -250,10 +270,24 @@ export default function DebtsPage() {
                       borderLeft,
                       borderBottom: isExpanded ? '1px solid var(--border)' : undefined,
                     }}>
-                    {/* Icon */}
-                    <div className="text-base flex-shrink-0" style={{ width: 24, textAlign: 'center' }}>
-                      {d.is_recurring ? '🔄' : '👤'}
-                    </div>
+                    {/* Tahsilat durumu ikonu (sadece alacak) */}
+                    {d.type === 'alacak' ? (
+                      <div className="flex-shrink-0 relative" style={{ width: 28, height: 28 }}>
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold"
+                          style={
+                            paidAmt > 0
+                              ? { background: 'rgba(251,146,60,0.15)', color: '#f97316', border: '1.5px solid rgba(251,146,60,0.4)' }
+                              : { background: 'rgba(107,114,128,0.1)', color: 'var(--muted)', border: '1.5px dashed var(--border2)' }
+                          }
+                          title={paidAmt > 0 ? `Kısmen tahsil edildi (${paidPct}%)` : 'Henüz tahsilat yapılmadı'}>
+                          {paidAmt > 0 ? `${paidPct}%` : '–'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-base flex-shrink-0" style={{ width: 28, textAlign: 'center' }}>
+                        {d.is_recurring ? '🔄' : '👤'}
+                      </div>
+                    )}
 
                     {/* Name + subtitle */}
                     <div className="flex-1 min-w-0">
@@ -356,7 +390,7 @@ export default function DebtsPage() {
 
                       {/* Action buttons */}
                       <div className="flex gap-2">
-                        <button onClick={() => { setPayModal(d); setPayAmount('') }}
+                        <button onClick={() => { setPayModal(d); setPayAmount(String(d.amount)); setCollectAccountId('') }}
                           className="flex-1 py-2 rounded-lg text-[12px] font-semibold"
                           style={{ background: d.type === 'alacak' ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.06)', color, border: `1px solid ${d.type === 'alacak' ? 'rgba(5,150,105,0.2)' : 'rgba(220,38,38,0.2)'}` }}>
                           {d.type === 'alacak' ? 'Tahsilat Al' : 'Odeme Yap'}
@@ -395,24 +429,82 @@ export default function DebtsPage() {
           </div>
         )}
 
-        {/* Partial payment / Tahsilat modal */}
+        {/* Tahsilat / Ödeme modal */}
         {payModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="card p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-1">{payModal.type === 'alacak' ? 'Tahsilat Al' : 'Odeme Yap'}</div>
-              <div className="text-[13px] mb-3" style={{ color: 'var(--muted)' }}>
-                <span className="font-medium" style={{ color: 'var(--text)' }}>{payModal.person_name}</span> — Kalan: {fmt(payModal.amount, payModal.currency)}
+              {/* Başlık */}
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
+                  style={{ background: payModal.type === 'alacak' ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.08)' }}>
+                  {payModal.type === 'alacak' ? '💰' : '💸'}
+                </div>
+                <div>
+                  <div className="text-sm font-semibold">{payModal.type === 'alacak' ? 'Tahsilat Al' : 'Ödeme Yap'}</div>
+                  <div className="text-[11px]" style={{ color: 'var(--muted)' }}>{payModal.person_name}</div>
+                </div>
               </div>
-              <div className="mb-4">
-                <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>
-                  {payModal.type === 'alacak' ? 'Tahsilat Tutari' : 'Odeme Tutari'}
-                </label>
-                <input value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder="0" type="number" className="input mono" />
+
+              {/* Kalan tutar bilgisi */}
+              <div className="rounded-lg px-3 py-2 mb-4 mt-3 flex justify-between items-center"
+                style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}>
+                <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Kalan tutar</span>
+                <span className="mono font-bold text-[14px]" style={{ color: payModal.type === 'alacak' ? '#059669' : '#dc2626' }}>
+                  {fmt(payModal.amount, payModal.currency)}
+                </span>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => { setPayModal(null); setPayAmount('') }} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+
+              <div className="flex flex-col gap-3">
+                {/* Tutar */}
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>
+                    {payModal.type === 'alacak' ? 'Tahsilat Tutarı' : 'Ödeme Tutarı'}
+                  </label>
+                  <div className="flex gap-2">
+                    <input value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                      placeholder="0" type="number" className="input mono flex-1" />
+                    <button
+                      onClick={() => setPayAmount(String(payModal.amount))}
+                      className="px-3 rounded-lg text-[11px] font-semibold flex-shrink-0"
+                      style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
+                      Tamamı
+                    </button>
+                  </div>
+                </div>
+
+                {/* Hesap seçimi */}
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>
+                    {payModal.type === 'alacak' ? 'Para Hangi Hesaba Geçti?' : 'Hangi Hesaptan Ödendi?'}
+                  </label>
+                  <select
+                    value={collectAccountId}
+                    onChange={e => setCollectAccountId(e.target.value ? Number(e.target.value) : '')}
+                    className="input">
+                    <option value="">— Hesap seçme (sadece kaydet) —</option>
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.bank}) — {fmt(a.balance, a.currency)}
+                      </option>
+                    ))}
+                  </select>
+                  {collectAccountId && (
+                    <div className="mt-1 text-[10px]" style={{ color: 'var(--muted)' }}>
+                      {payModal.type === 'alacak'
+                        ? `✓ Hesap bakiyesi +${fmt(parseFloat(payAmount) || 0)} artacak`
+                        : `✓ Hesap bakiyesi -${fmt(parseFloat(payAmount) || 0)} azalacak`}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => { setPayModal(null); setPayAmount(''); setCollectAccountId('') }}
+                  className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={handlePartialPay} disabled={paying || !payAmount || parseFloat(payAmount) <= 0}
-                  className="btn-primary flex-1 py-2.5 text-sm">{paying ? 'Kaydediliyor...' : 'Onayla'}</button>
+                  className="btn-primary flex-1 py-2.5 text-sm">
+                  {paying ? 'Kaydediliyor...' : 'Onayla'}
+                </button>
               </div>
             </div>
           </div>
