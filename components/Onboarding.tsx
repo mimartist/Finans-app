@@ -22,6 +22,7 @@ function ProgressBar({ current }: { current: number }) {
 
 export default function Onboarding({ children }: { children: React.ReactNode }) {
   const [show, setShow] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [step, setStep] = useState<Step>('welcome')
   const [saving, setSaving] = useState(false)
 
@@ -54,8 +55,10 @@ export default function Onboarding({ children }: { children: React.ReactNode }) 
   const [debtCurrency, setDebtCurrency] = useState('TRY')
 
   useEffect(() => {
-    if (localStorage.getItem(DONE_KEY)) return
-    setShow(true)
+    setMounted(true)
+    if (!localStorage.getItem(DONE_KEY)) {
+      setShow(true)
+    }
   }, [])
 
   function finish() {
@@ -127,12 +130,12 @@ export default function Onboarding({ children }: { children: React.ReactNode }) 
   function next() { setStep(STEPS[stepIdx + 1]) }
   function back() { setStep(STEPS[stepIdx - 1]) }
 
-  if (!show) return <>{children}</>
+  if (!mounted || !show) return <>{children}</>
 
   return (
     <>
-      <div className="fixed inset-0 z-[9998] flex items-center justify-center px-5"
-        style={{ background: 'var(--bg)', minHeight: '100dvh' }}>
+      <div className="fixed inset-0 flex items-center justify-center px-5"
+        style={{ background: 'var(--bg)', minHeight: '100dvh', zIndex: 9998 }}>
 
         <div className="w-full max-w-md">
 

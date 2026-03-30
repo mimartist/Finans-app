@@ -14,8 +14,18 @@ export async function POST() {
     const y = today.getFullYear()
     const m = String(today.getMonth() + 1).padStart(2, '0')
 
-    // ── 1. HESAPLAR ──────────────────────────────────────────
+    // ── 0. TEMİZLE (child → parent sırası) ──────────────────
+    await supabase.from('credit_card_transactions').delete().neq('id', 0)
+    await supabase.from('credit_card_statements').delete().neq('id', 0)
+    await supabase.from('investment_snapshots').delete().neq('id', 0)
+    await supabase.from('debt_records').delete().neq('id', 0)
+    await supabase.from('recurring_expenses').delete().neq('id', 0)
+    await supabase.from('loans').delete().neq('id', 0)
+    await supabase.from('credit_cards').delete().neq('id', 0)
+    await supabase.from('investments').delete().neq('id', 0)
     await supabase.from('accounts').delete().neq('id', 0)
+
+    // ── 1. HESAPLAR ──────────────────────────────────────────
     const { data: accs } = await supabase.from('accounts').insert([
       { name: 'Vadesiz TRY', bank: 'Garanti BBVA', type: 'vadesiz', currency: 'TRY', balance: 47850, is_active: true },
       { name: 'Vadesiz EUR', bank: 'Garanti BBVA', type: 'vadesiz', currency: 'EUR', balance: 3200, is_active: true },
