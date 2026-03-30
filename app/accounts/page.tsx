@@ -66,6 +66,7 @@ export default function AccountsPage() {
   const [investments, setInvestments] = useState<InvestmentWithSnapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedBanks, setExpandedBanks] = useState<Set<string>>(new Set())
+  const [userId, setUserId] = useState<string | null>(null)
 
   // Investment edit/delete state
   const [editInv, setEditInv] = useState<InvestmentWithSnapshot | null>(null)
@@ -136,7 +137,12 @@ export default function AccountsPage() {
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null)
+    })
+    loadData()
+  }, [])
 
   // Account CRUD
   function openAccAdd() { setEditAcc(null); setAccForm(emptyAccForm); setShowAccForm(true); setAccDeleteConfirm(false) }
@@ -149,7 +155,7 @@ export default function AccountsPage() {
   async function handleAccSave() {
     if (!accForm.name || !accForm.bank) return
     setAccSaving(true)
-    const payload = { name: accForm.name, bank: accForm.bank, type: accForm.type, currency: accForm.currency, balance: parseFloat(accForm.balance) || 0, is_active: true }
+    const payload = { name: accForm.name, bank: accForm.bank, type: accForm.type, currency: accForm.currency, balance: parseFloat(accForm.balance) || 0, is_active: true, ...(userId ? { user_id: userId } : {}) }
     if (!isDemo) {
       if (editAcc) { await supabase.from('accounts').update(payload).eq('id', editAcc.id) }
       else { await supabase.from('accounts').insert(payload) }
@@ -225,6 +231,7 @@ export default function AccountsPage() {
       await supabase.from('investment_snapshots').insert({
         investment_id: editInv.id, snapshot_date: today, price: currentPrice,
         total_value: totalValue, total_value_try: totalValueTry,
+        ...(userId ? { user_id: userId } : {}),
       })
     }
     setInvSaving(false); closeInvEdit(); await loadData()

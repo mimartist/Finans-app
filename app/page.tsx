@@ -65,6 +65,8 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(currentMonth)
   const [monthLoading, setMonthLoading] = useState(false)
   const [heroExpanded, setHeroExpanded] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [authUser, setAuthUser] = useState<{ name: string; avatarUrl: string } | null>(null)
 
   const isCurrent = sameMonth(selectedMonth, currentMonth)
   const isPast = selectedMonth.year < currentMonth.year || (selectedMonth.year === currentMonth.year && selectedMonth.month < currentMonth.month)
@@ -174,7 +176,18 @@ export default function Dashboard() {
     setPayments([...loanItems, ...expItems, ...ccItems].sort((a, b) => { if (a.paid !== b.paid) return a.paid ? 1 : -1; if (a.overdue !== b.overdue) return a.overdue ? -1 : 1; return a.day - b.day }))
   }, [])
 
-  useEffect(() => { (async () => { const { lnsList, recList } = await loadGlobal(); await loadMonth(currentMonth, lnsList, recList); setLoading(false) })() }, []) // eslint-disable-line
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null)
+      if (session?.user) {
+        setAuthUser({
+          name: session.user.user_metadata?.full_name || '',
+          avatarUrl: session.user.user_metadata?.avatar_url || '',
+        })
+      }
+    })
+    ;(async () => { const { lnsList, recList } = await loadGlobal(); await loadMonth(currentMonth, lnsList, recList); setLoading(false) })()
+  }, []) // eslint-disable-line
 
   const initialLoadDone = useRef(false)
   useEffect(() => { if (!initialLoadDone.current) { initialLoadDone.current = true; return }; if (loans.length === 0 && recurring.length === 0) return; setMonthLoading(true); loadMonth(selectedMonth, loans, recurring).then(() => setMonthLoading(false)) }, [selectedMonth]) // eslint-disable-line
@@ -226,8 +239,8 @@ export default function Dashboard() {
     if (!isDemo) {
       const year = now.getFullYear(), month = now.getMonth() + 1, today = now.toISOString().split('T')[0]
       const paymentNotes = payMethod === 'nakit' ? 'nakit' : payMethod === 'kredi_karti' ? `kk_${payCardId}` : undefined
-      if (payModal.source === 'recurring') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: payModal.sourceId, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(paymentNotes ? { notes: paymentNotes } : {}) }); if (error) { alert('Hata: ' + error.message); setPaying(false); return } }
-      if (payModal.source === 'loan') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: null, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today }); if (error) { alert('Hata: ' + error.message); setPaying(false); return }; const loan = loans.find(l => l.id === payModal.sourceId); if (loan) await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId) }
+      if (payModal.source === 'recurring') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: payModal.sourceId, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(paymentNotes ? { notes: paymentNotes } : {}), ...(userId ? { user_id: userId } : {}) }); if (error) { alert('Hata: ' + error.message); setPaying(false); return } }
+      if (payModal.source === 'loan') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: null, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) }); if (error) { alert('Hata: ' + error.message); setPaying(false); return }; const loan = loans.find(l => l.id === payModal.sourceId); if (loan) await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId) }
 
       if (payMethod === 'hesap' && payAccountId) {
         const account = accounts.find(a => a.id === payAccountId)
@@ -237,11 +250,11 @@ export default function Dashboard() {
         const stmtMonth = month, stmtYear = year
         const { data: existingStmt } = await supabase.from('credit_card_statements').select('*').eq('card_id', payCardId).eq('period_year', stmtYear).eq('period_month', stmtMonth)
         if (existingStmt && existingStmt.length > 0) {
-          await supabase.from('credit_card_transactions').insert({ card_id: payCardId, statement_id: existingStmt[0].id, transaction_date: today, description: payModal.name, category: payModal.type, amount: payModal.amount, currency: payModal.currency })
+          await supabase.from('credit_card_transactions').insert({ card_id: payCardId, statement_id: existingStmt[0].id, transaction_date: today, description: payModal.name, category: payModal.type, amount: payModal.amount, currency: payModal.currency, ...(userId ? { user_id: userId } : {}) })
           await supabase.from('credit_card_statements').update({ total_amount: (existingStmt[0].total_amount || 0) + payModal.amount }).eq('id', existingStmt[0].id)
         } else {
-          const { data: newStmt } = await supabase.from('credit_card_statements').insert({ card_id: payCardId, period_year: stmtYear, period_month: stmtMonth, total_amount: payModal.amount, minimum_payment: 0, is_paid: false }).select().single()
-          if (newStmt) await supabase.from('credit_card_transactions').insert({ card_id: payCardId, statement_id: newStmt.id, transaction_date: today, description: payModal.name, category: payModal.type, amount: payModal.amount, currency: payModal.currency })
+          const { data: newStmt } = await supabase.from('credit_card_statements').insert({ card_id: payCardId, period_year: stmtYear, period_month: stmtMonth, total_amount: payModal.amount, minimum_payment: 0, is_paid: false, ...(userId ? { user_id: userId } : {}) }).select().single()
+          if (newStmt) await supabase.from('credit_card_transactions').insert({ card_id: payCardId, statement_id: newStmt.id, transaction_date: today, description: payModal.name, category: payModal.type, amount: payModal.amount, currency: payModal.currency, ...(userId ? { user_id: userId } : {}) })
         }
       }
       // nakit: no account deduction, just record the payment
@@ -314,11 +327,18 @@ export default function Dashboard() {
         {/* ===== HEADER ===== */}
         <div className="flex justify-between items-center px-5 pt-6 pb-2">
           <div className="flex items-center gap-3">
-            <img src="https://i.pravatar.cc/80?img=68" alt="avatar" className="w-11 h-11 rounded-full object-cover"
-              style={{ border: '2.5px solid var(--border)' }} />
+            {authUser?.avatarUrl ? (
+              <img src={authUser.avatarUrl} alt="avatar" className="w-11 h-11 rounded-full object-cover"
+                style={{ border: '2.5px solid var(--border)' }} />
+            ) : (
+              <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-extrabold text-white flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #2b2d6e, #4a4db0)', border: '2.5px solid var(--border)' }}>
+                {authUser?.name ? authUser.name.charAt(0).toUpperCase() : 'F'}
+              </div>
+            )}
             <div>
               <span className="text-lg" style={{ color: 'var(--text)' }}>Merhaba </span>
-              <span className="text-lg font-extrabold" style={{ color: 'var(--text)' }}>Atakan!</span>
+              <span className="text-lg font-extrabold" style={{ color: 'var(--text)' }}>{authUser?.name ? authUser.name.split(' ')[0] : 'Atakan'}!</span>
             </div>
           </div>
           <div className="flex items-center gap-2">

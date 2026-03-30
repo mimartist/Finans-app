@@ -30,6 +30,7 @@ export default function LoansPage() {
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [paidLoans, setPaidLoans] = useState<any[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
 
   // Credit card transaction state
   const [txFormCardId, setTxFormCardId] = useState<number | null>(null)
@@ -55,7 +56,12 @@ export default function LoansPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null)
+    })
+    load()
+  }, [])
 
   const toTry = (loan: Loan, amount: number) => loan.currency === 'EUR' ? amount * eurTry : amount
   const totalMonthly = loans.reduce((s, l) => s + toTry(l, l.monthly_payment), 0)
@@ -92,6 +98,7 @@ export default function LoansPage() {
       total_installments: parseInt(form.total_installments) || 0, paid_installments: parseInt(form.paid_installments) || 0,
       interest_rate: parseFloat(form.interest_rate) || 0, start_date: form.start_date || null, end_date: form.end_date || null,
       collateral: form.collateral || null, notes: form.notes || null, is_active: true,
+      ...(userId ? { user_id: userId } : {}),
     }
     if (editId) { await supabase.from('loans').update(payload).eq('id', editId) }
     else { await supabase.from('loans').insert(payload) }
@@ -137,6 +144,7 @@ export default function LoansPage() {
       category: txForm.category,
       amount,
       currency: txForm.currency,
+      ...(userId ? { user_id: userId } : {}),
     }
 
     if (txEditId) {
@@ -166,6 +174,7 @@ export default function LoansPage() {
           total_amount: amount,
           minimum_payment: 0,
           is_paid: false,
+          ...(userId ? { user_id: userId } : {}),
         })
       }
     }

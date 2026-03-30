@@ -24,12 +24,18 @@ export default function RecurringPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
 
   async function load() {
     const { data } = await supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day', { nullsFirst: false })
     setExpenses(data || []); setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null)
+    })
+    load()
+  }, [])
 
   const categories = ['tumu', ...Array.from(new Set(expenses.map(e => e.category)))]
   // Sort by payment day ascending (1-31 calendar order), items without day go last
@@ -72,6 +78,7 @@ export default function RecurringPage() {
       is_variable: form.is_variable, is_active: true,
       expense_type: form.expense_type,
       remind_days_before: parseInt(form.remind_days_before) || 3,
+      ...(userId ? { user_id: userId } : {}),
     }
     if (form.expense_type === 'one_time') {
       payload.expense_date = form.expense_date || null

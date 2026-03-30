@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { supabase, fmt, isDemo } from '@/lib/supabase'
 import { EXPENSE_CATEGORIES, CATEGORY_GROUPS } from '@/lib/categories'
 
@@ -7,6 +7,7 @@ type Props = { onClose: () => void }
 
 export default function QuickAdd({ onClose }: Props) {
   const [type, setType] = useState<'expense' | 'income'>('expense')
+  const [userId, setUserId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '', amount: '', category: 'market', currency: 'TRY',
     expense_type: 'one_time' as 'recurring' | 'one_time',
@@ -26,6 +27,12 @@ export default function QuickAdd({ onClose }: Props) {
   const [scanError, setScanError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null)
+    })
+  }, [])
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
   const setInc = (k: string, v: any) => setIncomeForm(f => ({ ...f, [k]: v }))
@@ -84,6 +91,7 @@ export default function QuickAdd({ onClose }: Props) {
         is_settled: false,
         is_recurring: incomeForm.is_recurring,
         frequency: incomeForm.is_recurring ? 'aylik' : null,
+        ...(userId ? { user_id: userId } : {}),
       }
       const result = await supabase.from('debt_records').insert(payload)
       if (result.error) {
@@ -99,6 +107,7 @@ export default function QuickAdd({ onClose }: Props) {
         currency: form.currency, is_variable: false, is_active: true,
         expense_type: isRecurring ? 'recurring' : 'one_time',
         remind_days_before: 3,
+        ...(userId ? { user_id: userId } : {}),
       }
       if (isRecurring) {
         payload.payment_day = parseInt(form.payment_day) || null

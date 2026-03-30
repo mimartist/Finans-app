@@ -3,6 +3,8 @@ import '../styles/globals.css'
 import AppLockWrapper from '@/components/AppLockWrapper'
 import ThemeProvider from '@/components/ThemeProvider'
 import OnboardingWrapper from '@/components/OnboardingWrapper'
+import { AuthProvider } from '@/components/AuthProvider'
+import AuthGuard from '@/components/AuthGuard'
 
 export const metadata: Metadata = {
   title: 'Finans Asistan',
@@ -33,9 +35,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="safe-top">
         <ThemeProvider>
-          <AppLockWrapper>
-            <OnboardingWrapper>{children}</OnboardingWrapper>
-          </AppLockWrapper>
+          <AuthProvider>
+            <AuthGuard>
+              <AppLockWrapper>
+                <OnboardingWrapper>{children}</OnboardingWrapper>
+              </AppLockWrapper>
+            </AuthGuard>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

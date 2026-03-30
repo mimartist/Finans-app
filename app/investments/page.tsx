@@ -32,6 +32,7 @@ export default function InvestmentsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [updatingRates, setUpdatingRates] = useState(false)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
 
   // Inline price update
   const [priceEditId, setPriceEditId] = useState<number | null>(null)
@@ -86,7 +87,12 @@ export default function InvestmentsPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null)
+    })
+    load()
+  }, [])
 
   // Portfolio totals
   const totalCostTry = investments.reduce((s, i) => {
@@ -112,7 +118,7 @@ export default function InvestmentsPage() {
   async function handleSave() {
     if (!form.name || !form.quantity) return
     setSaving(true)
-    const payload = { name: form.name, type: form.type, symbol: form.symbol || null, quantity: parseFloat(form.quantity) || 0, avg_cost: parseFloat(form.avg_cost) || 0, currency: form.currency, platform: form.platform || null, is_active: true }
+    const payload = { name: form.name, type: form.type, symbol: form.symbol || null, quantity: parseFloat(form.quantity) || 0, avg_cost: parseFloat(form.avg_cost) || 0, currency: form.currency, platform: form.platform || null, is_active: true, ...(userId ? { user_id: userId } : {}) }
     if (editId) { await supabase.from('investments').update(payload).eq('id', editId) }
     else { await supabase.from('investments').insert(payload) }
     setSaving(false); closeForm(); await load()
@@ -147,6 +153,7 @@ export default function InvestmentsPage() {
       price: newPrice,
       total_value: Math.round(totalValue * 100) / 100,
       total_value_try: Math.round(totalValueTry * 100) / 100,
+      ...(userId ? { user_id: userId } : {}),
     })
 
     setPriceSaving(false)

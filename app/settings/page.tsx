@@ -5,6 +5,7 @@ import BottomNav from '@/components/BottomNav'
 import { supabase, isDemo } from '@/lib/supabase'
 import { IconSettings, IconRefresh } from '@/components/Icons'
 import { useAppLock } from '@/components/AppLock'
+import { useUser } from '@/components/AuthProvider'
 
 type Settings = {
   userName: string
@@ -39,12 +40,20 @@ function saveSettings(s: Settings) {
 
 export default function SettingsPage() {
   const router = useRouter()
+  const { user } = useUser()
   const [settings, setSettings] = useState<Settings>(defaultSettings)
   const [rateUpdating, setRateUpdating] = useState(false)
   const [rateMsg, setRateMsg] = useState('')
   const [saved, setSaved] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [seedMsg, setSeedMsg] = useState('')
+
+  // Auth profile state
+  const [profileName, setProfileName] = useState('')
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState('')
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileMsg, setProfileMsg] = useState('')
+  const [pwResetMsg, setPwResetMsg] = useState('')
 
   // PIN yönetimi
   const { isPinSet, setPin, removePin } = useAppLock()
@@ -59,6 +68,47 @@ export default function SettingsPage() {
     setSettings(loadSettings())
     setPinHasValue(isPinSet())
   }, [])
+
+  useEffect(() => {
+    if (user) {
+      setProfileName(user.user_metadata?.full_name || '')
+      setProfileAvatarUrl(user.user_metadata?.avatar_url || '')
+    }
+  }, [user])
+
+  async function handleProfileSave() {
+    if (!user) return
+    setProfileSaving(true); setProfileMsg('')
+    const { error } = await supabase.auth.updateUser({
+      data: { full_name: profileName, avatar_url: profileAvatarUrl },
+    })
+    setProfileSaving(false)
+    setProfileMsg(error ? 'Hata: ' + error.message : 'Kaydedildi')
+    if (!error) setTimeout(() => setProfileMsg(''), 2500)
+  }
+
+  async function handlePasswordReset() {
+    if (!user?.email) return
+    setPwResetMsg('')
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: `${window.location.origin}/auth`,
+    })
+    setPwResetMsg(error ? 'Hata: ' + error.message : 'Şifre sıfırlama maili gönderildi')
+    setTimeout(() => setPwResetMsg(''), 4000)
+  }
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    router.push('/auth')
+  }
+
+  function getInitials(nameStr: string, email: string) {
+    if (nameStr) {
+      const parts = nameStr.trim().split(' ')
+      return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : nameStr.slice(0, 2).toUpperCase()
+    }
+    return email ? email[0].toUpperCase() : 'U'
+  }
 
   function update(key: keyof Settings, value: any) {
     const next = { ...settings, [key]: value }
@@ -171,6 +221,89 @@ export default function SettingsPage() {
         </div>
 
         <div className="px-4">
+          {/* Auth Profil */}
+          {user && (
+            <div className="mb-6">
+              <div className="text-[11px] font-bold uppercase tracking-wider mb-3 px-1" style={{ color: 'var(--muted)' }}>Hesabım</div>
+              <div className="card rounded-2xl overflow-hidden p-4">
+                {/* Avatar + email row */}
+                <div className="flex items-center gap-4 mb-4">
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    {profileAvatarUrl ? (
+                      <img src={profileAvatarUrl} alt="avatar"
+                        style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border)' }} />
+                    ) : (
+                      <div style={{
+                        width: 56, height: 56, borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #2b2d6e, #4a4db0)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontWeight: 800, fontSize: 20,
+                      }}>
+                        {getInitials(profileName, user.email || '')}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[14px] font-bold truncate">{profileName || 'İsimsiz Kullanıcı'}</div>
+                    <div className="text-[11px] truncate" style={{ color: 'var(--muted)' }}>{user.email}</div>
+                  </div>
+                </div>
+
+                {/* Name input */}
+                <div className="mb-3">
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block font-semibold" style={{ color: 'var(--muted)' }}>Ad Soyad</label>
+                  <input value={profileName} onChange={e => setProfileName(e.target.value)}
+                    placeholder="Adınız Soyadınız" className="input" />
+                </div>
+
+                {/* Email (read-only) */}
+                <div className="mb-3">
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block font-semibold" style={{ color: 'var(--muted)' }}>Email (değiştirilemez)</label>
+                  <input value={user.email || ''} readOnly className="input"
+                    style={{ opacity: 0.6, cursor: 'not-allowed' }} />
+                </div>
+
+                {/* Avatar URL */}
+                <div className="mb-4">
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block font-semibold" style={{ color: 'var(--muted)' }}>Avatar URL</label>
+                  <input value={profileAvatarUrl} onChange={e => setProfileAvatarUrl(e.target.value)}
+                    placeholder="https://..." className="input" />
+                </div>
+
+                {/* Save button */}
+                <button onClick={handleProfileSave} disabled={profileSaving} className="btn-primary w-full py-2.5 text-sm mb-3">
+                  {profileSaving ? 'Kaydediliyor...' : 'Kaydet'}
+                </button>
+                {profileMsg && (
+                  <div className="text-[11px] font-medium text-center mb-3"
+                    style={{ color: profileMsg.includes('Hata') ? '#e5484d' : '#30a46c' }}>
+                    {profileMsg}
+                  </div>
+                )}
+
+                {/* Password reset */}
+                <button onClick={handlePasswordReset}
+                  className="w-full py-2.5 text-sm font-semibold rounded-xl mb-2"
+                  style={{ background: 'var(--bg4)', border: 'none', color: 'var(--text)', cursor: 'pointer' }}>
+                  Şifre Değiştir
+                </button>
+                {pwResetMsg && (
+                  <div className="text-[11px] font-medium text-center mb-3"
+                    style={{ color: pwResetMsg.includes('Hata') ? '#e5484d' : '#30a46c' }}>
+                    {pwResetMsg}
+                  </div>
+                )}
+
+                {/* Sign out */}
+                <button onClick={handleSignOut}
+                  className="w-full py-2.5 text-sm font-semibold rounded-xl"
+                  style={{ background: 'rgba(220,38,38,0.08)', border: 'none', color: '#dc2626', cursor: 'pointer' }}>
+                  Çıkış Yap
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Profil */}
           <Section title="Profil">
             <Row label="Kullanici Adi" desc="Dashboard'da gorunecek isim">

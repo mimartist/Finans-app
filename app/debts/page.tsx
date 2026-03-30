@@ -52,6 +52,7 @@ export default function DebtsPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [collectAccountId, setCollectAccountId] = useState<number | ''>('')
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
 
   const [eurTry, setEurTry] = useState(0)
   const [usdTry, setUsdTry] = useState(0)
@@ -68,7 +69,12 @@ export default function DebtsPage() {
     if (rt?.[0]?.usd_try) setUsdTry(rt[0].usd_try)
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null)
+    })
+    load()
+  }, [])
 
   const toTry = (amount: number, currency: string) => {
     if (currency === 'EUR') return amount * eurTry
@@ -117,6 +123,7 @@ export default function DebtsPage() {
       expected_day: form.is_recurring ? (parseInt(form.expected_day) || null) : null,
       total_amount: form.is_recurring ? (parseFloat(form.total_amount) || null) : null,
       paid_amount: form.is_recurring ? (parseFloat(form.paid_amount) || 0) : null,
+      ...(userId ? { user_id: userId } : {}),
     }
 
     if (editId) {
