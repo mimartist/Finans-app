@@ -261,8 +261,7 @@ export default function DebtsPage() {
                 <div key={d.id}>
                   {/* Compact row */}
                   <div
-                    onClick={() => setExpandedId(isExpanded ? null : d.id)}
-                    className="px-3 py-2.5 flex items-center gap-3 cursor-pointer"
+                    className="px-3 py-2.5 flex items-center gap-2.5"
                     style={{
                       background: 'var(--bg3)',
                       borderRadius: isExpanded ? '12px 12px 0 0' : 12,
@@ -270,27 +269,28 @@ export default function DebtsPage() {
                       borderLeft,
                       borderBottom: isExpanded ? '1px solid var(--border)' : undefined,
                     }}>
-                    {/* Tahsilat durumu ikonu (sadece alacak) */}
+
+                    {/* Tahsilat durumu ikonu — tıklanınca direkt modal açar */}
                     {d.type === 'alacak' ? (
-                      <div className="flex-shrink-0 relative" style={{ width: 28, height: 28 }}>
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold"
-                          style={
-                            paidAmt > 0
-                              ? { background: 'rgba(251,146,60,0.15)', color: '#f97316', border: '1.5px solid rgba(251,146,60,0.4)' }
-                              : { background: 'rgba(107,114,128,0.1)', color: 'var(--muted)', border: '1.5px dashed var(--border2)' }
-                          }
-                          title={paidAmt > 0 ? `Kısmen tahsil edildi (${paidPct}%)` : 'Henüz tahsilat yapılmadı'}>
-                          {paidAmt > 0 ? `${paidPct}%` : '–'}
-                        </div>
-                      </div>
+                      <button
+                        onClick={e => { e.stopPropagation(); setPayModal(d); setPayAmount(String(d.amount)); setCollectAccountId('') }}
+                        className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold"
+                        title={paidAmt > 0 ? `Kısmen tahsil edildi — tıkla` : 'Tahsilat yok — tıkla'}
+                        style={
+                          paidAmt > 0
+                            ? { background: 'rgba(251,146,60,0.15)', color: '#f97316', border: '1.5px solid rgba(251,146,60,0.4)' }
+                            : { background: 'rgba(5,150,105,0.08)', color: '#059669', border: '1.5px dashed rgba(5,150,105,0.35)' }
+                        }>
+                        {paidAmt > 0 ? `${paidPct}%` : '💰'}
+                      </button>
                     ) : (
-                      <div className="text-base flex-shrink-0" style={{ width: 28, textAlign: 'center' }}>
+                      <div className="text-base flex-shrink-0 w-9 text-center">
                         {d.is_recurring ? '🔄' : '👤'}
                       </div>
                     )}
 
-                    {/* Name + subtitle */}
-                    <div className="flex-1 min-w-0">
+                    {/* Name + subtitle — tıklanınca expand */}
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : d.id)}>
                       <div className="text-[13px] font-semibold truncate">{d.person_name}</div>
                       <div className="text-[10px] mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-medium"
@@ -310,20 +310,32 @@ export default function DebtsPage() {
                       </div>
                       {isOverdue && (
                         <div className="text-[10px] mt-0.5 font-medium" style={{ color: '#dc2626' }}>
-                          ⚠️ {overdueDays} gun gecikmis
+                          ⚠️ {overdueDays} gün gecikmis
                         </div>
                       )}
                     </div>
 
-                    {/* Amount + chevron */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <div className="text-right">
+                    {/* Amount + tahsilat butonu + chevron */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="text-right cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : d.id)}>
                         <div className="mono text-[13px] font-bold" style={{ color }}>{fmt(d.amount, d.currency)}</div>
                         {d.currency !== 'TRY' && (
                           <div className="mono text-[10px]" style={{ color: 'var(--muted)' }}>({fmt(toTry(d.amount, d.currency))})</div>
                         )}
                       </div>
-                      <span className="text-[12px]" style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>›</span>
+                      {/* Tahsilat / Ödeme hızlı buton */}
+                      <button
+                        onClick={e => { e.stopPropagation(); setPayModal(d); setPayAmount(String(d.amount)); setCollectAccountId('') }}
+                        className="flex-shrink-0 px-2 py-1.5 rounded-lg text-[10px] font-bold"
+                        style={{
+                          background: d.type === 'alacak' ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.07)',
+                          color: d.type === 'alacak' ? '#059669' : '#dc2626',
+                          border: `1px solid ${d.type === 'alacak' ? 'rgba(5,150,105,0.25)' : 'rgba(220,38,38,0.2)'}`,
+                        }}>
+                        {d.type === 'alacak' ? 'Tahsil' : 'Öde'}
+                      </button>
+                      <span className="text-[12px] cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : d.id)}
+                        style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>›</span>
                     </div>
                   </div>
 
