@@ -3,7 +3,13 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST() {
+export async function POST(req: Request) {
+  // Güvenlik: sadece özel header ile çalışır, kazara production'da çalışmasın
+  const secret = req.headers.get('x-seed-secret')
+  if (secret !== 'DEMO_ONLY_2025') {
+    return NextResponse.json({ success: false, error: 'Yetkisiz. Bu endpoint sadece demo amaçlıdır.' }, { status: 403 })
+  }
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
