@@ -429,8 +429,8 @@ export default function AccountsPage() {
             {/* Add account button */}
             <button onClick={openAccAdd}
               className="w-full mt-3 py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
-              style={{ background: 'rgba(43,45,110,0.06)', color: '#2b2d6e', border: '1.5px dashed rgba(43,45,110,0.2)' }}>
-              <IconPlus size={16} color="#2b2d6e" strokeWidth={2.5} />
+              style={{ background: 'var(--accent-light)', color: 'var(--primary)', border: '1.5px dashed var(--border2)' }}>
+              <IconPlus size={16} color="var(--primary)" strokeWidth={2.5} />
               Yeni Hesap Ekle
             </button>
           </>
@@ -555,7 +555,7 @@ export default function AccountsPage() {
                       <div className="tx-detail">{inv.platform || '—'} · {inv.type}</div>
                     </div>
                     <div className="tx-amount">
-                      <div className="tx-value" style={{ color: '#2b2d6e' }}>{fmt(currentVal, inv.currency)}</div>
+                      <div className="tx-value">{fmt(currentVal, inv.currency)}</div>
                       <div className="tx-badge" style={{ background: pnl >= 0 ? 'rgba(48,164,108,0.08)' : 'rgba(229,72,77,0.08)', color: pnl >= 0 ? '#30a46c' : '#e5484d' }}>
                         {pnl >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%
                       </div>

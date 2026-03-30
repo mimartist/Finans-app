@@ -41,7 +41,7 @@ export default function NotificationBell({ payments }: Props) {
       <button onClick={() => setOpen(!open)}
         className="w-10 h-10 rounded-full flex items-center justify-center"
         style={{ background: 'var(--bg4)', position: 'relative' }}>
-        <IconBell color="#2b2d6e" size={18} strokeWidth={2} />
+        <IconBell color="var(--primary)" size={18} strokeWidth={2} />
         {badgeCount > 0 && (
           <span style={{
             position: 'absolute', top: 2, right: 2,

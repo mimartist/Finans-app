@@ -223,14 +223,14 @@ export default function RecurringPage() {
             return (
               <div key={exp.id} className="tx-item" style={{ cursor: 'pointer' }} onClick={() => openEdit(exp)}>
                 <div className="tx-icon">
-                  {getCatIcon(exp.category, { color: '#2b2d6e', size: 20 })}
+                  {getCatIcon(exp.category, { color: 'var(--primary)', size: 20 })}
                 </div>
                 <div className="tx-info">
                   <div className="tx-name">
                     {exp.name}
                     {isOneTime && (
                       <span className="ml-1.5 text-[8px] px-1.5 py-0.5 rounded-full font-semibold"
-                        style={{ background: 'rgba(43,45,110,0.08)', color: '#2b2d6e', verticalAlign: 'middle' }}>
+                        style={{ background: 'var(--accent-light)', color: 'var(--primary)', verticalAlign: 'middle' }}>
                         TEK
                       </span>
                     )}
@@ -242,7 +242,7 @@ export default function RecurringPage() {
                 <div className="tx-amount">
                   <div className="tx-value">{fmt(exp.amount, exp.currency)}</div>
                   <button onClick={(e) => { e.stopPropagation(); openEdit(exp) }}
-                    className="tx-badge" style={{ background: 'rgba(43,45,110,0.06)', color: '#2b2d6e', border: 'none', cursor: 'pointer' }}>
+                    className="tx-badge" style={{ background: 'var(--accent-light)', color: 'var(--primary)', border: 'none', cursor: 'pointer' }}>
                     Duzenle
                   </button>
                 </div>

@@ -249,7 +249,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => { setPinModal(pinHasValue ? 'change' : 'set'); setPinMsg(''); setPinInput(''); setPinConfirm(''); setPinOld('') }}
                   className="text-[11px] font-semibold px-3 py-1.5 rounded-lg"
-                  style={{ background: 'rgba(43,45,110,0.08)', color: '#2b2d6e' }}>
+                  style={{ background: 'var(--accent-light)', color: 'var(--primary)' }}>
                   {pinHasValue ? 'Değiştir' : 'Şifre Koy'}
                 </button>
                 {pinHasValue && (
@@ -284,8 +284,8 @@ export default function SettingsPage() {
             <Row label="Doviz Kurlarini Guncelle" desc="TCMB, CoinGecko, Yahoo Finance">
               <button onClick={updateRates} disabled={rateUpdating || isDemo}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold"
-                style={{ background: 'rgba(43,45,110,0.08)', color: '#2b2d6e', border: 'none', cursor: 'pointer', opacity: rateUpdating ? 0.5 : 1 }}>
-                <IconRefresh size={12} color="#2b2d6e" strokeWidth={2.5} />
+                style={{ background: 'var(--accent-light)', color: 'var(--primary)', border: 'none', cursor: 'pointer', opacity: rateUpdating ? 0.5 : 1 }}>
+                <IconRefresh size={12} color="var(--primary)" strokeWidth={2.5} />
                 {rateUpdating ? 'Guncelleniyor...' : 'Guncelle'}
               </button>
             </Row>

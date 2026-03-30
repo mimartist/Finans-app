@@ -274,7 +274,7 @@ export default function Dashboard() {
     return (
       <div key={p.id} className="tx-item" style={{ opacity: p.paid ? 0.5 : 1 }}>
         <div className="tx-icon">
-          {p.paid ? <IconCheck color="#30a46c" size={20} strokeWidth={2.5} /> : getCatIcon(p.type, { color: '#2b2d6e', size: 20 })}
+          {p.paid ? <IconCheck color="#30a46c" size={20} strokeWidth={2.5} /> : getCatIcon(p.type, { color: 'var(--primary)', size: 20 })}
         </div>
         <div className="tx-info">
           <div className="tx-name" style={{ textDecoration: p.paid ? 'line-through' : 'none' }}>{p.name}</div>
@@ -325,12 +325,12 @@ export default function Dashboard() {
             <button onClick={async () => { if (isDemo) return; setLoading(true); await fetch('/api/update-rates'); await reloadAll(); setLoading(false) }}
               className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ background: 'var(--bg4)' }}>
-              <IconRefresh color="#2b2d6e" size={18} strokeWidth={2} />
+              <IconRefresh color="var(--primary)" size={18} strokeWidth={2} />
             </button>
             <NotificationBell payments={payments} />
             <button onClick={() => router.push('/settings')} className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ background: 'var(--bg4)' }}>
-              <IconSettings color="#2b2d6e" size={18} strokeWidth={2} />
+              <IconSettings color="var(--primary)" size={18} strokeWidth={2} />
             </button>
           </div>
         </div>
@@ -418,10 +418,10 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-3 mx-4 mt-4">
           {/* Left: Varliklar */}
           <div className="card p-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#2b2d6e' }}>Varliklar</div>
+            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--primary)' }}>Varliklar</div>
             <div className="flex flex-col gap-3">
               {[
-                { label: 'Nakit', value: cashTry, color: '#2b2d6e' },
+                { label: 'Nakit', value: cashTry, color: 'var(--primary)' },
                 { label: 'Yatirim', value: investTotalTry, color: '#4a4db0' },
                 { label: 'Alacak', value: alacakTry, color: '#6366f1' },
               ].filter(r => r.value > 0).map(r => (
@@ -459,7 +459,7 @@ export default function Dashboard() {
               <div className="pt-2 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-semibold" style={{ color: 'var(--text)' }}>Runway</span>
-                  <span className="mono text-[11px] font-extrabold" style={{ color: '#2b2d6e' }}>{runwayMonths} Ay</span>
+                  <span className="mono text-[11px] font-extrabold" style={{ color: 'var(--primary)' }}>{runwayMonths} Ay</span>
                 </div>
               </div>
             </div>
@@ -506,10 +506,10 @@ export default function Dashboard() {
 
         {/* ===== MONTH SUMMARY — nested card style ===== */}
         <div className="mx-4 mb-4" style={{
-          background: 'linear-gradient(145deg, #eef0f8, #e8ecf6)',
+          background: 'var(--bg3)',
           borderRadius: 20,
           padding: '16px 14px',
-          border: '1.5px solid #d8ddef',
+          border: '1.5px solid var(--border)',
           opacity: monthLoading ? 0.5 : 1,
           transition: 'opacity 0.2s',
         }}>
@@ -521,25 +521,25 @@ export default function Dashboard() {
 
           {/* Inner nested cards — Toplam / Odenen */}
           <div className="flex gap-2.5 mb-2.5">
-            <div className="flex-1" style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 3px rgba(43,45,110,0.04)' }}>
+            <div className="flex-1" style={{ background: 'var(--bg2)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Toplam</div>
               <div className="mono text-lg font-extrabold mt-1" style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>{fmt(totalObligation)}</div>
             </div>
-            <div className="flex-1" style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 3px rgba(43,45,110,0.04)' }}>
+            <div className="flex-1" style={{ background: 'var(--bg2)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Odenen</div>
               <div className="mono text-lg font-extrabold mt-1 amt-green" style={{ letterSpacing: '-0.03em' }}>{fmt(paidTotal)}</div>
             </div>
           </div>
 
           {/* Bottom row — Kalan + progress */}
-          <div style={{ background: '#fff', borderRadius: 14, padding: '12px 16px', boxShadow: '0 1px 3px rgba(43,45,110,0.04)' }}>
+          <div style={{ background: 'var(--bg2)', borderRadius: 14, padding: '12px 16px', boxShadow: 'var(--shadow-xs)' }}>
             <div className="flex items-center justify-between mb-2">
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#e5484d' }}>Kalan</div>
                 <div className="mono text-sm font-extrabold amt-red" style={{ letterSpacing: '-0.03em' }}>{fmt(remainingTotal)}</div>
               </div>
               <div className="text-right">
-                <div className="mono text-xl font-extrabold" style={{ color: '#2b2d6e', letterSpacing: '-0.03em' }}>%{paidPct}</div>
+                <div className="mono text-xl font-extrabold" style={{ color: 'var(--primary)', letterSpacing: '-0.03em' }}>%{paidPct}</div>
                 <div className="text-[9px]" style={{ color: 'var(--muted)' }}>tamamlandi</div>
               </div>
             </div>
@@ -596,9 +596,9 @@ export default function Dashboard() {
                     style={{
                       background: payMethod === val ? 'var(--bg2)' : 'transparent',
                       boxShadow: payMethod === val ? 'var(--shadow)' : 'none',
-                      color: payMethod === val ? '#2b2d6e' : 'var(--muted)',
+                      color: payMethod === val ? 'var(--primary)' : 'var(--muted)',
                     }}>
-                    <Icon size={14} color={payMethod === val ? '#2b2d6e' : '#8790a5'} strokeWidth={2} />
+                    <Icon size={14} color={payMethod === val ? 'var(--primary)' : undefined} strokeWidth={2} />
                     {label}
                   </button>
                 ))}

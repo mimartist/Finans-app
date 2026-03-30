@@ -50,7 +50,7 @@ export default function BottomNav() {
         <div className="px-6 mb-8">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-extrabold text-white"
-              style={{ background: 'linear-gradient(135deg, #2b2d6e, #4a4db0)' }}>F</div>
+              style={{ background: 'linear-gradient(135deg, var(--grad-start), var(--grad-end))' }}>F</div>
             <div>
               <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>Finans</div>
               <div className="text-[10px]" style={{ color: 'var(--muted)' }}>Asistan</div>
@@ -63,22 +63,22 @@ export default function BottomNav() {
             return (
               <Link key={item.href} href={item.href}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium"
-                style={{ background: active ? 'rgba(43,45,110,0.06)' : 'transparent', color: active ? '#2b2d6e' : 'var(--muted)', textDecoration: 'none' }}>
-                <item.Icon color={active ? '#2b2d6e' : '#b0b7c3'} size={20} strokeWidth={2.2} />
+                style={{ background: active ? 'var(--accent-light)' : 'transparent', color: active ? 'var(--primary)' : 'var(--muted)', textDecoration: 'none' }}>
+                <item.Icon color={active ? 'var(--primary)' : undefined} size={20} strokeWidth={2.2} />
                 <span>{item.label}</span>
               </Link>
             )
           })}
           <button onClick={() => setShowQuickAdd(true)}
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold mt-4"
-            style={{ background: 'linear-gradient(135deg, #2b2d6e, #3d3f8f)', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(43,45,110,0.3)' }}>
+            style={{ background: 'linear-gradient(135deg, var(--grad-start), var(--grad-mid))', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
             <IconPlus color="#fff" size={20} strokeWidth={2.5} />
             <span>Hizli Ekle</span>
           </button>
           <Link href="/settings"
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium mt-auto"
-            style={{ color: pathname === '/settings' ? '#2b2d6e' : 'var(--muted)', background: pathname === '/settings' ? 'rgba(43,45,110,0.06)' : 'transparent', textDecoration: 'none', marginTop: 'auto' }}>
-            <IconSettings color={pathname === '/settings' ? '#2b2d6e' : '#b0b7c3'} size={20} strokeWidth={2.2} />
+            style={{ color: pathname === '/settings' ? 'var(--primary)' : 'var(--muted)', background: pathname === '/settings' ? 'var(--accent-light)' : 'transparent', textDecoration: 'none', marginTop: 'auto' }}>
+            <IconSettings color={pathname === '/settings' ? 'var(--primary)' : undefined} size={20} strokeWidth={2.2} />
             <span>Ayarlar</span>
           </Link>
         </nav>
@@ -93,8 +93,8 @@ export default function BottomNav() {
           alignItems: 'center',
           justifyContent: 'space-evenly',
           borderRadius: 9999,
-          background: 'linear-gradient(135deg, #1e1f54, #2b2d6e)',
-          boxShadow: '0 8px 32px rgba(30,31,84,0.4)',
+          background: 'linear-gradient(135deg, var(--grad-start), var(--grad-mid))',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           padding: '6px 12px',
           gap: 0,
           width: '100%',
