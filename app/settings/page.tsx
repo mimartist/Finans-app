@@ -62,6 +62,10 @@ export default function SettingsPage() {
     const next = { ...settings, [key]: value }
     setSettings(next)
     saveSettings(next)
+    if (key === 'theme') {
+      document.documentElement.setAttribute('data-theme', value)
+      window.dispatchEvent(new Event('finans-theme-change'))
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -191,7 +195,7 @@ export default function SettingsPage() {
 
           {/* Gorunum */}
           <Section title="Gorunum">
-            <Row label="Tema" desc="Yakinda">
+            <Row label="Tema" desc="Açık veya koyu mod">
               <div className="flex gap-1.5">
                 {(['light', 'dark'] as const).map(t => (
                   <button key={t} onClick={() => update('theme', t)}
