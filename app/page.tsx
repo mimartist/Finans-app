@@ -230,9 +230,12 @@ export default function Dashboard() {
   const usdTotal = accounts.filter(a => a.currency === 'USD').reduce((s, a) => s + a.balance, 0)
   const totalDebtTry = loans.reduce((s, l) => s + toTry(l.remaining_amount || 0, l.currency), 0)
   const monthlyTotalAll = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
+  // Runway: tüm aktif kredi + düzenli giderlerin aylık toplamı (ay bağımsız)
+  const avgMonthlyExpense = loans.filter(l => l.payment_day).reduce((s, l) => s + toTry(l.monthly_payment, l.currency), 0)
+    + recurring.filter(r => r.payment_day && r.category !== 'nakit' && r.expense_type !== 'one_time').reduce((s, r) => s + toTry(r.amount, r.currency), 0)
   const recurringAlacak = allAlacak.filter(d => d.is_recurring)
   const monthlyIncome = recurringAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
-  const netMonthly = Math.max(0, monthlyTotalAll - monthlyIncome)
+  const netMonthly = Math.max(0, avgMonthlyExpense - monthlyIncome)
   const runwayMonths = netMonthly > 0 ? (totalAssetsTry / netMonthly).toFixed(1) : '∞'
   const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
 
