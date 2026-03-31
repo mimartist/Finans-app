@@ -44,6 +44,7 @@ const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('
 const BANK_META: Record<string, { bg: string; text: string; domain: string }> = {
   'Denizbank': { bg: 'rgba(0,83,159,0.06)', text: '#00539f', domain: 'denizbank.com' },
   'Garanti BBVA': { bg: 'rgba(0,130,66,0.06)', text: '#008242', domain: 'garantibbva.com.tr' },
+  'Garanti': { bg: 'rgba(0,130,66,0.06)', text: '#008242', domain: 'garantibbva.com.tr' },
   'Halkbank': { bg: 'rgba(0,73,144,0.06)', text: '#004990', domain: 'halkbank.com.tr' },
   'N26': { bg: 'rgba(72,209,204,0.06)', text: '#36a3a0', domain: 'n26.com' },
   'Sparkasse': { bg: 'rgba(255,0,0,0.06)', text: '#cc0000', domain: 'sparkasse.de' },

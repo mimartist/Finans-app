@@ -2,6 +2,7 @@
 import { useUser } from './AuthProvider'
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect } from 'react'
+import { isDemo } from '@/lib/supabase'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useUser()
@@ -9,6 +10,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   useEffect(() => {
+    if (isDemo) return
     if (loading) return
     if (!user && pathname !== '/auth') {
       router.replace('/auth')
@@ -17,6 +19,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       router.replace('/')
     }
   }, [user, loading, pathname, router])
+
+  if (isDemo) return <>{children}</>
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)' }}>

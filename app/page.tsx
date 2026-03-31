@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, daysUntil, daysUntilLabel, isDemo } from '@/lib/supabase'
 import { getCatIcon, IconWallet, IconPieChart, IconTarget, IconBank, IconTrendUp, IconRefresh, IconCheck, IconDollar, IconBriefcase, IconShield, IconCalendar, IconCreditCard, IconSettings, IconCash } from '@/components/Icons'
@@ -59,6 +59,8 @@ export default function Dashboard() {
   const [rates, setRates] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(true)
   const [investTotalTry, setInvestTotalTry] = useState(0)
+  const [hisseTry, setHisseTry] = useState(0)
+  const [fonTry, setFonTry] = useState(0)
   const [payments, setPayments] = useState<PaymentItem[]>([])
   const [allAlacak, setAllAlacak] = useState<DebtRecord[]>([])
   const [kriptoTry, setKriptoTry] = useState(0)
@@ -78,10 +80,10 @@ export default function Dashboard() {
   const loadGlobal = useCallback(async () => {
     if (isDemo) {
       setAccounts(MOCK_ACCOUNTS); setLoans(MOCK_LOANS); setRecurring(MOCK_RECURRING)
-      setAllAlacak([]); setRates(MOCK_RATES); setInvestTotalTry(85000); setKriptoTry(22000)
+      setAllAlacak([]); setRates(MOCK_RATES); setInvestTotalTry(85000); setHisseTry(52000); setFonTry(33000); setKriptoTry(22000)
       return { accs: MOCK_ACCOUNTS, lnsList: MOCK_LOANS, recList: MOCK_RECURRING }
     }
-    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: recAlacak }, { data: cryptoSnaps }, { data: crds }] = await Promise.all([
+    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: recAlacak }, { data: cryptoSnaps }, { data: crds }, { data: invs }] = await Promise.all([
       supabase.from('accounts').select('*').eq('is_active', true),
       supabase.from('loans').select('*').eq('is_active', true),
       supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
@@ -90,13 +92,29 @@ export default function Dashboard() {
       supabase.from('debt_records').select('*').eq('type', 'alacak').eq('is_settled', false),
       supabase.from('investment_snapshots').select('*, investments!inner(platform, type, is_active)').eq('investments.is_active', true).in('investments.platform', ['Binance']).order('snapshot_date', { ascending: false }),
       supabase.from('credit_cards').select('*').eq('is_active', true),
+      supabase.from('investments').select('*').eq('is_active', true),
     ])
-    setAccounts(acc || []); setLoans(lns || []); setRecurring(rec || []); setAllAlacak(recAlacak || []); setRates(rt?.[0] || null); setCreditCards(crds || [])
+    const ratesData = rt?.[0] || null
+    setAccounts(acc || []); setLoans(lns || []); setRecurring(rec || []); setAllAlacak(recAlacak || []); setRates(ratesData); setCreditCards(crds || [])
     const seen = new Set<number>()
     const latestSnaps = (snaps || []).filter((sn: any) => { if (seen.has(sn.investment_id)) return false; seen.add(sn.investment_id); return true })
+    const snapMap = new Map<number, number>()
+    latestSnaps.forEach((sn: any) => snapMap.set(sn.investment_id, sn.total_value_try || 0))
     setInvestTotalTry(latestSnaps.reduce((s: number, sn: any) => s + (sn.total_value_try || 0), 0))
     const latestByInvestment = (cryptoSnaps || []).reduce((acc: Record<number, any>, snap: any) => { if (!acc[snap.investment_id]) acc[snap.investment_id] = snap; return acc }, {} as Record<number, any>)
     setKriptoTry(Object.values(latestByInvestment).reduce((s: number, snap: any) => s + (snap.total_value_try || 0), 0))
+    // Calculate investment values by type from investments table directly
+    const _toTry = (amount: number, currency: string) => currency === 'EUR' ? amount * (ratesData?.eur_try || 0) : currency === 'USD' ? amount * (ratesData?.usd_try || 0) : amount
+    let _hisse = 0, _fon = 0, _kripto = 0
+    ;(invs || []).forEach((inv: any) => {
+      const snapVal = snapMap.get(inv.id)
+      const val = snapVal || _toTry(inv.quantity * inv.avg_cost, inv.currency)
+      if (inv.type === 'hisse') _hisse += val
+      else if (inv.type === 'fon') _fon += val
+      else if (inv.type === 'kripto') _kripto += val
+    })
+    setHisseTry(_hisse); setFonTry(_fon)
+    if (_kripto > 0) setKriptoTry(_kripto)
     return { accs: acc || [], lnsList: lns || [], recList: rec || [] }
   }, [])
 
@@ -173,7 +191,13 @@ export default function Dashboard() {
       }
     }).filter(Boolean) as PaymentItem[]
 
-    setPayments([...loanItems, ...expItems, ...ccItems].sort((a, b) => { if (a.paid !== b.paid) return a.paid ? 1 : -1; if (a.overdue !== b.overdue) return a.overdue ? -1 : 1; return a.day - b.day }))
+    // Sort: unpaid loans first (by day), then unpaid expenses/cc (by day), then paid items (by day)
+    const typeOrder = (p: PaymentItem) => p.paid ? 2 : p.source === 'loan' ? 0 : 1
+    setPayments([...loanItems, ...expItems, ...ccItems].sort((a, b) => {
+      const ta = typeOrder(a), tb = typeOrder(b)
+      if (ta !== tb) return ta - tb
+      return a.day - b.day
+    }))
   }, [])
 
   useEffect(() => {
@@ -199,7 +223,8 @@ export default function Dashboard() {
 
   const cashTry = accounts.reduce((s, a) => s + toTry(a.balance, a.currency), 0)
   const alacakTry = allAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
-  const totalAssetsTry = cashTry + investTotalTry + alacakTry
+  const allInvestTry = hisseTry + fonTry + kriptoTry
+  const totalAssetsTry = cashTry + (allInvestTry > 0 ? allInvestTry : investTotalTry) + alacakTry
   const tryTotal = accounts.filter(a => a.currency === 'TRY').reduce((s, a) => s + a.balance, 0)
   const eurTotal = accounts.filter(a => a.currency === 'EUR' && a.type !== 'kripto').reduce((s, a) => s + a.balance, 0)
   const usdTotal = accounts.filter(a => a.currency === 'USD').reduce((s, a) => s + a.balance, 0)
@@ -284,29 +309,40 @@ export default function Dashboard() {
     else if (p.overdue) { statusColor = '#e5a000' }
     else if (isUrgent) { statusColor = '#e5484d' }
 
+    const isLoan = p.source === 'loan'
+    const isCC = p.type === 'kredi_karti'
+    const isHighlight = isLoan || isCC
+
     return (
-      <div key={p.id} className="tx-item" style={{ opacity: p.paid ? 0.5 : 1 }}>
+      <div key={p.id} className="tx-item" style={{
+        opacity: p.paid ? 0.5 : 1,
+        ...(isHighlight && !p.paid ? {
+          border: `1.5px solid ${isLoan ? 'rgba(229,72,77,0.25)' : 'rgba(43,45,110,0.2)'}`,
+          borderRadius: 14,
+          padding: '12px 14px',
+          margin: '4px 0',
+          background: isLoan ? 'rgba(229,72,77,0.03)' : 'rgba(43,45,110,0.02)',
+        } : {}),
+      }}>
         <div className="tx-icon">
-          {p.paid ? <IconCheck color="#30a46c" size={20} strokeWidth={2.5} /> : getCatIcon(p.type, { color: 'var(--primary)', size: 20 })}
+          {p.paid ? <IconCheck color="#30a46c" size={20} strokeWidth={2.5} /> : getCatIcon(p.type, { color: isLoan ? '#e5484d' : 'var(--primary)', size: 20 })}
         </div>
         <div className="tx-info">
-          <div className="tx-name" style={{ textDecoration: p.paid ? 'line-through' : 'none' }}>{p.name}</div>
+          <div className="tx-name" style={{ textDecoration: p.paid ? 'line-through' : 'none', fontWeight: isHighlight ? 700 : undefined }}>{p.name}</div>
           <div className="tx-detail" style={{ color: statusColor }}>
             {p.paid ? 'Odendi' : (() => {
               if (p.type === 'kredi_karti') {
-                // CC: days is actual diff from today, calculate real date
                 const payDate = new Date(); payDate.setDate(payDate.getDate() + p.days)
                 const payMonthStr = payDate.toLocaleDateString('tr-TR', { month: 'short' })
                 const dateStr = `${p.day} ${payMonthStr}`
                 return p.overdue ? `Gecikti · ${dateStr}` : `${dateStr} · ${daysUntilLabel(p.days)}`
               }
-              // Regular expenses/loans: use selected month short name
               return p.overdue ? `Gecikti · ${p.day} ${selMonthShort}` : `${p.day} ${selMonthShort} · ${daysUntilLabel(p.days)}`
             })()}
           </div>
         </div>
         <div className="tx-amount">
-          <div className="tx-value" style={{ color: p.paid ? '#30a46c' : 'var(--text)', textDecoration: p.paid ? 'line-through' : 'none' }}>{fmt(p.amount, p.currency)}</div>
+          <div className="tx-value" style={{ color: p.paid ? '#30a46c' : isLoan ? '#e5484d' : 'var(--text)', textDecoration: p.paid ? 'line-through' : 'none', fontWeight: isHighlight ? 700 : undefined }}>{fmt(p.amount, p.currency)}</div>
           {isCurrent && !p.paid && (
             <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
               className="tx-badge" style={{ background: p.overdue ? 'rgba(229,160,0,0.08)' : 'rgba(43,45,110,0.06)', color: p.overdue ? '#e5a000' : '#2b2d6e', border: 'none', cursor: 'pointer' }}>
@@ -394,7 +430,9 @@ export default function Dashboard() {
               <div className="flex flex-col gap-3">
                 {[
                   { label: 'Nakit', value: cashTry, icon: '🏦' },
-                  { label: 'Yatirim', value: investTotalTry, icon: '📈' },
+                  { label: 'Hisse', value: hisseTry, icon: '📊' },
+                  { label: 'Kripto', value: kriptoTry, icon: '₿' },
+                  { label: 'Fon', value: fonTry, icon: '📈' },
                   { label: 'Alacak', value: alacakTry, icon: '💰' },
                 ].filter(r => r.value > 0).map(r => {
                   const pct = totalAssetsTry > 0 ? Math.round((r.value / totalAssetsTry) * 100) : 0
@@ -434,53 +472,78 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ===== DUAL COLUMNS: Varliklar | Harcamalar ===== */}
-        <div className="grid grid-cols-2 gap-3 mx-4 mt-4">
-          {/* Left: Varliklar */}
-          <div className="card p-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--primary)' }}>Varliklar</div>
-            <div className="flex flex-col gap-3">
-              {[
-                { label: 'Nakit', value: cashTry, color: 'var(--primary)' },
-                { label: 'Yatirim', value: investTotalTry, color: '#4a4db0' },
-                { label: 'Alacak', value: alacakTry, color: '#6366f1' },
-              ].filter(r => r.value > 0).map(r => (
-                <div key={r.label}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: r.color }} />
-                      <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{r.label}</span>
-                    </div>
-                    <span className="mono text-[11px] font-bold" style={{ color: r.color }}>{fmt(r.value)}</span>
-                  </div>
+        {/* ===== VARLIK DAGILIMI ===== */}
+        {(() => {
+          const assetSlices = [
+            { label: 'Nakit', value: cashTry, color: '#2b2d6e' },
+            { label: 'Hisse', value: hisseTry, color: '#4a4db0' },
+            { label: 'Kripto', value: kriptoTry, color: '#8b5cf6' },
+            { label: 'Fon', value: fonTry, color: '#6366f1' },
+            { label: 'Alacak', value: alacakTry, color: '#059669' },
+          ].filter(r => r.value > 0)
+          const total = assetSlices.reduce((s, r) => s + r.value, 0)
+          return (
+            <div className="mx-4 mt-4 card p-4">
+              <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--primary)' }}>Varlik Dagilimi</div>
+              <div className="flex items-center gap-4">
+                <div style={{ width: 110, height: 110, flexShrink: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={assetSlices} dataKey="value" cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={2} startAngle={90} endAngle={-270}>
+                        {assetSlices.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
+                <div className="flex flex-col gap-2 flex-1">
+                  {assetSlices.map(r => {
+                    const pct = total > 0 ? Math.round((r.value / total) * 100) : 0
+                    return (
+                      <div key={r.label}>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full" style={{ background: r.color }} />
+                            <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{r.label}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="mono text-[11px] font-bold" style={{ color: r.color }}>{fmt(r.value)}</span>
+                            <span className="text-[9px] px-1 py-0.5 rounded-full" style={{ background: 'var(--bg2)', color: 'var(--muted)' }}>%{pct}</span>
+                          </div>
+                        </div>
+                        <div className="rounded-full overflow-hidden" style={{ height: 3, background: 'var(--bg2)' }}>
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: r.color }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
+          )
+        })()}
 
-          {/* Right: Harcamalar */}
-          <div className="card p-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#e5484d' }}>Yukumluluk</div>
-            <div className="flex flex-col gap-3">
-              {[
-                { label: 'Toplam Borc', value: totalDebtTry, color: '#e5484d' },
-                { label: 'Aylik Gider', value: monthlyTotalAll, color: '#d97706' },
-              ].map(r => (
-                <div key={r.label}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: r.color }} />
-                      <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{r.label}</span>
-                    </div>
-                    <span className="mono text-[11px] font-bold" style={{ color: r.color }}>{fmt(r.value)}</span>
-                  </div>
-                </div>
-              ))}
-              <div className="pt-2 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
+        {/* ===== YUKUMLULUK ===== */}
+        <div className="mx-4 mt-3 card p-4">
+          <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#e5484d' }}>Yukumluluk</div>
+          <div className="flex flex-col gap-3">
+            {[
+              { label: 'Toplam Borc', value: totalDebtTry, color: '#e5484d' },
+              { label: 'Aylik Gider', value: monthlyTotalAll, color: '#d97706' },
+            ].map(r => (
+              <div key={r.label}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold" style={{ color: 'var(--text)' }}>Runway</span>
-                  <span className="mono text-[11px] font-extrabold" style={{ color: 'var(--primary)' }}>{runwayMonths} Ay</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: r.color }} />
+                    <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{r.label}</span>
+                  </div>
+                  <span className="mono text-[11px] font-bold" style={{ color: r.color }}>{fmt(r.value)}</span>
                 </div>
+              </div>
+            ))}
+            <div className="pt-2 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold" style={{ color: 'var(--text)' }}>Runway</span>
+                <span className="mono text-[11px] font-extrabold" style={{ color: 'var(--primary)' }}>{runwayMonths} Ay</span>
               </div>
             </div>
           </div>

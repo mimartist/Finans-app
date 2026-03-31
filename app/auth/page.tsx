@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { supabase, isDemo } from '@/lib/supabase'
 
 type Mode = 'login' | 'signup' | 'reset'
 
@@ -11,6 +11,7 @@ export default function AuthPage() {
 
   // Giriş yapıldıysa (OAuth veya email) dashboard'a yönlendir
   useEffect(() => {
+    if (isDemo) { router.replace('/'); return }
     // Mevcut session kontrolü
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) router.replace('/')

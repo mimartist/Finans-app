@@ -132,16 +132,17 @@ export type ExchangeRate = {
 
 // Helper: format currency
 export function fmt(amount: number, currency = 'TRY'): string {
+  const opts = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
   if (currency === 'TRY') {
-    return '₺' + amount.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    return '₺' + amount.toLocaleString('tr-TR', opts)
   }
   if (currency === 'EUR') {
-    return '€' + amount.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    return '€' + amount.toLocaleString('tr-TR', opts)
   }
   if (currency === 'USD') {
-    return '$' + amount.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    return '$' + amount.toLocaleString('tr-TR', opts)
   }
-  return amount.toLocaleString('tr-TR') + ' ' + currency
+  return amount.toLocaleString('tr-TR', opts) + ' ' + currency
 }
 
 // Helper: days until payment
