@@ -54,17 +54,21 @@ export async function GET() {
       console.error('Gold API fetch failed:', e)
     }
 
-    // 3) BTC and ETH from CoinGecko
+    // 3) BTC, ETH, PEAQ, USDC from CoinGecko
+    let peaq_usd = 0
+    let usdc_usd = 0
     try {
       const cryptoRes = await fetch(
-        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd',
+        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,peaq,usd-coin&vs_currencies=usd',
         { cache: 'no-store' }
       )
       if (cryptoRes.ok) {
         const cryptoData = await cryptoRes.json()
         btc_usd = cryptoData.bitcoin?.usd || 0
         eth_usd = cryptoData.ethereum?.usd || 0
-        console.log('CoinGecko — BTC:', btc_usd, 'ETH:', eth_usd)
+        peaq_usd = cryptoData.peaq?.usd || 0
+        usdc_usd = cryptoData['usd-coin']?.usd || 1
+        console.log('CoinGecko — BTC:', btc_usd, 'ETH:', eth_usd, 'PEAQ:', peaq_usd, 'USDC:', usdc_usd)
       }
     } catch (e) {
       console.error('CoinGecko fetch failed:', e)
@@ -84,6 +88,26 @@ export async function GET() {
       }
     } catch (e) {
       console.error('Yahoo TNZTP fetch failed:', e)
+    }
+
+    // 5) GTA (Garanti Portföy Altın Fonu) price from TEFAS
+    let gtaPrice = 0
+    try {
+      const tefasRes = await fetch('https://www.tefas.gov.tr/api/DB/BindHistoryInfo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0' },
+        body: `fontip=YAT&fonkod=GTA&baession=&fession=&fontupipi=&session=`,
+        cache: 'no-store',
+      })
+      if (tefasRes.ok) {
+        const tefasData = await tefasRes.json()
+        if (tefasData?.data?.length > 0) {
+          gtaPrice = tefasData.data[0]?.ToplamDeger || tefasData.data[0]?.BirimPayDeger || 0
+          console.log('TEFAS GTA price:', gtaPrice)
+        }
+      }
+    } catch (e) {
+      console.error('TEFAS GTA fetch failed:', e)
     }
 
     // Validate we got at least one rate
@@ -118,38 +142,45 @@ export async function GET() {
 
     console.log('Supabase insert SUCCESS:', inserted)
 
-    // Auto-update TNZTP investment snapshot if price available
-    if (tnztpPrice > 0) {
-      try {
-        // Find TNZTP investment by symbol
-        const { data: tnztpInv } = await supabase
-          .from('investments').select('id, quantity')
-          .eq('symbol', 'TNZTP').eq('is_active', true).limit(1)
+    // Auto-update all investment snapshots
+    const { data: allInvestments } = await supabase
+      .from('investments').select('id, symbol, quantity, currency, type')
+      .eq('is_active', true)
 
-        if (tnztpInv && tnztpInv.length > 0) {
-          const inv = tnztpInv[0]
-          const totalValue = inv.quantity * tnztpPrice
-          // TNZTP is TRY-denominated
-          const totalValueTry = totalValue
+    const priceMap: Record<string, { price: number; currency: string }> = {}
+    if (tnztpPrice > 0) priceMap['TNZTP'] = { price: tnztpPrice, currency: 'TRY' }
+    if (btc_usd > 0) priceMap['BTC'] = { price: btc_usd, currency: 'USD' }
+    if (usdc_usd > 0) priceMap['USDC'] = { price: usdc_usd, currency: 'USD' }
+    if (peaq_usd > 0) priceMap['PEAQ'] = { price: peaq_usd, currency: 'USD' }
+    if (gtaPrice > 0) priceMap['GTA'] = { price: gtaPrice, currency: 'TRY' }
 
-          await supabase.from('investment_snapshots').delete()
-            .eq('investment_id', inv.id).eq('snapshot_date', today)
+    const updatedSnapshots: string[] = []
+    for (const inv of (allInvestments || [])) {
+      const symbol = (inv.symbol || '').toUpperCase()
+      // Match by symbol or partial match for fund codes
+      const match = priceMap[symbol] || (symbol.includes('GTA') ? priceMap['GTA'] : null)
+      if (!match) continue
 
-          await supabase.from('investment_snapshots').insert({
-            investment_id: inv.id,
-            snapshot_date: today,
-            price: Math.round(tnztpPrice * 1000) / 1000,
-            total_value: Math.round(totalValue * 100) / 100,
-            total_value_try: Math.round(totalValueTry * 100) / 100,
-          })
-          console.log('TNZTP snapshot updated — price:', tnztpPrice, 'total:', totalValue)
-        }
-      } catch (e) {
-        console.error('TNZTP snapshot update failed:', e)
-      }
+      const totalValue = inv.quantity * match.price
+      let totalValueTry = totalValue
+      if (match.currency === 'USD' && usd_try > 0) totalValueTry = totalValue * usd_try
+      else if (match.currency === 'EUR' && eur_try > 0) totalValueTry = totalValue * eur_try
+
+      await supabase.from('investment_snapshots').delete()
+        .eq('investment_id', inv.id).eq('snapshot_date', today)
+
+      await supabase.from('investment_snapshots').insert({
+        investment_id: inv.id,
+        snapshot_date: today,
+        price: Math.round(match.price * 1000000) / 1000000,
+        total_value: Math.round(totalValue * 100) / 100,
+        total_value_try: Math.round(totalValueTry * 100) / 100,
+      })
+      updatedSnapshots.push(`${symbol}: ${match.price}`)
+      console.log(`${symbol} snapshot updated — price: ${match.price}, total: ${totalValue}, TRY: ${totalValueTry}`)
     }
 
-    return NextResponse.json({ success: true, rates, saved: inserted, tnztp_price: tnztpPrice || null })
+    return NextResponse.json({ success: true, rates, saved: inserted, snapshots: updatedSnapshots })
   } catch (e: any) {
     console.error('Unhandled error:', e)
     return NextResponse.json({ error: e.message || 'Bilinmeyen hata' }, { status: 500 })
