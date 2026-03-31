@@ -21,6 +21,38 @@ function fmtPrice(amount: number, currency = 'TRY'): string {
   return prefix + amount.toLocaleString('tr-TR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 }
 
+const INVESTMENT_ICONS: Record<string, { logo: string; bg: string }> = {
+  'BTC': { logo: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png', bg: 'rgba(247,147,26,0.1)' },
+  'USDC': { logo: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png', bg: 'rgba(39,117,202,0.1)' },
+  'PEAQ': { logo: 'https://assets.coingecko.com/coins/images/34346/small/peaq.png', bg: 'rgba(0,210,190,0.1)' },
+  'ETH': { logo: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png', bg: 'rgba(98,126,234,0.1)' },
+}
+const PLATFORM_DOMAINS: Record<string, string> = {
+  'Binance': 'binance.com',
+  'Garanti BBVA': 'garantibbva.com.tr',
+  'Garanti': 'garantibbva.com.tr',
+  'Midas': 'getmidas.com',
+  'TEFAS': 'tefas.gov.tr',
+  'Is Yatirim': 'isyatirim.com.tr',
+}
+function getInvestmentIcon(inv: { symbol?: string; type: string; platform?: string; name: string }) {
+  const sym = (inv.symbol || '').toUpperCase()
+  if (INVESTMENT_ICONS[sym]) return INVESTMENT_ICONS[sym]
+  // For stocks, use Borsa Istanbul favicon
+  if (inv.type === 'hisse') return { logo: 'https://www.google.com/s2/favicons?domain=borsaistanbul.com&sz=64', bg: 'rgba(220,38,38,0.06)' }
+  // For funds, try platform or TEFAS
+  if (inv.type === 'fon') {
+    const domain = PLATFORM_DOMAINS[inv.platform || ''] || 'tefas.gov.tr'
+    return { logo: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`, bg: 'rgba(0,130,66,0.06)' }
+  }
+  // For crypto without specific icon, try platform
+  if (inv.type === 'kripto' && inv.platform) {
+    const domain = PLATFORM_DOMAINS[inv.platform] || ''
+    if (domain) return { logo: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`, bg: 'rgba(247,147,26,0.06)' }
+  }
+  return null
+}
+
 export default function InvestmentsPage() {
   const [investments, setInvestments] = useState<InvestmentWithSnapshot[]>([])
   const [rates, setRates] = useState<ExchangeRate | null>(null)
@@ -264,7 +296,13 @@ export default function InvestmentsPage() {
                       borderLeft: `3px solid ${pnlColor}`,
                       borderBottom: isExpanded ? '1px solid var(--border)' : undefined,
                     }}>
-                    <div className="text-base flex-shrink-0" style={{ width: 24, textAlign: 'center' }}>{typeIcon[inv.type] || '📦'}</div>
+                    <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 32, height: 32, borderRadius: 8, background: getInvestmentIcon(inv)?.bg || 'var(--bg4)' }}>
+                      {getInvestmentIcon(inv) ? (
+                        <img src={getInvestmentIcon(inv)!.logo} alt={inv.symbol || inv.name} className="w-5 h-5 object-contain" />
+                      ) : (
+                        <span className="text-sm">{typeIcon[inv.type] || '📦'}</span>
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-semibold truncate">{inv.symbol || inv.name}</div>
                       <div className="text-[10px] mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
