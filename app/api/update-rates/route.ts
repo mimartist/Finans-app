@@ -144,7 +144,7 @@ export async function GET() {
 
     // Auto-update all investment snapshots
     const { data: allInvestments } = await supabase
-      .from('investments').select('id, symbol, quantity, currency, type')
+      .from('investments').select('id, name, symbol, quantity, currency, type')
       .eq('is_active', true)
 
     const priceMap: Record<string, { price: number; currency: string }> = {}
@@ -154,11 +154,24 @@ export async function GET() {
     if (peaq_usd > 0) priceMap['PEAQ'] = { price: peaq_usd, currency: 'USD' }
     if (gtaPrice > 0) priceMap['GTA'] = { price: gtaPrice, currency: 'TRY' }
 
+    // Name-to-key mapping for investments without proper symbol
+    const nameMap: Record<string, string> = {
+      'bitcoin': 'BTC', 'btc': 'BTC',
+      'usdc': 'USDC', 'usd coin': 'USDC',
+      'peaq': 'PEAQ',
+      'ethereum': 'ETH', 'eth': 'ETH',
+      'tnztp': 'TNZTP', 'tapdi': 'TNZTP', 'tinaztepe': 'TNZTP',
+    }
+
     const updatedSnapshots: string[] = []
     for (const inv of (allInvestments || [])) {
       const symbol = (inv.symbol || '').toUpperCase()
-      // Match by symbol or partial match for fund codes
-      const match = priceMap[symbol] || (symbol.includes('GTA') ? priceMap['GTA'] : null)
+      const nameLower = (inv.name || '').toLowerCase()
+      // Match by symbol, name, or partial match for fund codes
+      const match = priceMap[symbol]
+        || priceMap[nameMap[symbol.toLowerCase()] || '']
+        || priceMap[nameMap[nameLower] || '']
+        || (nameLower.includes('gta') || symbol.includes('GTA') ? priceMap['GTA'] : null)
       if (!match) continue
 
       const totalValue = inv.quantity * match.price
