@@ -23,7 +23,10 @@
       "Bash(dir \"C:\\\\finans-app\\\\.claude\\\\worktrees\\\\laughing-lewin\\\\.env*\")",
       "WebSearch",
       "Bash(npx tsc:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(cp /root/.claude/projects/-home-user-Finans-app/8cc2c31e-81d8-47a6-ad2a-0d4ed6ce0f3e/tool-results/webfetch-1776704964936-pihw9x.bin /tmp/design.gz)",
+      "Bash(gunzip -f /tmp/design.gz)",
+      "Read(//tmp/**)"
     ]
   }
 }
