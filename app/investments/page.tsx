@@ -168,7 +168,7 @@ export default function InvestmentsPage() {
 
   return (
     <div className="app-layout">
-      <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
+      <div className="bg-blobs" />
       <BottomNav />
       <div className="app-main pb-32 page-enter">
         <div className="flex justify-between items-center px-5 pt-5 pb-4">
@@ -186,7 +186,7 @@ export default function InvestmentsPage() {
         </div>
 
         {/* Portfolio Summary */}
-        <div className="mx-4 mb-4 card-lg p-5">
+        <div className="mx-4 mb-4 glass-bold p-5 rounded-2xl">
           <div className="text-[12px] font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>Toplam Portfoy</div>
           <div className="mono text-3xl font-bold amt-blue">{fmt(totalValueTry)}</div>
           {rates && (
@@ -219,7 +219,7 @@ export default function InvestmentsPage() {
             <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Doviz Kurlari</div></div>
             <div className="flex gap-2 mx-4 mb-4">
               {[{ label: 'USD/TRY', val: rates.usd_try, icon: '🇺🇸' }, { label: 'EUR/TRY', val: rates.eur_try, icon: '🇪🇺' }, { label: 'ALTIN/gr', val: rates.gold_try, icon: '🥇' }].map(r => (
-                <div key={r.label} className="flex-1 card p-3">
+                <div key={r.label} className="flex-1 glass p-3 rounded-2xl">
                   <div className="text-base mb-1">{r.icon}</div>
                   <div className="mono text-sm font-semibold">{r.val ? fmt(r.val) : '—'}</div>
                   <div className="text-[10px] mt-0.5 uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{r.label}</div>
@@ -232,7 +232,7 @@ export default function InvestmentsPage() {
         <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Pozisyonlar</div></div>
 
         {investments.length === 0 ? (
-          <div className="mx-4 card p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
+          <div className="mx-4 glass p-6 text-center text-sm rounded-2xl" style={{ color: 'var(--muted)' }}>
             Henuz yatirim eklenmemis.<br />
             <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>Yatirim Ekle</button>
           </div>
@@ -391,8 +391,8 @@ export default function InvestmentsPage() {
         )}
 
         {deleteConfirm !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card p-5 w-full max-w-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+            <div className="glass-bold p-5 w-full max-w-sm rounded-2xl">
               <div className="text-sm font-semibold mb-2">Yatirimi Sil</div>
               <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu yatirimi silmek istediginize emin misiniz?</div>
               <div className="flex gap-2">
@@ -404,8 +404,8 @@ export default function InvestmentsPage() {
         )}
 
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+            <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Yatirimi Duzenle' : 'Yeni Yatirim'}</div>

@@ -104,7 +104,7 @@ export default function BottomNav() {
 
           {/* Center FAB — Siri glow */}
           <div style={{ position: 'relative', margin: '0 4px', flexShrink: 0 }}>
-            <div style={{
+            <div className="animate-halo-spin" style={{
               position: 'absolute', inset: -4, borderRadius: '50%',
               background: 'conic-gradient(from 0deg, #4a4db0, #818cf8, #c7d2fe, #818cf8, #4a4db0)',
               opacity: 0.55, filter: 'blur(4px)',

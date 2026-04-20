@@ -199,7 +199,7 @@ export default function DebtsPage() {
 
   return (
     <div className="app-layout">
-      <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
+      <div className="bg-blobs" />
       <BottomNav />
       <div className="app-main pb-32 page-enter">
         <div className="flex justify-between items-center px-5 pt-5 pb-4">
@@ -242,7 +242,7 @@ export default function DebtsPage() {
         </div>
 
         {shown.length === 0 ? (
-          <div className="mx-4 card p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
+          <div className="mx-4 glass p-6 text-center text-sm rounded-2xl" style={{ color: 'var(--muted)' }}>
             Kayit bulunamadi.<br />
             <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>Kayit Ekle</button>
           </div>
@@ -438,8 +438,8 @@ export default function DebtsPage() {
 
         {/* Delete confirmation */}
         {deleteConfirm !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card p-5 w-full max-w-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+            <div className="glass-bold p-5 w-full max-w-sm rounded-2xl">
               <div className="text-sm font-semibold mb-2">Kaydi Sil</div>
               <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu kaydi kalici olarak silmek istediginize emin misiniz?</div>
               <div className="flex gap-2">
@@ -452,8 +452,8 @@ export default function DebtsPage() {
 
         {/* Tahsilat / Ödeme modal */}
         {payModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card p-5 w-full max-w-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+            <div className="glass-bold p-5 w-full max-w-sm rounded-2xl">
               {/* Başlık */}
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
@@ -533,8 +533,8 @@ export default function DebtsPage() {
 
         {/* Add/Edit Form */}
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+            <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Kaydi Duzenle' : 'Yeni Kayit'}</div>

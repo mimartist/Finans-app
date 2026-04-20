@@ -320,8 +320,8 @@ export default function Dashboard() {
 
   return (
     <div className="app-layout">
-      {/* Background blobs */}
-      <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
+      {/* Glass wallpaper background */}
+      <div className="bg-blobs" />
       <BottomNav />
       <div className="app-main pb-32 page-enter">
         {/* ===== HEADER ===== */}
@@ -343,14 +343,14 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={async () => { if (isDemo) return; setLoading(true); await fetch('/api/update-rates'); await reloadAll(); setLoading(false) }}
-              className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: 'var(--bg4)' }}>
-              <IconRefresh color="var(--primary)" size={18} strokeWidth={2} />
+              className="w-10 h-10 rounded-full flex items-center justify-center glass-soft"
+              style={{ border: '1px solid rgba(255,255,255,0.5)' }}>
+              <IconRefresh color="var(--primary)" size={17} strokeWidth={2} />
             </button>
             <NotificationBell payments={payments} />
-            <button onClick={() => router.push('/settings')} className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: 'var(--bg4)' }}>
-              <IconSettings color="var(--primary)" size={18} strokeWidth={2} />
+            <button onClick={() => router.push('/settings')} className="w-10 h-10 rounded-full flex items-center justify-center glass-soft"
+              style={{ border: '1px solid rgba(255,255,255,0.5)' }}>
+              <IconSettings color="var(--primary)" size={17} strokeWidth={2} />
             </button>
           </div>
         </div>
@@ -434,15 +434,32 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ===== DUAL COLUMNS: Varliklar | Harcamalar ===== */}
-        <div className="grid grid-cols-2 gap-3 mx-4 mt-4">
-          {/* Left: Varliklar */}
-          <div className="card p-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--primary)' }}>Varliklar</div>
+        {/* ===== SNAPSHOT TRIO ===== */}
+        <div className="snapshot-grid mx-4 mt-4">
+          {[
+            { label: 'NAKİT AKIŞI', value: `+${fmt(cashTry).replace(' ₺', '')}`, detail: 'toplam nakit', color: '#30a46c' },
+            { label: 'RUNWAY', value: `${runwayMonths} ay`, detail: 'mevcut nakit', color: '#2b2d6e' },
+            { label: 'GECİKEN', value: overduePayments.length > 0 ? fmt(overduePayments.reduce((s, p) => s + p.amount, 0)) : '0 ₺', detail: `${overduePayments.length} işlem`, color: '#e5484d' },
+          ].map(s => (
+            <div key={s.label} className="glass snapshot-card">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                <div className="snapshot-label">{s.label}</div>
+              </div>
+              <div className="snapshot-value" style={{ color: s.color }}>{s.value}</div>
+              <div className="snapshot-detail">{s.detail}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ===== DUAL COLUMNS: Varlıklar | Yükümlülük ===== */}
+        <div className="grid grid-cols-2 gap-3 mx-4 mt-3">
+          <div className="glass p-4">
+            <div className="eyebrow">Varlıklar</div>
             <div className="flex flex-col gap-3">
               {[
-                { label: 'Nakit', value: cashTry, color: 'var(--primary)' },
-                { label: 'Yatirim', value: investTotalTry, color: '#4a4db0' },
+                { label: 'Nakit', value: cashTry, color: '#2b2d6e' },
+                { label: 'Yatırım', value: investTotalTry, color: '#4a4db0' },
                 { label: 'Alacak', value: alacakTry, color: '#6366f1' },
               ].filter(r => r.value > 0).map(r => (
                 <div key={r.label}>
@@ -458,13 +475,12 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Right: Harcamalar */}
-          <div className="card p-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#e5484d' }}>Yukumluluk</div>
+          <div className="glass p-4">
+            <div className="eyebrow" style={{ color: '#e5484d' }}>Yükümlülük</div>
             <div className="flex flex-col gap-3">
               {[
-                { label: 'Toplam Borc', value: totalDebtTry, color: '#e5484d' },
-                { label: 'Aylik Gider', value: monthlyTotalAll, color: '#d97706' },
+                { label: 'Toplam Borç', value: totalDebtTry, color: '#e5484d' },
+                { label: 'Aylık Gider', value: monthlyTotalAll, color: '#d97706' },
               ].map(r => (
                 <div key={r.label}>
                   <div className="flex items-center justify-between">
@@ -476,7 +492,7 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
-              <div className="pt-2 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
+              <div className="pt-2 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.3)' }}>
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-semibold" style={{ color: 'var(--text)' }}>Runway</span>
                   <span className="mono text-[11px] font-extrabold" style={{ color: 'var(--primary)' }}>{runwayMonths} Ay</span>
@@ -511,10 +527,12 @@ export default function Dashboard() {
                 <button key={`${m.year}-${m.month}`} onClick={() => setSelectedMonth(m)}
                   className="flex-shrink-0 px-4 py-2.5 rounded-full text-xs font-semibold whitespace-nowrap"
                   style={{
-                    background: active ? 'linear-gradient(135deg, #2b2d6e, #3d3f8f)' : 'transparent',
+                    background: active ? 'linear-gradient(135deg, #2b2d6e, #4a4db0)' : 'rgba(255,255,255,0.55)',
                     color: active ? '#fff' : 'var(--text2)',
-                    border: active ? '1.5px solid transparent' : '1.5px solid var(--border2)',
-                    boxShadow: active ? '0 2px 6px rgba(43,45,110,0.2)' : 'none',
+                    border: 'none',
+                    backdropFilter: active ? 'none' : 'blur(10px)',
+                    WebkitBackdropFilter: active ? 'none' : 'blur(10px)',
+                    boxShadow: active ? '0 4px 12px rgba(43,45,110,0.25)' : 'inset 0 1px 0 rgba(255,255,255,0.6)',
                     transition: 'all 0.2s',
                   }}>
                   {MONTH_NAMES[m.month - 1].substring(0, 3)} {m.year !== currentMonth.year ? m.year : ''}{isCurr ? ' •' : ''}
@@ -525,11 +543,9 @@ export default function Dashboard() {
         </div>
 
         {/* ===== MONTH SUMMARY — nested card style ===== */}
-        <div className="mx-4 mb-4" style={{
-          background: 'var(--bg3)',
+        <div className="mx-4 mb-4 glass-bold" style={{
           borderRadius: 20,
           padding: '16px 14px',
-          border: '1.5px solid var(--border)',
           opacity: monthLoading ? 0.5 : 1,
           transition: 'opacity 0.2s',
         }}>
@@ -541,18 +557,18 @@ export default function Dashboard() {
 
           {/* Inner nested cards — Toplam / Odenen */}
           <div className="flex gap-2.5 mb-2.5">
-            <div className="flex-1" style={{ background: 'var(--bg2)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
+            <div className="flex-1 glass-soft" style={{ borderRadius: 14, padding: '14px 16px' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Toplam</div>
               <div className="mono text-lg font-extrabold mt-1" style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>{fmt(totalObligation)}</div>
             </div>
-            <div className="flex-1" style={{ background: 'var(--bg2)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
-              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Odenen</div>
+            <div className="flex-1 glass-soft" style={{ borderRadius: 14, padding: '14px 16px' }}>
+              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Ödenen</div>
               <div className="mono text-lg font-extrabold mt-1 amt-green" style={{ letterSpacing: '-0.03em' }}>{fmt(paidTotal)}</div>
             </div>
           </div>
 
           {/* Bottom row — Kalan + progress */}
-          <div style={{ background: 'var(--bg2)', borderRadius: 14, padding: '12px 16px', boxShadow: 'var(--shadow-xs)' }}>
+          <div className="glass-soft" style={{ borderRadius: 14, padding: '12px 16px' }}>
             <div className="flex items-center justify-between mb-2">
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#e5484d' }}>Kalan</div>
@@ -599,9 +615,9 @@ export default function Dashboard() {
 
         {/* ===== PAY MODAL ===== */}
         {payModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(30,31,84,0.5)' }}
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(15,17,40,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
             onClick={e => { if (e.target === e.currentTarget) { setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) } }}>
-            <div className="card p-6 w-full max-w-sm scale-in">
+            <div className="glass-bold p-6 w-full max-w-sm scale-in" style={{ borderRadius: 24 }}>
               <div className="text-base font-bold mb-1">{payModal.overdue ? 'Gecmis Odemeyi Onayla' : 'Odeme Yap'}</div>
               <div className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text)' }}>{payModal.name}</span>

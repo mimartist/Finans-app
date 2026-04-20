@@ -1,7 +1,8 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { IconBell } from './Icons'
+import { IconBell, IconCheck } from './Icons'
 import { fmt } from '@/lib/supabase'
+import { isPushSupported, getNotificationPermission, requestNotificationPermission, subscribeToPush, unsubscribeFromPush, getCurrentSubscription } from '@/lib/notifications'
 
 type Payment = {
   id: string
@@ -20,7 +21,19 @@ type Props = {
 
 export default function NotificationBell({ payments }: Props) {
   const [open, setOpen] = useState(false)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushSupported, setPushSupported] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    isPushSupported().then(supported => {
+      setPushSupported(supported)
+      if (supported) {
+        getCurrentSubscription().then(sub => setPushEnabled(!!sub))
+      }
+    })
+  }, [])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -29,6 +42,21 @@ export default function NotificationBell({ payments }: Props) {
     if (open) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
+
+  async function togglePush() {
+    setPushLoading(true)
+    if (pushEnabled) {
+      await unsubscribeFromPush()
+      setPushEnabled(false)
+    } else {
+      const granted = await requestNotificationPermission()
+      if (granted) {
+        const sub = await subscribeToPush()
+        setPushEnabled(!!sub)
+      }
+    }
+    setPushLoading(false)
+  }
 
   const overdue = payments.filter(p => !p.paid && p.overdue)
   const urgent = payments.filter(p => !p.paid && !p.overdue && p.days <= 3)
@@ -39,9 +67,9 @@ export default function NotificationBell({ payments }: Props) {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button onClick={() => setOpen(!open)}
-        className="w-10 h-10 rounded-full flex items-center justify-center"
-        style={{ background: 'var(--bg4)', position: 'relative' }}>
-        <IconBell color="var(--primary)" size={18} strokeWidth={2} />
+        className="w-10 h-10 rounded-full flex items-center justify-center glass-soft"
+        style={{ border: '1px solid rgba(255,255,255,0.5)', position: 'relative' }}>
+        <IconBell color="var(--primary)" size={17} strokeWidth={2} />
         {badgeCount > 0 && (
           <span style={{
             position: 'absolute', top: 2, right: 2,
@@ -55,12 +83,10 @@ export default function NotificationBell({ payments }: Props) {
       </button>
 
       {open && (
-        <div className="scale-in" style={{
+        <div className="scale-in glass-bold" style={{
           position: 'absolute', top: 48, right: 0,
           width: 320, maxHeight: 400, overflowY: 'auto',
-          background: 'var(--bg2)', borderRadius: 16,
-          boxShadow: '0 8px 32px rgba(30,31,84,0.15)',
-          border: '1px solid var(--border)',
+          borderRadius: 18,
           zIndex: 100,
         }}>
           <div className="p-4 pb-2">
@@ -98,7 +124,7 @@ export default function NotificationBell({ payments }: Props) {
           })}
 
           {notifications.length > 0 && (
-            <div className="px-4 pb-3 pt-1">
+            <div className="px-4 pb-2 pt-1">
               <div className="text-[10px] text-center" style={{ color: 'var(--muted)' }}>
                 {overdue.length > 0 && <span style={{ color: '#e5484d' }}>{overdue.length} gecmis</span>}
                 {overdue.length > 0 && urgent.length > 0 && ' · '}
@@ -106,6 +132,29 @@ export default function NotificationBell({ payments }: Props) {
                 {(overdue.length > 0 || urgent.length > 0) && upcoming.length > 0 && ' · '}
                 {upcoming.length > 0 && <span style={{ color: '#6366f1' }}>{upcoming.length} yaklasan</span>}
               </div>
+            </div>
+          )}
+
+          {pushSupported && (
+            <div className="mx-3 mb-3 px-3 py-2.5 rounded-xl flex items-center justify-between"
+              style={{ background: pushEnabled ? 'rgba(48,164,108,0.06)' : 'rgba(43,45,110,0.04)', borderTop: '1px solid rgba(255,255,255,0.3)' }}>
+              <div>
+                <div className="text-[12px] font-semibold" style={{ color: 'var(--text)' }}>
+                  {pushEnabled ? 'Bildirimler Açık' : 'Bildirim Al'}
+                </div>
+                <div className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                  {pushEnabled ? 'Her gün 09:00\'da hatırlatma' : 'Ödeme günü yaklaşınca uyar'}
+                </div>
+              </div>
+              <button onClick={togglePush} disabled={pushLoading}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold"
+                style={{
+                  background: pushEnabled ? 'rgba(48,164,108,0.12)' : 'linear-gradient(135deg, #2b2d6e, #4a4db0)',
+                  color: pushEnabled ? '#30a46c' : '#fff',
+                  border: 'none', cursor: 'pointer',
+                }}>
+                {pushLoading ? '...' : pushEnabled ? '✓ Aktif' : 'Aç'}
+              </button>
             </div>
           )}
         </div>
