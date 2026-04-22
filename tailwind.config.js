@@ -7,22 +7,46 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Sora', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['Plus Jakarta Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        mono: ['DM Sans', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       colors: {
-        bg: {
-          DEFAULT: '#0a0c10',
-          2: '#111318',
-          3: '#181c24',
-          4: '#1e2330',
+        navy: {
+          DEFAULT: '#2b2d6e',
+          light: '#3d3f8f',
+          dark: '#1e1f54',
+          pop: '#4a4db0',
+          glow: '#818cf8',
         },
-        accent: {
-          blue: '#6c8fff',
-          green: '#4ade9a',
-          amber: '#f59e0b',
-          red: '#f87171',
-          purple: '#a78bfa',
+        semantic: {
+          green: '#30a46c',
+          red: '#e5484d',
+          amber: '#e5a000',
+          purple: '#7c3aed',
+        },
+      },
+      borderRadius: {
+        'glass': '16px',
+        'glass-lg': '20px',
+        'glass-xl': '24px',
+      },
+      animation: {
+        'halo-spin': 'haloSpin 8s linear infinite',
+        'fade-up': 'fadeUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        'slide-up': 'slideUp 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+      keyframes: {
+        haloSpin: {
+          from: { transform: 'rotate(0deg)' },
+          to: { transform: 'rotate(360deg)' },
+        },
+        fadeUp: {
+          from: { opacity: '0', transform: 'translateY(12px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(100%)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
         },
       },
     },
