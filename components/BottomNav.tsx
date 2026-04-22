@@ -82,9 +82,6 @@ export default function BottomNav() {
             <span>Ayarlar</span>
           </Link>
         </nav>
-        <div className="px-6 mt-auto pt-4 pb-4">
-          <div className="text-[10px] font-medium" style={{ color: 'var(--muted)', opacity: 0.5 }}>v2.1.0</div>
-        </div>
       </aside>
 
       {/* Mobile Bottom Nav — floating pill, 20px from bottom */}
@@ -107,7 +104,7 @@ export default function BottomNav() {
 
           {/* Center FAB — Siri glow */}
           <div style={{ position: 'relative', margin: '0 4px', flexShrink: 0 }}>
-            <div style={{
+            <div className="animate-halo-spin" style={{
               position: 'absolute', inset: -4, borderRadius: '50%',
               background: 'conic-gradient(from 0deg, #4a4db0, #818cf8, #c7d2fe, #818cf8, #4a4db0)',
               opacity: 0.55, filter: 'blur(4px)',

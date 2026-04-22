@@ -44,7 +44,6 @@ const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('
 const BANK_META: Record<string, { bg: string; text: string; domain: string }> = {
   'Denizbank': { bg: 'rgba(0,83,159,0.06)', text: '#00539f', domain: 'denizbank.com' },
   'Garanti BBVA': { bg: 'rgba(0,130,66,0.06)', text: '#008242', domain: 'garantibbva.com.tr' },
-  'Garanti': { bg: 'rgba(0,130,66,0.06)', text: '#008242', domain: 'garantibbva.com.tr' },
   'Halkbank': { bg: 'rgba(0,73,144,0.06)', text: '#004990', domain: 'halkbank.com.tr' },
   'N26': { bg: 'rgba(72,209,204,0.06)', text: '#36a3a0', domain: 'n26.com' },
   'Sparkasse': { bg: 'rgba(255,0,0,0.06)', text: '#cc0000', domain: 'sparkasse.de' },
@@ -446,9 +445,9 @@ export default function AccountsPage() {
 
         {/* Account Form Modal */}
         {showAccForm && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}
             onClick={e => { if (e.target === e.currentTarget) closeAccForm() }}>
-            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editAcc ? 'Hesabi Duzenle' : 'Yeni Hesap'}</div>
@@ -688,8 +687,8 @@ export default function AccountsPage() {
         ); })()}
         {/* ===== INVESTMENT EDIT MODAL ===== */}
         {editInv && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={closeInvEdit}>
-            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }} onClick={closeInvEdit}>
+            <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">Yatirimi Duzenle</div>
@@ -814,8 +813,8 @@ export default function AccountsPage() {
         {/* ===== DEBT EDIT MODAL ===== */}
         {/* ===== TAHSİLAT MODAL ===== */}
         {collectModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card p-5 w-full max-w-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+            <div className="glass-bold p-5 w-full max-w-sm rounded-2xl">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center"
                   style={{ background: collectModal.type === 'alacak' ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.08)' }}>
@@ -887,8 +886,8 @@ export default function AccountsPage() {
         )}
 
         {editDebt && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={closeDebtEdit}>
-            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }} onClick={closeDebtEdit}>
+            <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">Kaydi Duzenle</div>

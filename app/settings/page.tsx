@@ -163,7 +163,7 @@ export default function SettingsPage() {
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="mb-6">
       <div className="text-[11px] font-bold uppercase tracking-wider mb-3 px-1" style={{ color: 'var(--muted)' }}>{title}</div>
-      <div className="card rounded-2xl overflow-hidden">
+      <div className="glass rounded-2xl overflow-hidden">
         {children}
       </div>
     </div>
@@ -199,7 +199,7 @@ export default function SettingsPage() {
 
   return (
     <div className="app-layout">
-      <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
+      <div className="bg-blobs" />
       <BottomNav />
       <div className="app-main pb-32 page-enter">
         {/* Header */}
@@ -225,7 +225,7 @@ export default function SettingsPage() {
           {user && (
             <div className="mb-6">
               <div className="text-[11px] font-bold uppercase tracking-wider mb-3 px-1" style={{ color: 'var(--muted)' }}>Hesabım</div>
-              <div className="card rounded-2xl overflow-hidden p-4">
+              <div className="glass-bold rounded-2xl overflow-hidden p-4">
                 {/* Avatar + email row */}
                 <div className="flex items-center gap-4 mb-4">
                   <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -452,8 +452,8 @@ export default function SettingsPage() {
 
       {/* PIN Modal */}
       {pinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-          <div className="card p-5 w-full max-w-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+          <div className="glass-bold p-5 w-full max-w-sm">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(43,45,110,0.08)' }}>
                 🔐

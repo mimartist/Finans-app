@@ -463,7 +463,7 @@ export default function Dashboard() {
           ].filter(r => r.value > 0)
           const total = assetSlices.reduce((s, r) => s + r.value, 0)
           return (
-            <div className="mx-4 mt-4 card p-4">
+            <div className="mx-4 mt-4 glass p-4">
               <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--primary)' }}>Varlik Dagilimi</div>
               <div className="flex items-center gap-4">
                 <div style={{ width: 110, height: 110, flexShrink: 0 }}>
@@ -503,7 +503,7 @@ export default function Dashboard() {
         })()}
 
         {/* ===== YUKUMLULUK ===== */}
-        <div className="mx-4 mt-3 card p-4">
+        <div className="mx-4 mt-3 glass p-4">
           <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#e5484d' }}>Yukumluluk</div>
           <div className="flex flex-col gap-3">
             {[
@@ -530,7 +530,7 @@ export default function Dashboard() {
         </div>
 
         {/* ===== CHART ===== */}
-        <div className="mx-4 mt-4 card p-4">
+        <div className="mx-4 mt-4 glass p-4">
           <div className="text-xs font-bold mb-2" style={{ color: 'var(--text)' }}>Aylik Gider Trendi</div>
           <ResponsiveContainer width="100%" height={120}>
             <BarChart data={chartData} barSize={20}>
@@ -624,7 +624,7 @@ export default function Dashboard() {
             </>
           )}
           {unpaidPayments.length === 0 && (
-            <div className="mx-4 mb-4 card p-6 text-center">
+            <div className="mx-4 mb-4 glass p-6 text-center">
               <IconCheck color="#30a46c" size={28} strokeWidth={2.5} />
               <div className="text-sm font-semibold mt-2" style={{ color: '#30a46c' }}>Tum odemeler tamamlandi</div>
             </div>
@@ -644,7 +644,7 @@ export default function Dashboard() {
         {payModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(30,31,84,0.5)' }}
             onClick={e => { if (e.target === e.currentTarget) { setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) } }}>
-            <div className="card p-6 w-full max-w-sm scale-in">
+            <div className="glass p-6 w-full max-w-sm scale-in">
               <div className="text-base font-bold mb-1">{payModal.overdue ? 'Gecmis Odemeyi Onayla' : 'Odeme Yap'}</div>
               <div className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text)' }}>{payModal.name}</span>

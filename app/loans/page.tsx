@@ -361,7 +361,7 @@ export default function LoansPage() {
             const pct = progressPct(loan)
             const days = loan.payment_day ? daysUntil(loan.payment_day) : null
             return (
-              <div key={loan.id} className="card p-4" style={{ borderLeft: isPaid ? '3px solid #4ade9a' : undefined }}>
+              <div key={loan.id} className="glass p-4" style={{ borderLeft: isPaid ? '3px solid #4ade9a' : undefined }}>
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold">{loan.name}</div>
@@ -543,7 +543,7 @@ export default function LoansPage() {
         {/* Delete Loan Confirm */}
         {deleteConfirm !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card p-5 w-full max-w-sm">
+            <div className="glass p-5 w-full max-w-sm">
               <div className="text-sm font-semibold mb-2">Krediyi Sil</div>
               <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu krediyi silmek istediginize emin misiniz?</div>
               <div className="flex gap-2">
@@ -557,7 +557,7 @@ export default function LoansPage() {
         {/* Delete Transaction Confirm */}
         {txDeleteConfirm !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card p-5 w-full max-w-sm">
+            <div className="glass p-5 w-full max-w-sm">
               <div className="text-sm font-semibold mb-2">Harcamayi Sil</div>
               <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu harcamayi silmek istediginize emin misiniz?</div>
               <div className="flex gap-2">
@@ -717,7 +717,7 @@ export default function LoansPage() {
         {/* Delete Card Confirm */}
         {cardDeleteConfirm !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card p-5 w-full max-w-sm">
+            <div className="glass p-5 w-full max-w-sm">
               <div className="text-sm font-semibold mb-2">Karti Sil</div>
               <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu karti silmek istediginize emin misiniz?</div>
               <div className="flex gap-2">

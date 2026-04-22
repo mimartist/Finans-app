@@ -147,7 +147,7 @@ export default function RecurringPage() {
 
   return (
     <div className="app-layout">
-      <div className="bg-blobs"><div className="bg-blob-3" /><div className="bg-blob-4" /></div>
+      <div className="bg-blobs" />
       <BottomNav />
       <div className="app-main pb-32 page-enter">
         <div className="flex justify-between items-center px-5 pt-5 pb-4">
@@ -188,13 +188,13 @@ export default function RecurringPage() {
         </div>
 
         {/* Type filter */}
-        <div className="flex gap-2 px-4 mb-3">
+        <div className="flex gap-2 px-4 mb-3 glass-soft rounded-full p-1" style={{ display: 'inline-flex', marginLeft: 16, marginRight: 16 }}>
           {([['all', 'Tümü'], ['recurring', 'Düzenli'], ['one_time', 'Tek Seferlik']] as const).map(([val, label]) => (
             <button key={val} onClick={() => setTypeFilter(val)}
               className="px-3 py-1.5 rounded-full text-[12px] font-medium"
               style={{
                 background: typeFilter === val ? 'linear-gradient(135deg, #2b2d6e, #3d3f8f)' : 'transparent',
-                border: typeFilter === val ? 'none' : '1.5px solid var(--border2)',
+                border: 'none',
                 color: typeFilter === val ? '#fff' : 'var(--text2)',
               }}>
               {label}
@@ -265,8 +265,8 @@ export default function RecurringPage() {
 
         {/* Delete confirm */}
         {deleteConfirm !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card p-5 w-full max-w-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+            <div className="glass-bold p-5 w-full max-w-sm">
               <div className="text-sm font-semibold mb-2">Gideri Sil</div>
               <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu gideri silmek istediginize emin misiniz?</div>
               <div className="flex gap-2">
@@ -279,8 +279,8 @@ export default function RecurringPage() {
 
         {/* Add/Edit form */}
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+            <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Gideri Duzenle' : 'Yeni Gider'}</div>
