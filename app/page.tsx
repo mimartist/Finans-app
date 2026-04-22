@@ -354,6 +354,7 @@ export default function Dashboard() {
             <div>
               <span className="text-lg" style={{ color: 'var(--text)' }}>Merhaba </span>
               <span className="text-lg font-extrabold" style={{ color: 'var(--text)' }}>{authUser?.name ? authUser.name.split(' ')[0] : 'Atakan'}!</span>
+              <div className="text-[9px] font-medium" style={{ color: 'var(--muted)' }}>v2.1.0</div>
             </div>
           </div>
           <div className="flex items-center gap-2">

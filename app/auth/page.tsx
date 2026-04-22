@@ -112,6 +112,7 @@ export default function AuthPage() {
             marginBottom: 16,
           }}>F</div>
           <div style={{ color: '#fff', fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px' }}>Finans Asistan</div>
+          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, marginTop: 2 }}>v2.1.0</div>
           <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 4 }}>
             {mode === 'login' ? 'Hesabınıza giriş yapın' : mode === 'signup' ? 'Yeni hesap oluşturun' : 'Şifrenizi sıfırlayın'}
           </div>
