@@ -314,6 +314,7 @@ export default function AccountsPage() {
 
   return (
     <div className="app-layout">
+      <div className="bg-blobs" />
       <BottomNav />
       <div className="app-main pb-32 page-enter">
         {/* Header */}

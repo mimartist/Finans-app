@@ -4,6 +4,7 @@
 @tailwind utilities;
 
 :root {
+  /* ── BRAND — mapped from --fa-* design tokens ────────────── */
   --bg: #f0f2f8;
   --bg2: #ffffff;
   --bg3: #ffffff;
@@ -13,6 +14,7 @@
   --text: #1e2243;
   --text2: #2d3356;
   --muted: #8790a5;
+  --muted2: #b0b7c3;
   --primary: #2b2d6e;
   --primary-light: #3d3f8f;
   --primary-dark: #1e1f54;
@@ -21,38 +23,57 @@
   --accent: #2b2d6e;
   --accent-light: rgba(43,45,110,0.06);
   --accent-mid: rgba(43,45,110,0.12);
+  --green: #30a46c;
+  --red: #e5484d;
+  --amber: #e5a000;
+  --purple: #7c3aed;
+
+  /* ── SHADOWS ─────────────────────────────────────────────── */
   --shadow-xs: 0 1px 2px rgba(30,34,67,0.04);
   --shadow: 0 2px 8px rgba(30,34,67,0.06);
   --shadow-lg: 0 8px 24px rgba(30,34,67,0.08);
   --shadow-xl: 0 12px 40px rgba(30,34,67,0.12);
+
+  /* ── RADII ───────────────────────────────────────────────── */
   --radius: 16px;
   --radius-sm: 12px;
   --radius-xs: 8px;
   --radius-lg: 20px;
   --radius-xl: 24px;
+  --radius-pill: 9999px;
+
+  /* ── GRADIENTS ───────────────────────────────────────────── */
   --grad-start: #1e1f54;
   --grad-mid: #2b2d6e;
   --grad-end: #4a4db0;
 
-  /* Glass morphism tokens */
-  --wallpaper: radial-gradient(120% 80% at 10% 0%, #818cf8 0%, transparent 45%),
-               radial-gradient(100% 80% at 95% 10%, #e879f9 0%, transparent 45%),
-               radial-gradient(120% 100% at 50% 100%, #60a5fa 0%, transparent 50%),
-               linear-gradient(180deg, #ddd6fe 0%, #c4b5fd 100%);
-  --glass-fill: rgba(255,255,255,0.25);
-  --glass-fill-soft: rgba(255,255,255,0.15);
-  --glass-fill-bold: rgba(255,255,255,0.4);
-  --glass-border: rgba(255,255,255,0.45);
-  --glass-border-in: rgba(255,255,255,0.2);
-  --glass-shadow: 0 1px 0 0 rgba(255,255,255,0.6) inset, 0 8px 32px rgba(30,31,84,0.12), 0 2px 6px rgba(30,31,84,0.08);
-  --glass-shadow-lg: 0 1px 0 0 rgba(255,255,255,0.6) inset, 0 18px 48px rgba(30,31,84,0.2), 0 4px 10px rgba(30,31,84,0.1);
-  --blur: 32px;
-  --blur-lg: 48px;
-  --blur-xs: 16px;
-  --saturate: 1.8;
+  /* ── GLASS / LIQUID — authoritative from design system ──── */
+  --wallpaper: radial-gradient(120% 80% at 10% 0%, #a5b4fc 0%, transparent 55%),
+               radial-gradient(100% 80% at 90% 15%, #f0abfc 0%, transparent 55%),
+               radial-gradient(120% 100% at 50% 100%, #60a5fa 0%, transparent 60%),
+               linear-gradient(180deg, #eef1fb 0%, #dbe4fb 100%);
+  --glass-fill: rgba(255,255,255,0.55);
+  --glass-fill-soft: rgba(255,255,255,0.38);
+  --glass-fill-bold: rgba(255,255,255,0.72);
+  --glass-border: rgba(255,255,255,0.65);
+  --glass-border-in: rgba(255,255,255,0.35);
+  --glass-shadow:
+    0 1px 0 0 rgba(255,255,255,0.7) inset,
+    0 -1px 0 0 rgba(43,45,110,0.06) inset,
+    0 8px 32px rgba(30,31,84,0.10),
+    0 2px 6px rgba(30,31,84,0.06);
+  --glass-shadow-lg:
+    0 1px 0 0 rgba(255,255,255,0.7) inset,
+    0 -1px 0 0 rgba(43,45,110,0.08) inset,
+    0 18px 48px rgba(30,31,84,0.18),
+    0 4px 10px rgba(30,31,84,0.08);
+  --blur: 20px;
+  --blur-lg: 32px;
+  --blur-xs: 10px;
+  --saturate: 1.6;
 }
 
-/* ── DARK MODE ────────────────────────────────────────────────── */
+/* ── DARK MODE — authoritative from design system ────────────── */
 [data-theme="dark"] {
   --bg: #0f1117;
   --bg2: #181b2a;
@@ -63,6 +84,7 @@
   --text: #e8eaf6;
   --text2: #c5c9e0;
   --muted: #717899;
+  --muted2: #4e546f;
   --primary: #8b8fda;
   --primary-light: #a5a9e8;
   --primary-dark: #6467c4;
@@ -86,8 +108,16 @@
   --glass-fill-bold: rgba(40,45,75,0.78);
   --glass-border: rgba(255,255,255,0.12);
   --glass-border-in: rgba(255,255,255,0.06);
-  --glass-shadow: 0 1px 0 0 rgba(255,255,255,0.08) inset, 0 -1px 0 0 rgba(0,0,0,0.25) inset, 0 8px 32px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.3);
-  --glass-shadow-lg: 0 1px 0 0 rgba(255,255,255,0.08) inset, 0 -1px 0 0 rgba(0,0,0,0.3) inset, 0 18px 48px rgba(0,0,0,0.55), 0 4px 10px rgba(0,0,0,0.35);
+  --glass-shadow:
+    0 1px 0 0 rgba(255,255,255,0.08) inset,
+    0 -1px 0 0 rgba(0,0,0,0.25) inset,
+    0 8px 32px rgba(0,0,0,0.45),
+    0 2px 6px rgba(0,0,0,0.3);
+  --glass-shadow-lg:
+    0 1px 0 0 rgba(255,255,255,0.08) inset,
+    0 -1px 0 0 rgba(0,0,0,0.3) inset,
+    0 18px 48px rgba(0,0,0,0.55),
+    0 4px 10px rgba(0,0,0,0.35);
 }
 
 [data-theme="dark"] .card {

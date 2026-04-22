@@ -347,7 +347,7 @@ export default function LoansPage() {
         </div>
 
         {loans.length === 0 && (
-          <div className="mx-4 card p-6 text-center text-sm mb-4" style={{ color: 'var(--muted)' }}>
+          <div className="mx-4 glass p-6 text-center text-sm mb-4" style={{ color: 'var(--muted)' }}>
             Henuz kredi eklenmemis.<br />
             <button onClick={openAdd} className="mt-2 text-sm font-medium" style={{ color: 'var(--accent)' }}>Kredi Ekle</button>
           </div>
@@ -442,7 +442,7 @@ export default function LoansPage() {
         <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Kredi Kartlari</div></div>
 
         {totalKK > 0 && (
-          <div className="mx-4 mb-2 card px-4 py-3 flex items-center justify-between">
+          <div className="mx-4 mb-2 glass px-4 py-3 flex items-center justify-between">
             <div className="text-sm font-semibold">Bu Ay Toplam KK</div>
             <div className="mono text-base font-bold amt-amber">{fmt(totalKK)}</div>
           </div>
@@ -456,7 +456,7 @@ export default function LoansPage() {
             const isExpanded = expandedCards.has(card.id)
             const isCardPaid = stmt?.is_paid === true
             return (
-              <div key={card.id} className="card" style={isCardPaid ? { borderLeft: '3px solid #4ade9a' } : undefined}>
+              <div key={card.id} className="glass" style={isCardPaid ? { borderLeft: '3px solid #4ade9a' } : undefined}>
                 <div className="px-4 py-3 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: isCardPaid ? 'rgba(74,222,154,0.08)' : 'var(--accent-light)' }}>
                     {isCardPaid ? (
@@ -571,7 +571,7 @@ export default function LoansPage() {
         {/* Loan Form Modal */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Krediyi Duzenle' : 'Yeni Kredi'}</div>
@@ -614,7 +614,7 @@ export default function LoansPage() {
         {/* Transaction Form Modal */}
         {txFormCardId !== null && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{txEditId ? 'Harcamayi Duzenle' : 'Yeni Harcama'}</div>
@@ -663,7 +663,7 @@ export default function LoansPage() {
         {/* Card Form Modal */}
         {showCardForm && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-            <div className="card slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editCardId ? 'Karti Duzenle' : 'Yeni Kredi Karti'}</div>
