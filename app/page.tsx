@@ -360,12 +360,12 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <button onClick={async () => { if (isDemo) return; setLoading(true); await fetch('/api/update-rates'); await reloadAll(); setLoading(false) }}
               className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: 'var(--bg4)' }}>
+              style={{ background: 'var(--glass-fill-soft)' }}>
               <IconRefresh color="var(--primary)" size={18} strokeWidth={2} />
             </button>
             <NotificationBell payments={payments} />
             <button onClick={() => router.push('/settings')} className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: 'var(--bg4)' }}>
+              style={{ background: 'var(--glass-fill-soft)' }}>
               <IconSettings color="var(--primary)" size={18} strokeWidth={2} />
             </button>
           </div>
@@ -487,10 +487,10 @@ export default function Dashboard() {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="mono text-[11px] font-bold" style={{ color: r.color }}>{fmt(r.value)}</span>
-                            <span className="text-[9px] px-1 py-0.5 rounded-full" style={{ background: 'var(--bg2)', color: 'var(--muted)' }}>%{pct}</span>
+                            <span className="text-[9px] px-1 py-0.5 rounded-full" style={{ background: 'var(--glass-fill-soft)', color: 'var(--muted)' }}>%{pct}</span>
                           </div>
                         </div>
-                        <div className="rounded-full overflow-hidden" style={{ height: 3, background: 'var(--bg2)' }}>
+                        <div className="rounded-full overflow-hidden" style={{ height: 3, background: 'var(--glass-fill-soft)' }}>
                           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: r.color }} />
                         </div>
                       </div>
@@ -569,7 +569,7 @@ export default function Dashboard() {
 
         {/* ===== MONTH SUMMARY — nested card style ===== */}
         <div className="mx-4 mb-4" style={{
-          background: 'var(--bg3)',
+          background: 'var(--glass-fill-soft)',
           borderRadius: 20,
           padding: '16px 14px',
           border: '1.5px solid var(--border)',
@@ -584,18 +584,18 @@ export default function Dashboard() {
 
           {/* Inner nested cards — Toplam / Odenen */}
           <div className="flex gap-2.5 mb-2.5">
-            <div className="flex-1" style={{ background: 'var(--bg2)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
+            <div className="flex-1" style={{ background: 'var(--glass-fill-soft)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Toplam</div>
               <div className="mono text-lg font-extrabold mt-1" style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>{fmt(totalObligation)}</div>
             </div>
-            <div className="flex-1" style={{ background: 'var(--bg2)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
+            <div className="flex-1" style={{ background: 'var(--glass-fill-soft)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Odenen</div>
               <div className="mono text-lg font-extrabold mt-1 amt-green" style={{ letterSpacing: '-0.03em' }}>{fmt(paidTotal)}</div>
             </div>
           </div>
 
           {/* Bottom row — Kalan + progress */}
-          <div style={{ background: 'var(--bg2)', borderRadius: 14, padding: '12px 16px', boxShadow: 'var(--shadow-xs)' }}>
+          <div style={{ background: 'var(--glass-fill-soft)', borderRadius: 14, padding: '12px 16px', boxShadow: 'var(--shadow-xs)' }}>
             <div className="flex items-center justify-between mb-2">
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#e5484d' }}>Kalan</div>
@@ -652,7 +652,7 @@ export default function Dashboard() {
               </div>
 
               {/* Payment method tabs */}
-              <div className="flex gap-1.5 mb-4 p-1 rounded-xl" style={{ background: 'var(--bg4)' }}>
+              <div className="flex gap-1.5 mb-4 p-1 rounded-xl" style={{ background: 'var(--glass-fill-soft)' }}>
                 {([['hesap', 'Hesaptan', IconBank], ['kredi_karti', 'Kredi Karti', IconCreditCard], ['nakit', 'Nakit', IconCash]] as const).map(([val, label, Icon]) => (
                   <button key={val} onClick={() => setPayMethod(val)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold transition-all"

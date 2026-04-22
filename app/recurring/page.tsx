@@ -284,7 +284,7 @@ export default function RecurringPage() {
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Gideri Duzenle' : 'Yeni Gider'}</div>
-                <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+                <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
 
               {/* Expense type toggle */}

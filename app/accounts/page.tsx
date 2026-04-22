@@ -327,7 +327,7 @@ export default function AccountsPage() {
 
         {/* Tab Selector — single card with 3 tabs */}
         <div className="mx-4 mb-4">
-          <div className="flex p-1 rounded-2xl" style={{ background: 'var(--bg2)', border: '1.5px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+          <div className="flex p-1 rounded-2xl" style={{ background: 'var(--glass-fill-soft)', border: '1.5px solid var(--border)', boxShadow: 'var(--shadow)' }}>
             {tabs.map(t => (
               <button key={t.key} onClick={() => setTab(t.key)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[11px] font-semibold transition-all"
@@ -376,7 +376,7 @@ export default function AccountsPage() {
                 const logo = getBankLogo(bank)
                 const isExpanded = expandedBanks.has(bank)
                 return (
-                  <div key={bank} className="rounded-2xl overflow-hidden" style={{ border: '1.5px solid var(--border)', background: 'var(--bg2)', boxShadow: 'var(--shadow)' }}>
+                  <div key={bank} className="rounded-2xl overflow-hidden" style={{ border: '1.5px solid var(--border)', background: 'var(--glass-fill-soft)', boxShadow: 'var(--shadow)' }}>
                     {/* Bank header — clickable */}
                     <button onClick={() => toggleBank(bank)}
                       className="w-full flex items-center gap-3 px-4 py-3.5"
@@ -452,7 +452,7 @@ export default function AccountsPage() {
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editAcc ? 'Hesabi Duzenle' : 'Yeni Hesap'}</div>
-                <button onClick={closeAccForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+                <button onClick={closeAccForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
@@ -693,7 +693,7 @@ export default function AccountsPage() {
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">Yatirimi Duzenle</div>
-                <button onClick={closeInvEdit} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+                <button onClick={closeInvEdit} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
@@ -741,7 +741,7 @@ export default function AccountsPage() {
                   const pnlPct = costBasis > 0 ? (pnl / costBasis) * 100 : 0
                   if (qty <= 0 || avgCost <= 0) return null
                   return (
-                    <div className="rounded-xl p-3" style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}>
+                    <div className="rounded-xl p-3" style={{ background: 'var(--glass-fill-soft)', border: '1px solid var(--border)' }}>
                       <div className="text-[9px] uppercase tracking-wide font-semibold mb-2" style={{ color: 'var(--muted)' }}>Canli Hesaplama</div>
                       <div className="flex justify-between text-[11px] mb-1">
                         <span style={{ color: 'var(--muted)' }}>Maliyet</span>
@@ -802,7 +802,7 @@ export default function AccountsPage() {
                 <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
                   <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu yatirimi silmek istediginize emin misiniz?</div>
                   <div className="flex gap-2">
-                    <button onClick={() => setInvDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--bg4)', color: 'var(--text)' }}>Iptal</button>
+                    <button onClick={() => setInvDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--glass-fill-soft)', color: 'var(--text)' }}>Iptal</button>
                     <button onClick={handleInvDelete} className="flex-1 py-2 rounded-lg text-sm font-semibold" style={{ background: '#dc2626', color: '#fff' }}>Evet, Sil</button>
                   </div>
                 </div>
@@ -829,7 +829,7 @@ export default function AccountsPage() {
 
               {/* Kalan tutar */}
               <div className="rounded-lg px-3 py-2 mb-4 flex justify-between items-center"
-                style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}>
+                style={{ background: 'var(--glass-fill-soft)', border: '1px solid var(--border)' }}>
                 <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Kalan tutar</span>
                 <span className="mono font-bold text-[14px]" style={{ color: collectModal.type === 'alacak' ? '#059669' : '#dc2626' }}>
                   {fmt(collectModal.amount, collectModal.currency)}
@@ -846,7 +846,7 @@ export default function AccountsPage() {
                       placeholder="0" type="number" className="input mono flex-1" />
                     <button onClick={() => setCollectAmount(String(collectModal.amount))}
                       className="px-3 rounded-lg text-[11px] font-semibold flex-shrink-0"
-                      style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
+                      style={{ background: 'var(--glass-fill-soft)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
                       Tamamı
                     </button>
                   </div>
@@ -892,7 +892,7 @@ export default function AccountsPage() {
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">Kaydi Duzenle</div>
-                <button onClick={closeDebtEdit} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+                <button onClick={closeDebtEdit} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
@@ -936,7 +936,7 @@ export default function AccountsPage() {
                 <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
                   <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu kaydi silmek istediginize emin misiniz?</div>
                   <div className="flex gap-2">
-                    <button onClick={() => setDebtDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--bg4)', color: 'var(--text)' }}>Iptal</button>
+                    <button onClick={() => setDebtDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--glass-fill-soft)', color: 'var(--text)' }}>Iptal</button>
                     <button onClick={handleDebtDelete} className="flex-1 py-2 rounded-lg text-sm font-semibold" style={{ background: '#dc2626', color: '#fff' }}>Evet, Sil</button>
                   </div>
                 </div>

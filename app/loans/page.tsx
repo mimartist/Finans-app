@@ -383,7 +383,7 @@ export default function LoansPage() {
                       ) : null}
                     </div>
                     <div className="flex gap-1 ml-1">
-                      <button onClick={() => openEdit(loan)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
+                      <button onClick={() => openEdit(loan)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--glass-fill-soft)' }}>✏️</button>
                       <button onClick={() => setDeleteConfirm(loan.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
                     </div>
                   </div>
@@ -487,7 +487,7 @@ export default function LoansPage() {
                       )}
                     </div>
                     <div className="flex gap-1">
-                      <button onClick={() => openCardEdit(card)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--bg4)' }}>✏️</button>
+                      <button onClick={() => openCardEdit(card)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'var(--glass-fill-soft)' }}>✏️</button>
                       <button onClick={() => setCardDeleteConfirm(card.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
                     </div>
                   </div>
@@ -504,7 +504,7 @@ export default function LoansPage() {
                   {cardTxs.length > 0 && (
                     <button onClick={() => toggleExpand(card.id)}
                       className="text-[11px] font-medium px-3 py-1.5 rounded-lg"
-                      style={{ background: 'var(--bg4)', color: 'var(--muted)' }}>
+                      style={{ background: 'var(--glass-fill-soft)', color: 'var(--muted)' }}>
                       {isExpanded ? 'Gizle' : `Son ${cardTxs.length} islem`}
                     </button>
                   )}
@@ -527,7 +527,7 @@ export default function LoansPage() {
                           </div>
                           <div className="mono text-[13px] font-semibold amt-red flex-shrink-0">{fmt(tx.amount, tx.currency)}</div>
                           <div className="flex gap-1 flex-shrink-0">
-                            <button onClick={() => openTxEdit(tx)} className="w-6 h-6 rounded flex items-center justify-center text-[10px]" style={{ background: 'var(--bg4)' }}>✏️</button>
+                            <button onClick={() => openTxEdit(tx)} className="w-6 h-6 rounded flex items-center justify-center text-[10px]" style={{ background: 'var(--glass-fill-soft)' }}>✏️</button>
                             <button onClick={() => setTxDeleteConfirm(tx.id)} className="w-6 h-6 rounded flex items-center justify-center text-[10px]" style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
                           </div>
                         </div>
@@ -575,7 +575,7 @@ export default function LoansPage() {
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Krediyi Duzenle' : 'Yeni Kredi'}</div>
-                <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+                <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 {inp('Kredi Adi', 'name', 'text', 'Orn: Mercedes Kredi')}
@@ -618,7 +618,7 @@ export default function LoansPage() {
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{txEditId ? 'Harcamayi Duzenle' : 'Yeni Harcama'}</div>
-                <button onClick={closeTxForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+                <button onClick={closeTxForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
@@ -667,7 +667,7 @@ export default function LoansPage() {
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editCardId ? 'Karti Duzenle' : 'Yeni Kredi Karti'}</div>
-                <button onClick={closeCardForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+                <button onClick={closeCardForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div className="flex gap-3">

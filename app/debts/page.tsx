@@ -270,7 +270,7 @@ export default function DebtsPage() {
                   <div
                     className="px-3 py-2.5 flex items-center gap-2.5"
                     style={{
-                      background: 'var(--bg3)',
+                      background: 'var(--glass-fill-soft)',
                       borderRadius: isExpanded ? '12px 12px 0 0' : 12,
                       border: '1px solid var(--border)',
                       borderLeft,
@@ -351,7 +351,7 @@ export default function DebtsPage() {
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="px-4 py-3" style={{
-                      background: 'var(--bg3)',
+                      background: 'var(--glass-fill-soft)',
                       borderRadius: '0 0 12px 12px',
                       border: '1px solid var(--border)',
                       borderTop: 'none',
@@ -423,7 +423,7 @@ export default function DebtsPage() {
                         </button>
                         <button onClick={() => openEdit(d)}
                           className="w-9 h-9 rounded-lg flex items-center justify-center text-xs"
-                          style={{ background: 'var(--bg4)' }}>✏️</button>
+                          style={{ background: 'var(--glass-fill-soft)' }}>✏️</button>
                         <button onClick={() => setDeleteConfirm(d.id)}
                           className="w-9 h-9 rounded-lg flex items-center justify-center text-xs"
                           style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
@@ -468,7 +468,7 @@ export default function DebtsPage() {
 
               {/* Kalan tutar bilgisi */}
               <div className="rounded-lg px-3 py-2 mb-4 mt-3 flex justify-between items-center"
-                style={{ background: 'var(--bg4)', border: '1px solid var(--border)' }}>
+                style={{ background: 'var(--glass-fill-soft)', border: '1px solid var(--border)' }}>
                 <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Kalan tutar</span>
                 <span className="mono font-bold text-[14px]" style={{ color: payModal.type === 'alacak' ? '#059669' : '#dc2626' }}>
                   {fmt(payModal.amount, payModal.currency)}
@@ -487,7 +487,7 @@ export default function DebtsPage() {
                     <button
                       onClick={() => setPayAmount(String(payModal.amount))}
                       className="px-3 rounded-lg text-[11px] font-semibold flex-shrink-0"
-                      style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
+                      style={{ background: 'var(--glass-fill-soft)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
                       Tamamı
                     </button>
                   </div>
@@ -538,7 +538,7 @@ export default function DebtsPage() {
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Kaydi Duzenle' : 'Yeni Kayit'}</div>
-                <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+                <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>

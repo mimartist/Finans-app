@@ -179,7 +179,7 @@ export default function InvestmentsPage() {
           <div className="flex gap-2">
             <button onClick={updateRates} disabled={updatingRates}
               className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5"
-              style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: updatingRates ? 'var(--muted)' : 'var(--accent)' }}>
+              style={{ background: 'var(--glass-fill-soft)', border: '1px solid var(--border)', color: updatingRates ? 'var(--muted)' : 'var(--accent)' }}>
               {updatingRates ? '↻ ...' : '↻ Kurlari Guncelle'}
             </button>
           </div>
@@ -258,7 +258,7 @@ export default function InvestmentsPage() {
                     onClick={() => setExpandedId(isExpanded ? null : inv.id)}
                     className="px-3 py-2.5 flex items-center gap-3 cursor-pointer"
                     style={{
-                      background: 'var(--bg3)',
+                      background: 'var(--glass-fill-soft)',
                       borderRadius: isExpanded ? '12px 12px 0 0' : 12,
                       border: '1px solid var(--border)',
                       borderLeft: `3px solid ${pnlColor}`,
@@ -287,7 +287,7 @@ export default function InvestmentsPage() {
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="px-4 py-3" style={{
-                      background: 'var(--bg3)',
+                      background: 'var(--glass-fill-soft)',
                       borderRadius: '0 0 12px 12px',
                       border: '1px solid var(--border)',
                       borderTop: 'none',
@@ -322,7 +322,7 @@ export default function InvestmentsPage() {
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); setPriceEditId(null); setPriceInput('') }}
                                   className="text-[10px] px-1.5 py-1 rounded"
-                                  style={{ background: 'var(--bg4)', color: 'var(--muted)' }}>✕</button>
+                                  style={{ background: 'var(--glass-fill-soft)', color: 'var(--muted)' }}>✕</button>
                               </div>
                             ) : (
                               <>
@@ -377,7 +377,7 @@ export default function InvestmentsPage() {
                       <div className="flex gap-2">
                         <button onClick={(e) => { e.stopPropagation(); openEdit(inv) }}
                           className="w-9 h-9 rounded-lg flex items-center justify-center text-xs"
-                          style={{ background: 'var(--bg4)' }}>✏️</button>
+                          style={{ background: 'var(--glass-fill-soft)' }}>✏️</button>
                         <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(inv.id) }}
                           className="w-9 h-9 rounded-lg flex items-center justify-center text-xs"
                           style={{ background: 'rgba(220,38,38,0.06)' }}>🗑️</button>
@@ -409,7 +409,7 @@ export default function InvestmentsPage() {
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold">{editId ? 'Yatirimi Duzenle' : 'Yeni Yatirim'}</div>
-                <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg4)' }}>✕</button>
+                <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>

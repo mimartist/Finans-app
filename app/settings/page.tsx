@@ -204,7 +204,7 @@ export default function SettingsPage() {
       <div className="app-main pb-32 page-enter">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 pt-6 pb-4">
-          <button onClick={() => router.back()} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--bg4)' }}>
+          <button onClick={() => router.back()} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2b2d6e" strokeWidth="2" strokeLinecap="round">
               <path d="M19 12H5" /><polyline points="12 19 5 12 12 5" />
             </svg>
@@ -284,7 +284,7 @@ export default function SettingsPage() {
                 {/* Password reset */}
                 <button onClick={handlePasswordReset}
                   className="w-full py-2.5 text-sm font-semibold rounded-xl mb-2"
-                  style={{ background: 'var(--bg4)', border: 'none', color: 'var(--text)', cursor: 'pointer' }}>
+                  style={{ background: 'var(--glass-fill-soft)', border: 'none', color: 'var(--text)', cursor: 'pointer' }}>
                   Şifre Değiştir
                 </button>
                 {pwResetMsg && (
@@ -309,12 +309,12 @@ export default function SettingsPage() {
             <Row label="Kullanici Adi" desc="Dashboard'da gorunecek isim">
               <input value={settings.userName} onChange={e => update('userName', e.target.value)}
                 className="text-[13px] font-medium text-right rounded-lg px-3 py-1.5"
-                style={{ background: 'var(--bg4)', border: 'none', width: 140, color: 'var(--text)' }} />
+                style={{ background: 'var(--glass-fill-soft)', border: 'none', width: 140, color: 'var(--text)' }} />
             </Row>
             <Row label="Varsayilan Para Birimi">
               <select value={settings.defaultCurrency} onChange={e => update('defaultCurrency', e.target.value)}
                 className="text-[13px] font-medium rounded-lg px-3 py-1.5"
-                style={{ background: 'var(--bg4)', border: 'none', color: 'var(--text)' }}>
+                style={{ background: 'var(--glass-fill-soft)', border: 'none', color: 'var(--text)' }}>
                 <option value="TRY">₺ TRY</option>
                 <option value="EUR">€ EUR</option>
                 <option value="USD">$ USD</option>
@@ -327,7 +327,7 @@ export default function SettingsPage() {
             <Row label="Hatirlatma Zamani" desc="Odeme gununen kac gun once">
               <select value={settings.remindDaysBefore} onChange={e => update('remindDaysBefore', Number(e.target.value))}
                 className="text-[13px] font-medium rounded-lg px-3 py-1.5"
-                style={{ background: 'var(--bg4)', border: 'none', color: 'var(--text)' }}>
+                style={{ background: 'var(--glass-fill-soft)', border: 'none', color: 'var(--text)' }}>
                 <option value={1}>1 gun once</option>
                 <option value={2}>2 gun once</option>
                 <option value={3}>3 gun once</option>
@@ -360,7 +360,7 @@ export default function SettingsPage() {
             <Row label="Dil">
               <select value={settings.language} onChange={e => update('language', e.target.value)}
                 className="text-[13px] font-medium rounded-lg px-3 py-1.5"
-                style={{ background: 'var(--bg4)', border: 'none', color: 'var(--text)' }}>
+                style={{ background: 'var(--glass-fill-soft)', border: 'none', color: 'var(--text)' }}>
                 <option value="tr">Turkce</option>
                 <option value="en">English</option>
               </select>
