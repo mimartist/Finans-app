@@ -48,15 +48,15 @@
   --grad-end: #4a4db0;
 
   /* ── GLASS / LIQUID — authoritative from design system ──── */
-  --wallpaper: radial-gradient(120% 80% at 10% 0%, #a5b4fc 0%, transparent 55%),
-               radial-gradient(100% 80% at 90% 15%, #f0abfc 0%, transparent 55%),
-               radial-gradient(120% 100% at 50% 100%, #60a5fa 0%, transparent 60%),
-               linear-gradient(180deg, #eef1fb 0%, #dbe4fb 100%);
-  --glass-fill: rgba(255,255,255,0.55);
-  --glass-fill-soft: rgba(255,255,255,0.38);
-  --glass-fill-bold: rgba(255,255,255,0.72);
-  --glass-border: rgba(255,255,255,0.65);
-  --glass-border-in: rgba(255,255,255,0.35);
+  --wallpaper: radial-gradient(120% 80% at 10% 0%, #818cf8 0%, transparent 45%),
+               radial-gradient(100% 80% at 95% 10%, #e879f9 0%, transparent 45%),
+               radial-gradient(120% 100% at 50% 100%, #60a5fa 0%, transparent 50%),
+               linear-gradient(180deg, #ddd6fe 0%, #c4b5fd 100%);
+  --glass-fill: rgba(255,255,255,0.25);
+  --glass-fill-soft: rgba(255,255,255,0.15);
+  --glass-fill-bold: rgba(255,255,255,0.4);
+  --glass-border: rgba(255,255,255,0.45);
+  --glass-border-in: rgba(255,255,255,0.2);
   --glass-shadow:
     0 1px 0 0 rgba(255,255,255,0.7) inset,
     0 -1px 0 0 rgba(43,45,110,0.06) inset,
@@ -67,10 +67,10 @@
     0 -1px 0 0 rgba(43,45,110,0.08) inset,
     0 18px 48px rgba(30,31,84,0.18),
     0 4px 10px rgba(30,31,84,0.08);
-  --blur: 20px;
-  --blur-lg: 32px;
-  --blur-xs: 10px;
-  --saturate: 1.6;
+  --blur: 32px;
+  --blur-lg: 48px;
+  --blur-xs: 16px;
+  --saturate: 1.8;
 }
 
 /* ── DARK MODE — authoritative from design system ────────────── */
