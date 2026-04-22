@@ -3,7 +3,7 @@ const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
+  disable: true,
 })
 
 const securityHeaders = [
@@ -18,8 +18,9 @@ const nextConfig = {
   reactStrictMode: true,
   async headers() {
     return [
-      { source: '/(.*)', headers: securityHeaders },
+      { source: '/(.*)', headers: [...securityHeaders, { key: 'Cache-Control', value: 'no-cache, must-revalidate' }] },
       { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }] },
+      { source: '/_next/static/(.*)', headers: [{ key: 'Cache-Control', value: 'no-cache, must-revalidate' }] },
     ]
   },
 }
