@@ -18,7 +18,7 @@ const emptyTx = {
 }
 
 const emptyCard = {
-  name: '', bank: '', credit_limit: '', currency: 'TRY', due_day: '', statement_day: '',
+  name: '', bank: '', credit_limit: '', currency: 'TRY', due_day: '', statement_day: '', current_spending: '',
 }
 
 export default function LoansPage() {
@@ -124,12 +124,14 @@ export default function LoansPage() {
   function openCardAdd() { setEditCardId(null); setCardForm(emptyCard); setShowCardForm(true) }
   function openCardEdit(card: CreditCard) {
     setEditCardId(card.id)
+    const stmt = statements.find(s => s.card_id === card.id)
     setCardForm({
       name: card.name, bank: card.bank,
       credit_limit: String((card as any).credit_limit || (card as any).limit_amount || ''),
       currency: (card as any).currency || 'TRY',
       due_day: String(card.due_day || ''),
       statement_day: String(card.statement_day || ''),
+      current_spending: stmt ? String(stmt.total_amount || '') : '',
     })
     setShowCardForm(true)
   }
@@ -148,8 +150,29 @@ export default function LoansPage() {
       is_active: true,
       ...(userId ? { user_id: userId } : {}),
     }
+    let cardId = editCardId
     if (editCardId) { await supabase.from('credit_cards').update(payload).eq('id', editCardId) }
-    else { await supabase.from('credit_cards').insert(payload) }
+    else {
+      const { data: newCard } = await supabase.from('credit_cards').insert(payload).select().single()
+      if (newCard) cardId = newCard.id
+    }
+
+    const spending = parseFloat(cardForm.current_spending)
+    if (cardId && !isNaN(spending) && spending >= 0) {
+      const now = new Date()
+      const year = now.getFullYear(), month = now.getMonth() + 1
+      const existingStmt = statements.find(s => s.card_id === cardId)
+      if (existingStmt) {
+        await supabase.from('credit_card_statements').update({ total_amount: spending }).eq('id', existingStmt.id)
+      } else {
+        await supabase.from('credit_card_statements').insert({
+          card_id: cardId, period_year: year, period_month: month,
+          total_amount: spending, minimum_payment: 0, is_paid: false,
+          ...(userId ? { user_id: userId } : {}),
+        })
+      }
+    }
+
     setCardSaving(false); closeCardForm(); await load()
   }
 
@@ -678,6 +701,11 @@ export default function LoansPage() {
                     <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ekstre Gunu</label>
                     <input value={cardForm.statement_day} onChange={e => setCardForm(f => ({ ...f, statement_day: e.target.value }))} type="number" placeholder="1-31" min="1" max="31" className="input" />
                   </div>
+                </div>
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: '#d97706' }}>Bu Ay Harcama Tutari</label>
+                  <input value={cardForm.current_spending} onChange={e => setCardForm(f => ({ ...f, current_spending: e.target.value }))} type="number" placeholder="Toplam ekstre tutari" className="input mono" style={{ borderColor: 'rgba(217,119,6,0.3)' }} />
+                  <div className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>Bu ayin toplam kredi karti borcunu girin. Dashboard'da gorunur.</div>
                 </div>
               </div>
               <button onClick={handleCardSave} disabled={cardSaving || !cardForm.name || !cardForm.bank}

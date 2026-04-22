@@ -82,6 +82,9 @@ export default function BottomNav() {
             <span>Ayarlar</span>
           </Link>
         </nav>
+        <div className="px-6 mt-auto pt-4 pb-4">
+          <div className="text-[10px] font-medium" style={{ color: 'var(--muted)', opacity: 0.5 }}>v2.1.0</div>
+        </div>
       </aside>
 
       {/* Mobile Bottom Nav — floating pill, 20px from bottom */}
