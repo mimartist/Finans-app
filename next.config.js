@@ -17,7 +17,10 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   async headers() {
-    return [{ source: '/(.*)', headers: securityHeaders }]
+    return [
+      { source: '/(.*)', headers: securityHeaders },
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }] },
+    ]
   },
 }
 
