@@ -325,7 +325,7 @@ export default function LoansPage() {
             </div>
             <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
               style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
-              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>KREDİ KARTI</div>
+              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.72)' }}>KREDİ KARTI</div>
               <div className="mono text-[12px] font-bold mt-0.5">{fmt(totalKK)}</div>
             </div>
             {loans.length > 0 && (() => {
@@ -377,7 +377,7 @@ export default function LoansPage() {
                         <span className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>/ay</span>
                       </div>
                       {isPaid ? (
-                        <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Bu ay odendi</div>
+                        <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Bu ay ödendi</div>
                       ) : days !== null ? (
                         <div className="text-[11px] mt-0.5" style={{ color: days <= 3 ? '#dc2626' : 'var(--muted)' }}>{daysUntilLabel(days)}</div>
                       ) : null}
@@ -404,7 +404,7 @@ export default function LoansPage() {
                 </div>
                 {loan.paid_installments > 0 && (
                   <div className="text-[10px] mt-1.5" style={{ color: 'var(--muted)' }}>
-                    Toplam Odenen: <span className="amt-green font-semibold">{fmt(loan.paid_installments * loan.monthly_payment, loan.currency)}</span>
+                    Toplam Ödenen: <span className="amt-green font-semibold">{fmt(loan.paid_installments * loan.monthly_payment, loan.currency)}</span>
                     {loan.currency === 'EUR' && <span> ({fmt(loan.paid_installments * loan.monthly_payment * eurTry)})</span>}
                     <span> · {loan.paid_installments} taksit</span>
                   </div>
@@ -426,7 +426,7 @@ export default function LoansPage() {
               {paidLoansList.length > 0 && (
                 <>
                   <div className="px-5 mb-2 flex items-center gap-2">
-                    <div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: '#059669' }}>Odenen Krediler</div>
+                    <div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: '#059669' }}>Ödenen Krediler</div>
                     <div className="flex-1 h-px" style={{ background: 'rgba(74,222,154,0.3)' }} />
                     <div className="text-[10px] font-medium" style={{ color: '#059669' }}>{paidLoansList.length} odeme</div>
                   </div>
@@ -469,7 +469,7 @@ export default function LoansPage() {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium">{card.name}</div>
-                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>Ekstre: {card.statement_day}'i · Son odeme: {card.due_day}'i</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>Ekstre: {card.statement_day}'i · Son ödeme: {card.due_day}'i</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="text-right">
@@ -477,7 +477,7 @@ export default function LoansPage() {
                         <>
                           <div className={isCardPaid ? 'mono text-sm font-semibold' : 'mono text-sm font-semibold amt-amber'} style={isCardPaid ? { color: '#4ade9a' } : undefined}>{fmt(stmt.total_amount)}</div>
                           {isCardPaid ? (
-                            <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Odendi</div>
+                            <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Ödendi</div>
                           ) : (
                             <div className="text-[11px] mt-0.5" style={{ color: days && days <= 3 ? '#dc2626' : 'var(--muted)' }}>{days !== null ? daysUntilLabel(days) : ''}</div>
                           )}
@@ -505,7 +505,7 @@ export default function LoansPage() {
                     <button onClick={() => toggleExpand(card.id)}
                       className="text-[11px] font-medium px-3 py-1.5 rounded-lg"
                       style={{ background: 'var(--glass-fill-soft)', color: 'var(--muted)' }}>
-                      {isExpanded ? 'Gizle' : `Son ${cardTxs.length} islem`}
+                      {isExpanded ? 'Gizle' : `Son ${cardTxs.length} işlem`}
                     </button>
                   )}
                 </div>
@@ -545,9 +545,9 @@ export default function LoansPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="glass p-5 w-full max-w-sm">
               <div className="text-sm font-semibold mb-2">Krediyi Sil</div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu krediyi silmek istediginize emin misiniz?</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu krediyi silmek istediğinize emin misiniz?</div>
               <div className="flex gap-2">
-                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
               </div>
             </div>
@@ -559,9 +559,9 @@ export default function LoansPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="glass p-5 w-full max-w-sm">
               <div className="text-sm font-semibold mb-2">Harcamayi Sil</div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu harcamayi silmek istediginize emin misiniz?</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu harcamayi silmek istediğinize emin misiniz?</div>
               <div className="flex gap-2">
-                <button onClick={() => setTxDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => setTxDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={() => handleTxDelete(txDeleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
               </div>
             </div>
@@ -574,15 +574,15 @@ export default function LoansPage() {
             <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{editId ? 'Krediyi Duzenle' : 'Yeni Kredi'}</div>
+                <div className="text-sm font-semibold">{editId ? 'Krediyi Düzenle' : 'Yeni Kredi'}</div>
                 <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
-                {inp('Kredi Adi', 'name', 'text', 'Orn: Mercedes Kredi')}
+                {inp('Kredi Adi', 'name', 'text', 'Örn: Mercedes Kredi')}
                 <div className="flex gap-3">
-                  {inp('Banka', 'bank', 'text', 'Orn: Garanti')}
+                  {inp('Banka', 'bank', 'text', 'Örn: Garanti')}
                   <div>
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tür</label>
                     <select value={form.type} onChange={e => set('type', e.target.value)} className="input">
                       <option value="ihtiyac">Ihtiyac</option><option value="tasit">Tasit</option>
                       <option value="konut">Konut</option><option value="ticari">Ticari</option><option value="diger">Diger</option>
@@ -591,7 +591,7 @@ export default function LoansPage() {
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={form.currency} onChange={e => set('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -599,14 +599,14 @@ export default function LoansPage() {
                   {inp('Faiz %', 'interest_rate', 'number', '0')}
                 </div>
                 <div className="flex gap-3">{inp('Orijinal Tutar', 'original_amount', 'number', '0')}{inp('Kalan Tutar', 'remaining_amount', 'number', '0')}</div>
-                <div className="flex gap-3">{inp('Aylik Odeme', 'monthly_payment', 'number', '0')}{inp('Odeme Gunu', 'payment_day', 'number', '1-31')}</div>
-                <div className="flex gap-3">{inp('Toplam Taksit', 'total_installments', 'number', '0')}{inp('Odenen Taksit', 'paid_installments', 'number', '0')}</div>
+                <div className="flex gap-3">{inp('Aylık Ödeme', 'monthly_payment', 'number', '0')}{inp('Ödeme Günü', 'payment_day', 'number', '1-31')}</div>
+                <div className="flex gap-3">{inp('Toplam Taksit', 'total_installments', 'number', '0')}{inp('Ödenen Taksit', 'paid_installments', 'number', '0')}</div>
                 <div className="flex gap-3">{inp('Baslangic', 'start_date', 'date')}{inp('Bitis', 'end_date', 'date')}</div>
-                {inp('Teminat', 'collateral', 'text', 'Orn: Arac rehni')}
+                {inp('Teminat', 'collateral', 'text', 'Örn: Arac rehni')}
                 {inp('Notlar', 'notes', 'text')}
               </div>
               <button onClick={handleSave} disabled={saving || !form.name || !form.bank || !form.monthly_payment}
-                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Guncelle' : 'Ekle'}</button>
+                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Güncelle' : 'Ekle'}</button>
             </div>
           </div>
         )}
@@ -617,7 +617,7 @@ export default function LoansPage() {
             <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{txEditId ? 'Harcamayi Duzenle' : 'Yeni Harcama'}</div>
+                <div className="text-sm font-semibold">{txEditId ? 'Harcamayi Düzenle' : 'Yeni Harcama'}</div>
                 <button onClick={closeTxForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
@@ -627,7 +627,7 @@ export default function LoansPage() {
                 </div>
                 <div>
                   <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Aciklama</label>
-                  <input value={txForm.description} onChange={e => setTx('description', e.target.value)} placeholder="Orn: Migros alisveris" className="input" />
+                  <input value={txForm.description} onChange={e => setTx('description', e.target.value)} placeholder="Örn: Migros alisveris" className="input" />
                 </div>
                 <div>
                   <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kategori</label>
@@ -656,7 +656,7 @@ export default function LoansPage() {
                 </div>
               </div>
               <button onClick={handleTxSave} disabled={txSaving || !txForm.description || !txForm.amount}
-                className="btn-primary w-full mt-4 py-3">{txSaving ? 'Kaydediliyor...' : txEditId ? 'Guncelle' : 'Ekle'}</button>
+                className="btn-primary w-full mt-4 py-3">{txSaving ? 'Kaydediliyor...' : txEditId ? 'Güncelle' : 'Ekle'}</button>
             </div>
           </div>
         )}
@@ -666,18 +666,18 @@ export default function LoansPage() {
             <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{editCardId ? 'Karti Duzenle' : 'Yeni Kredi Karti'}</div>
+                <div className="text-sm font-semibold">{editCardId ? 'Kartı Düzenle' : 'Yeni Kredi Kartı'}</div>
                 <button onClick={closeCardForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kart Adi</label>
-                    <input value={cardForm.name} onChange={e => setCardForm(f => ({ ...f, name: e.target.value }))} placeholder="Orn: Bonus, Miles" className="input" />
+                    <input value={cardForm.name} onChange={e => setCardForm(f => ({ ...f, name: e.target.value }))} placeholder="Örn: Bonus, Miles" className="input" />
                   </div>
                   <div className="flex-1">
                     <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Banka</label>
-                    <input value={cardForm.bank} onChange={e => setCardForm(f => ({ ...f, bank: e.target.value }))} placeholder="Orn: Garanti" className="input" />
+                    <input value={cardForm.bank} onChange={e => setCardForm(f => ({ ...f, bank: e.target.value }))} placeholder="Örn: Garanti" className="input" />
                   </div>
                 </div>
                 <div className="flex gap-3">
@@ -686,7 +686,7 @@ export default function LoansPage() {
                     <input value={cardForm.credit_limit} onChange={e => setCardForm(f => ({ ...f, credit_limit: e.target.value }))} type="number" placeholder="0" className="input mono" />
                   </div>
                   <div className="w-28">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={cardForm.currency} onChange={e => setCardForm(f => ({ ...f, currency: e.target.value }))} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -694,22 +694,22 @@ export default function LoansPage() {
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Son Odeme Gunu</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Son Ödeme Günü</label>
                     <input value={cardForm.due_day} onChange={e => setCardForm(f => ({ ...f, due_day: e.target.value }))} type="number" placeholder="1-31" min="1" max="31" className="input" />
                   </div>
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ekstre Gunu</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ekstre Günü</label>
                     <input value={cardForm.statement_day} onChange={e => setCardForm(f => ({ ...f, statement_day: e.target.value }))} type="number" placeholder="1-31" min="1" max="31" className="input" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: '#d97706' }}>Bu Ay Harcama Tutari</label>
-                  <input value={cardForm.current_spending} onChange={e => setCardForm(f => ({ ...f, current_spending: e.target.value }))} type="number" placeholder="Toplam ekstre tutari" className="input mono" style={{ borderColor: 'rgba(217,119,6,0.3)' }} />
-                  <div className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>Bu ayin toplam kredi karti borcunu girin. Dashboard'da gorunur.</div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: '#d97706' }}>Bu Ay Harcama Tutarı</label>
+                  <input value={cardForm.current_spending} onChange={e => setCardForm(f => ({ ...f, current_spending: e.target.value }))} type="number" placeholder="Toplam ekstre tutarı" className="input mono" style={{ borderColor: 'rgba(217,119,6,0.3)' }} />
+                  <div className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>Bu ayın toplam kredi kartı borcunu girin. Dashboard'da görünür.</div>
                 </div>
               </div>
               <button onClick={handleCardSave} disabled={cardSaving || !cardForm.name || !cardForm.bank}
-                className="btn-primary w-full mt-4 py-3">{cardSaving ? 'Kaydediliyor...' : editCardId ? 'Guncelle' : 'Ekle'}</button>
+                className="btn-primary w-full mt-4 py-3">{cardSaving ? 'Kaydediliyor...' : editCardId ? 'Güncelle' : 'Ekle'}</button>
             </div>
           </div>
         )}
@@ -718,10 +718,10 @@ export default function LoansPage() {
         {cardDeleteConfirm !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)' }}>
             <div className="glass p-5 w-full max-w-sm">
-              <div className="text-sm font-semibold mb-2">Karti Sil</div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu karti silmek istediginize emin misiniz?</div>
+              <div className="text-sm font-semibold mb-2">Kartı Sil</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu karti silmek istediğinize emin misiniz?</div>
               <div className="flex gap-2">
-                <button onClick={() => setCardDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => setCardDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={() => handleCardDelete(cardDeleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
               </div>
             </div>

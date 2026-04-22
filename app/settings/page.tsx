@@ -155,8 +155,8 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/update-rates')
       const data = await res.json()
-      setRateMsg(data.success ? 'Kurlar guncellendi!' : 'Hata: ' + (data.error || 'Bilinmeyen'))
-    } catch { setRateMsg('Baglanti hatasi') }
+      setRateMsg(data.success ? 'Kurlar güncellendi!' : 'Hata: ' + (data.error || 'Bilinmeyen'))
+    } catch { setRateMsg('Bağlantı hatası') }
     setRateUpdating(false)
   }
 
@@ -306,7 +306,7 @@ export default function SettingsPage() {
 
           {/* Profil */}
           <Section title="Profil">
-            <Row label="Kullanici Adi" desc="Dashboard'da gorunecek isim">
+            <Row label="Kullanici Adi" desc="Dashboard'da görecek isim">
               <input value={settings.userName} onChange={e => update('userName', e.target.value)}
                 className="text-[13px] font-medium text-right rounded-lg px-3 py-1.5"
                 style={{ background: 'var(--glass-fill-soft)', border: 'none', width: 140, color: 'var(--text)' }} />
@@ -324,24 +324,24 @@ export default function SettingsPage() {
 
           {/* Bildirimler */}
           <Section title="Bildirimler">
-            <Row label="Hatirlatma Zamani" desc="Odeme gununen kac gun once">
+            <Row label="Hatırlatma Zamani" desc="Ödeme gununen kac gün önce">
               <select value={settings.remindDaysBefore} onChange={e => update('remindDaysBefore', Number(e.target.value))}
                 className="text-[13px] font-medium rounded-lg px-3 py-1.5"
                 style={{ background: 'var(--glass-fill-soft)', border: 'none', color: 'var(--text)' }}>
-                <option value={1}>1 gun once</option>
-                <option value={2}>2 gun once</option>
-                <option value={3}>3 gun once</option>
-                <option value={5}>5 gun once</option>
-                <option value={7}>7 gun once</option>
+                <option value={1}>1 gün önce</option>
+                <option value={2}>2 gün önce</option>
+                <option value={3}>3 gün önce</option>
+                <option value={5}>5 gün önce</option>
+                <option value={7}>7 gün önce</option>
               </select>
             </Row>
-            <Row label="Gecmis Odeme Uyarilari" desc="Tarihi gecmis odemeler icin uyari goster">
+            <Row label="Geçmiş Ödeme Uyarıları" desc="Tarihi geçmiş ödemeler için uyarı göster">
               <Toggle value={settings.overdueAlerts} onChange={v => update('overdueAlerts', v)} />
             </Row>
           </Section>
 
-          {/* Gorunum */}
-          <Section title="Gorunum">
+          {/* Görünüm */}
+          <Section title="Görünüm">
             <Row label="Tema" desc="Açık veya koyu mod">
               <div className="flex gap-1.5">
                 {(['light', 'dark'] as const).map(t => (
@@ -361,7 +361,7 @@ export default function SettingsPage() {
               <select value={settings.language} onChange={e => update('language', e.target.value)}
                 className="text-[13px] font-medium rounded-lg px-3 py-1.5"
                 style={{ background: 'var(--glass-fill-soft)', border: 'none', color: 'var(--text)' }}>
-                <option value="tr">Turkce</option>
+                <option value="tr">Türkçe</option>
                 <option value="en">English</option>
               </select>
             </Row>
@@ -414,12 +414,12 @@ export default function SettingsPage() {
 
           {/* Veri */}
           <Section title="Veri">
-            <Row label="Doviz Kurlarini Guncelle" desc="TCMB, CoinGecko, Yahoo Finance">
+            <Row label="Döviz Kurlarını Güncelle" desc="TCMB, CoinGecko, Yahoo Finance">
               <button onClick={updateRates} disabled={rateUpdating || isDemo}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold"
                 style={{ background: 'var(--accent-light)', color: 'var(--primary)', border: 'none', cursor: 'pointer', opacity: rateUpdating ? 0.5 : 1 }}>
                 <IconRefresh size={12} color="var(--primary)" strokeWidth={2.5} />
-                {rateUpdating ? 'Guncelleniyor...' : 'Guncelle'}
+                {rateUpdating ? 'Güncelleniyor...' : 'Güncelle'}
               </button>
             </Row>
             {rateMsg && (

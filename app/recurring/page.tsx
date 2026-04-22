@@ -159,20 +159,20 @@ export default function RecurringPage() {
 
         {/* Hero Card */}
         <div className="mx-4 mb-4 card-hero p-5" style={{ position: 'relative', zIndex: 1 }}>
-          <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>Aylik Gider</div>
+          <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)', position: 'relative', zIndex: 2 }}>Aylık Gider</div>
           <div className="mono text-2xl font-extrabold mt-1" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalAll)}</div>
           <div className="flex gap-2 mt-4" style={{ position: 'relative', zIndex: 2 }}>
             <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
               style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
-              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>DÜZENLİ</div>
+              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.72)' }}>DÜZENLİ</div>
               <div className="mono text-[12px] font-bold mt-0.5">{recurringCount}</div>
-              <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{fmt(expenses.filter(e => (e.expense_type || 'recurring') === 'recurring').reduce((s, e) => s + e.amount, 0))}</div>
+              <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{fmt(expenses.filter(e => (e.expense_type || 'recurring') === 'recurring').reduce((s, e) => s + e.amount, 0))}</div>
             </div>
             <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
               style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
-              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>TEK SEFERLİK</div>
+              <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.72)' }}>TEK SEFERLİK</div>
               <div className="mono text-[12px] font-bold mt-0.5">{oneTimeCount}</div>
-              <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{fmt(expenses.filter(e => e.expense_type === 'one_time').reduce((s, e) => s + e.amount, 0))}</div>
+              <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{fmt(expenses.filter(e => e.expense_type === 'one_time').reduce((s, e) => s + e.amount, 0))}</div>
             </div>
             {filter !== 'tumu' && (
               <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
@@ -250,7 +250,7 @@ export default function RecurringPage() {
                   <div className="tx-value">{fmt(exp.amount, exp.currency)}</div>
                   <button onClick={(e) => { e.stopPropagation(); openEdit(exp) }}
                     className="tx-badge" style={{ background: 'var(--accent-light)', color: 'var(--primary)', border: 'none', cursor: 'pointer' }}>
-                    Duzenle
+                    Düzenle
                   </button>
                 </div>
               </div>
@@ -268,9 +268,9 @@ export default function RecurringPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
             <div className="glass-bold p-5 w-full max-w-sm">
               <div className="text-sm font-semibold mb-2">Gideri Sil</div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu gideri silmek istediginize emin misiniz?</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu gideri silmek istediğinize emin misiniz?</div>
               <div className="flex gap-2">
-                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
               </div>
             </div>
@@ -283,7 +283,7 @@ export default function RecurringPage() {
             <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{editId ? 'Gideri Duzenle' : 'Yeni Gider'}</div>
+                <div className="text-sm font-semibold">{editId ? 'Gideri Düzenle' : 'Yeni Gider'}</div>
                 <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
 
@@ -312,7 +312,7 @@ export default function RecurringPage() {
               <div className="flex flex-col gap-3">
                 <div>
                   <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Gider Adi</label>
-                  <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Orn: Elektrik" className="input" />
+                  <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Örn: Elektrik" className="input" />
                 </div>
 
                 {/* Category - grouped select */}
@@ -342,7 +342,7 @@ export default function RecurringPage() {
                     <input value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" type="number" className="input mono" />
                   </div>
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={form.currency} onChange={e => set('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -359,7 +359,7 @@ export default function RecurringPage() {
                   <>
                     <div className="flex gap-3">
                       <div className="flex-1">
-                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Odeme Gunu</label>
+                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ödeme Günü</label>
                         <input value={form.payment_day} onChange={e => set('payment_day', e.target.value)} placeholder="1-31" type="number" min="1" max="31" className="input" />
                       </div>
                       <div className="flex-1">
@@ -368,7 +368,7 @@ export default function RecurringPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Hatirlatma (gun)</label>
+                      <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Hatırlatma (gun)</label>
                       <input value={form.remind_days_before} onChange={e => set('remind_days_before', e.target.value)} type="number" className="input" />
                     </div>
                   </>
@@ -383,7 +383,7 @@ export default function RecurringPage() {
                 <div className="mt-3 p-2.5 rounded-lg text-[12px]" style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>{saveError}</div>
               )}
               <button onClick={handleSave} disabled={saving || !form.name || !form.amount}
-                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Guncelle' : 'Ekle'}</button>
+                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Güncelle' : 'Ekle'}</button>
               {editId && (
                 <button onClick={() => { closeForm(); setDeleteConfirm(editId) }}
                   className="w-full mt-2 py-3 rounded-xl text-sm font-semibold"

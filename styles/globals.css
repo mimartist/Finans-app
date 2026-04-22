@@ -13,8 +13,8 @@
   --border2: #d0d4e0;
   --text: #1e2243;
   --text2: #2d3356;
-  --muted: #8790a5;
-  --muted2: #b0b7c3;
+  --muted: #60687d;
+  --muted2: #8790a5;
   --primary: #2b2d6e;
   --primary-light: #3d3f8f;
   --primary-dark: #1e1f54;
@@ -47,30 +47,36 @@
   --grad-mid: #2b2d6e;
   --grad-end: #4a4db0;
 
-  /* ── GLASS / LIQUID — authoritative from design system ──── */
+  /* ── WARM ACCENT — amber / peach (replaces pink) ────────── */
+  --accent-warm: #f59e0b;
+  --accent-warm-soft: #fbbf24;
+  --accent-warm-deep: #ea580c;
+  --accent-peach: #fb923c;
+
+  /* ── GLASS / LIQUID — stronger, warmer wallpaper ─────────── */
   --wallpaper: radial-gradient(120% 80% at 10% 0%, #818cf8 0%, transparent 45%),
-               radial-gradient(100% 80% at 95% 10%, #e879f9 0%, transparent 45%),
+               radial-gradient(100% 80% at 95% 10%, #fb923c 0%, transparent 45%),
                radial-gradient(120% 100% at 50% 100%, #60a5fa 0%, transparent 50%),
-               linear-gradient(180deg, #ddd6fe 0%, #c4b5fd 100%);
-  --glass-fill: rgba(255,255,255,0.25);
-  --glass-fill-soft: rgba(255,255,255,0.15);
-  --glass-fill-bold: rgba(255,255,255,0.4);
-  --glass-border: rgba(255,255,255,0.45);
-  --glass-border-in: rgba(255,255,255,0.2);
+               linear-gradient(180deg, #ede9fe 0%, #c4b5fd 100%);
+  --glass-fill: rgba(255,255,255,0.35);
+  --glass-fill-soft: rgba(255,255,255,0.22);
+  --glass-fill-bold: rgba(255,255,255,0.55);
+  --glass-border: rgba(255,255,255,0.6);
+  --glass-border-in: rgba(255,255,255,0.3);
   --glass-shadow:
-    0 1px 0 0 rgba(255,255,255,0.7) inset,
-    0 -1px 0 0 rgba(43,45,110,0.06) inset,
-    0 8px 32px rgba(30,31,84,0.10),
-    0 2px 6px rgba(30,31,84,0.06);
-  --glass-shadow-lg:
-    0 1px 0 0 rgba(255,255,255,0.7) inset,
+    0 1px 0 0 rgba(255,255,255,0.85) inset,
     0 -1px 0 0 rgba(43,45,110,0.08) inset,
-    0 18px 48px rgba(30,31,84,0.18),
-    0 4px 10px rgba(30,31,84,0.08);
-  --blur: 32px;
-  --blur-lg: 48px;
-  --blur-xs: 16px;
-  --saturate: 1.8;
+    0 10px 36px rgba(30,31,84,0.14),
+    0 2px 8px rgba(30,31,84,0.08);
+  --glass-shadow-lg:
+    0 1px 0 0 rgba(255,255,255,0.9) inset,
+    0 -1px 0 0 rgba(43,45,110,0.10) inset,
+    0 22px 60px rgba(30,31,84,0.22),
+    0 4px 12px rgba(30,31,84,0.10);
+  --blur: 40px;
+  --blur-lg: 56px;
+  --blur-xs: 20px;
+  --saturate: 2.1;
 }
 
 /* ── DARK MODE — authoritative from design system ────────────── */
@@ -100,7 +106,7 @@
   --shadow-xl: 0 12px 40px rgba(0,0,0,0.6);
 
   --wallpaper: radial-gradient(120% 80% at 15% 0%, #3d40a0 0%, transparent 55%),
-               radial-gradient(100% 80% at 85% 20%, #7c3aed 0%, transparent 55%),
+               radial-gradient(100% 80% at 85% 20%, #d97706 0%, transparent 55%),
                radial-gradient(120% 100% at 50% 100%, #4338ca 0%, transparent 60%),
                linear-gradient(180deg, #0f1117 0%, #1a1d2e 100%);
   --glass-fill: rgba(30,35,65,0.55);

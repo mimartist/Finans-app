@@ -63,14 +63,14 @@ export default function OcrUpload({ cardId, onComplete }: Props) {
       }
 
       if (!data.transactions || data.transactions.length === 0) {
-        setError('Goruntude islem bulunamadi')
+        setError('Görüntüde işlem bulunamadı')
         setScanning(false)
         return
       }
 
       setResults(data.transactions)
     } catch (err: any) {
-      setError(err.message || 'Baglanti hatasi')
+      setError(err.message || 'Bağlantı hatasi')
     }
 
     setScanning(false)

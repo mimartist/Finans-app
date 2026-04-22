@@ -17,7 +17,7 @@ type PaymentItem = {
 
 type MonthKey = { year: number; month: number }
 
-const MONTH_NAMES = ['Ocak','Subat','Mart','Nisan','Mayis','Haziran','Temmuz','Agustos','Eylul','Ekim','Kasim','Aralik']
+const MONTH_NAMES = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
 
 function monthLabel(m: MonthKey) { return `${MONTH_NAMES[m.month-1]} ${m.year}` }
 function sameMonth(a: MonthKey, b: MonthKey) { return a.year === b.year && a.month === b.month }
@@ -30,7 +30,7 @@ function monthOffset(base: MonthKey, offset: number): MonthKey {
 const MOCK_ACCOUNTS: Account[] = [
   { id: 1, name: 'Ziraat TL', bank: 'Ziraat', type: 'vadesiz', currency: 'TRY', balance: 45200, is_active: true, updated_at: '' },
   { id: 2, name: 'Garanti EUR', bank: 'Garanti', type: 'vadesiz', currency: 'EUR', balance: 3200, is_active: true, updated_at: '' },
-  { id: 3, name: 'Is Bankasi USD', bank: 'Is', type: 'vadesiz', currency: 'USD', balance: 1500, is_active: true, updated_at: '' },
+  { id: 3, name: 'İş Bankası USD', bank: 'Is Bankasi', type: 'vadesiz', currency: 'USD', balance: 1500, is_active: true, updated_at: '' },
 ]
 const MOCK_LOANS: Loan[] = [
   { id: 1, name: 'Konut Kredisi', bank: 'Ziraat', type: 'konut', currency: 'TRY', original_amount: 850000, remaining_amount: 620000, monthly_payment: 14500, payment_day: 15, total_installments: 120, paid_installments: 24, interest_rate: 1.89, start_date: '2024-01-15', end_date: '2034-01-15', is_active: true },
@@ -43,7 +43,7 @@ const MOCK_RECURRING: RecurringExpense[] = [
   { id: 5, name: 'Aidat', category: 'aidat', amount: 12000, currency: 'TRY', payment_day: 15, is_variable: false, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
   { id: 6, name: 'Cep Telefonu', category: 'gsm', amount: 1100, currency: 'TRY', payment_day: 1, is_variable: false, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
   { id: 7, name: 'Mimar Fatma', category: 'hizmet', amount: 30000, currency: 'TRY', payment_day: 30, is_variable: false, is_active: true, remind_days_before: 3, expense_type: 'one_time', expense_date: '2026-03-30' },
-  { id: 8, name: 'Su Faturasi', category: 'su', amount: 250, currency: 'TRY', payment_day: 15, is_variable: true, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
+  { id: 8, name: 'Su Faturası', category: 'su', amount: 250, currency: 'TRY', payment_day: 15, is_variable: true, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
 ]
 const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('T')[0], usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
 
@@ -159,7 +159,7 @@ export default function Dashboard() {
       const isPaid = stmt?.is_paid || false
       if (!isCurrentMonth && amount === 0) return null
       return {
-        id: `cc_${card.id}`, name: card.name || 'Kredi Karti', amount,
+        id: `cc_${card.id}`, name: card.name || 'Kredi Kartı', amount,
         currency: card.currency || 'TRY', day: dueDay, type: 'kredi_karti',
         source: 'recurring' as const, sourceId: card.id,
         days, paid: isPaid,
@@ -309,7 +309,7 @@ export default function Dashboard() {
         <div className="tx-info">
           <div className="tx-name" style={{ textDecoration: p.paid ? 'line-through' : 'none', fontWeight: isHighlight ? 700 : undefined }}>{p.name}</div>
           <div className="tx-detail" style={{ color: statusColor }}>
-            {p.paid ? 'Odendi' : (() => {
+            {p.paid ? 'Ödendi' : (() => {
               if (p.type === 'kredi_karti') {
                 const payDate = new Date(); payDate.setDate(payDate.getDate() + p.days)
                 const payMonthStr = payDate.toLocaleDateString('tr-TR', { month: 'short' })
@@ -325,7 +325,7 @@ export default function Dashboard() {
           {isCurrent && !p.paid && (
             <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
               className="tx-badge" style={{ background: p.overdue ? 'rgba(229,160,0,0.08)' : 'rgba(43,45,110,0.06)', color: p.overdue ? '#e5a000' : '#2b2d6e', border: 'none', cursor: 'pointer' }}>
-              {p.overdue ? 'Onayla' : 'Ode'}
+              {p.overdue ? 'Onayla' : 'Öde'}
             </button>
           )}
         </div>
@@ -375,12 +375,12 @@ export default function Dashboard() {
         <div className="mx-4 mt-3 card-hero p-6" style={{ position: 'relative', zIndex: 1, cursor: 'pointer', transition: 'all 0.3s ease' }}
           onClick={() => setHeroExpanded(e => !e)}>
           <div className="flex items-center justify-between mb-1" style={{ position: 'relative', zIndex: 2 }}>
-            <div className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)' }}>Toplam Varlik</div>
-            <IconWallet color="rgba(255,255,255,0.3)" size={20} />
+            <div className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.7)' }}>Toplam Varlık</div>
+            <IconWallet color="rgba(255,255,255,0.55)" size={20} />
           </div>
           <div className="mono text-3xl font-extrabold mb-1" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalAssetsTry)}</div>
-          <div className="text-[10px] mb-4" style={{ position: 'relative', zIndex: 2, color: 'rgba(255,255,255,0.4)' }}>
-            {heroExpanded ? 'Gizlemek icin dokun ↑' : 'Detaylar icin dokun ↓'}
+          <div className="text-[10px] mb-4" style={{ position: 'relative', zIndex: 2, color: 'rgba(255,255,255,0.72)' }}>
+            {heroExpanded ? 'Gizlemek için dokun ↑' : 'Detaylar için dokun ↓'}
           </div>
           <div className="flex gap-2" style={{ position: 'relative', zIndex: 2 }}>
             {[
@@ -390,7 +390,7 @@ export default function Dashboard() {
             ].map(c => (
               <div key={c.label} className="flex-1 rounded-full py-2 px-3 text-center"
                 style={{ border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)' }}>
-                <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>{c.label}</div>
+                <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.75)' }}>{c.label}</div>
                 <div className="mono text-[11px] font-bold mt-0.5">{c.value}</div>
               </div>
             ))}
@@ -406,7 +406,7 @@ export default function Dashboard() {
             marginTop: heroExpanded ? 20 : 0,
           }}>
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 16 }}>
-              <div className="text-[9px] font-medium uppercase tracking-wider mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>Varlik Dagilimi</div>
+              <div className="text-[9px] font-medium uppercase tracking-wider mb-3" style={{ color: 'rgba(255,255,255,0.72)' }}>Varlık Dağılımı</div>
               <div className="flex flex-col gap-3">
                 {[
                   { label: 'Nakit', value: cashTry, icon: '🏦' },
@@ -438,11 +438,11 @@ export default function Dashboard() {
               </div>
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 14, paddingTop: 12 }}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Toplam Borc</span>
+                  <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.6)' }}>Toplam Borç</span>
                   <span className="mono text-[11px] font-bold" style={{ color: '#ff8a8a' }}>{fmt(totalDebtTry)}</span>
                 </div>
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-[10px] font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>Net Varlik</span>
+                  <span className="text-[10px] font-semibold" style={{ color: 'rgba(255,255,255,0.8)' }}>Net Varlık</span>
                   <span className="mono text-[13px] font-extrabold" style={{ color: totalAssetsTry - totalDebtTry >= 0 ? '#86efac' : '#ff8a8a' }}>
                     {fmt(totalAssetsTry - totalDebtTry)}
                   </span>
@@ -452,7 +452,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ===== VARLIK DAGILIMI ===== */}
+        {/* ===== VARLIK DAĞILIMI ===== */}
         {(() => {
           const assetSlices = [
             { label: 'Nakit', value: cashTry, color: '#2b2d6e' },
@@ -464,7 +464,7 @@ export default function Dashboard() {
           const total = assetSlices.reduce((s, r) => s + r.value, 0)
           return (
             <div className="mx-4 mt-4 glass p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--primary)' }}>Varlik Dagilimi</div>
+              <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--primary)' }}>Varlık Dağılımı</div>
               <div className="flex items-center gap-4">
                 <div style={{ width: 110, height: 110, flexShrink: 0 }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -502,13 +502,13 @@ export default function Dashboard() {
           )
         })()}
 
-        {/* ===== YUKUMLULUK ===== */}
+        {/* ===== YÜKÜMLÜLÜK ===== */}
         <div className="mx-4 mt-3 glass p-4">
-          <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#e5484d' }}>Yukumluluk</div>
+          <div className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: '#e5484d' }}>Yükümlülük</div>
           <div className="flex flex-col gap-3">
             {[
-              { label: 'Toplam Borc', value: totalDebtTry, color: '#e5484d' },
-              { label: 'Aylik Gider', value: monthlyTotalAll, color: '#d97706' },
+              { label: 'Toplam Borç', value: totalDebtTry, color: '#e5484d' },
+              { label: 'Aylık Gider', value: monthlyTotalAll, color: '#d97706' },
             ].map(r => (
               <div key={r.label}>
                 <div className="flex items-center justify-between">
@@ -531,7 +531,7 @@ export default function Dashboard() {
 
         {/* ===== CHART ===== */}
         <div className="mx-4 mt-4 glass p-4">
-          <div className="text-xs font-bold mb-2" style={{ color: 'var(--text)' }}>Aylik Gider Trendi</div>
+          <div className="text-xs font-bold mb-2" style={{ color: 'var(--text)' }}>Aylık Gider Trendi</div>
           <ResponsiveContainer width="100%" height={120}>
             <BarChart data={chartData} barSize={20}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -579,17 +579,17 @@ export default function Dashboard() {
           {/* Header */}
           <div className="flex items-center justify-between mb-3 px-1">
             <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>{isPast ? monthLabel(selectedMonth) : isFuture ? monthLabel(selectedMonth) : 'Bu Ay'}</span>
-            <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>{paidPayments.length}/{payments.length} odeme</span>
+            <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>{paidPayments.length}/{payments.length} ödeme</span>
           </div>
 
-          {/* Inner nested cards — Toplam / Odenen */}
+          {/* Inner nested cards — Toplam / Ödenen */}
           <div className="flex gap-2.5 mb-2.5">
             <div className="flex-1" style={{ background: 'var(--glass-fill-soft)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Toplam</div>
               <div className="mono text-lg font-extrabold mt-1" style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>{fmt(totalObligation)}</div>
             </div>
             <div className="flex-1" style={{ background: 'var(--glass-fill-soft)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
-              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Odenen</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Ödenen</div>
               <div className="mono text-lg font-extrabold mt-1 amt-green" style={{ letterSpacing: '-0.03em' }}>{fmt(paidTotal)}</div>
             </div>
           </div>
@@ -603,7 +603,7 @@ export default function Dashboard() {
               </div>
               <div className="text-right">
                 <div className="mono text-xl font-extrabold" style={{ color: 'var(--primary)', letterSpacing: '-0.03em' }}>%{paidPct}</div>
-                <div className="text-[9px]" style={{ color: 'var(--muted)' }}>tamamlandi</div>
+                <div className="text-[9px]" style={{ color: 'var(--muted)' }}>tamamlandı</div>
               </div>
             </div>
             <div className="progress-wrap">
@@ -617,8 +617,8 @@ export default function Dashboard() {
           {unpaidPayments.length > 0 && (
             <>
               <div className="flex items-center justify-between mx-5 mb-3">
-                <span className="text-xs font-bold">{isFuture ? 'Planlanan' : isPast ? 'Odenmemis' : 'Bekleyen Odemeler'}</span>
-                {overduePayments.length > 0 && <span className="badge badge-amber">{overduePayments.length} gecmis</span>}
+                <span className="text-xs font-bold">{isFuture ? 'Planlanan' : isPast ? 'Ödenmemiş' : 'Bekleyen Ödemeler'}</span>
+                {overduePayments.length > 0 && <span className="badge badge-amber">{overduePayments.length} geçmiş</span>}
               </div>
               <div className="tx-list mx-4 mb-4">{unpaidPayments.map(renderPaymentItem)}</div>
             </>
@@ -626,14 +626,14 @@ export default function Dashboard() {
           {unpaidPayments.length === 0 && (
             <div className="mx-4 mb-4 glass p-6 text-center">
               <IconCheck color="#30a46c" size={28} strokeWidth={2.5} />
-              <div className="text-sm font-semibold mt-2" style={{ color: '#30a46c' }}>Tum odemeler tamamlandi</div>
+              <div className="text-sm font-semibold mt-2" style={{ color: '#30a46c' }}>Tüm ödemeler tamamlandı</div>
             </div>
           )}
           {paidPayments.length > 0 && (
             <>
               <div className="flex items-center justify-between mx-5 mb-3">
                 <span className="text-xs font-bold" style={{ color: '#30a46c' }}>Tamamlanan</span>
-                <span className="text-[10px] font-medium" style={{ color: '#30a46c' }}>{paidPayments.length} odeme</span>
+                <span className="text-[10px] font-medium" style={{ color: '#30a46c' }}>{paidPayments.length} ödeme</span>
               </div>
               <div className="tx-list mx-4 mb-4">{paidPayments.map(renderPaymentItem)}</div>
             </>
@@ -645,7 +645,7 @@ export default function Dashboard() {
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(30,31,84,0.5)' }}
             onClick={e => { if (e.target === e.currentTarget) { setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) } }}>
             <div className="glass p-6 w-full max-w-sm scale-in">
-              <div className="text-base font-bold mb-1">{payModal.overdue ? 'Gecmis Odemeyi Onayla' : 'Odeme Yap'}</div>
+              <div className="text-base font-bold mb-1">{payModal.overdue ? 'Geçmiş Ödemeyi Onayla' : 'Ödeme Yap'}</div>
               <div className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text)' }}>{payModal.name}</span>
                 <span className="mono ml-2 font-bold">{fmt(payModal.amount, payModal.currency)}</span>
@@ -653,7 +653,7 @@ export default function Dashboard() {
 
               {/* Payment method tabs */}
               <div className="flex gap-1.5 mb-4 p-1 rounded-xl" style={{ background: 'var(--glass-fill-soft)' }}>
-                {([['hesap', 'Hesaptan', IconBank], ['kredi_karti', 'Kredi Karti', IconCreditCard], ['nakit', 'Nakit', IconCash]] as const).map(([val, label, Icon]) => (
+                {([['hesap', 'Hesaptan', IconBank], ['kredi_karti', 'Kredi Kartı', IconCreditCard], ['nakit', 'Nakit', IconCash]] as const).map(([val, label, Icon]) => (
                   <button key={val} onClick={() => setPayMethod(val)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold transition-all"
                     style={{
@@ -680,19 +680,19 @@ export default function Dashboard() {
                 <div className="mb-4">
                   <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Hangi kart?</label>
                   <select value={payCardId || ''} onChange={e => setPayCardId(Number(e.target.value))} className="input">
-                    <option value="">Kart secin...</option>
+                    <option value="">Kart seçin...</option>
                     {creditCards.map(c => <option key={c.id} value={c.id}>{c.name} ({c.bank})</option>)}
                   </select>
                 </div>
               )}
               {payMethod === 'nakit' && (
                 <div className="mb-4 p-3 rounded-xl text-[12px]" style={{ background: 'rgba(99,102,241,0.06)', color: '#6366f1' }}>
-                  Nakit odeme olarak kaydedilecek. Hesap bakiyesinden dusulmez.
+                  Nakit ödeme olarak kaydedilecek. Hesap bakiyesinden düşülmez.
                 </div>
               )}
 
               <div className="flex gap-3">
-                <button onClick={() => { setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) }} className="btn-outline flex-1 py-3 text-sm">Iptal</button>
+                <button onClick={() => { setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) }} className="btn-outline flex-1 py-3 text-sm">İptal</button>
                 <button onClick={handlePay}
                   disabled={paying || (payMethod === 'hesap' && !payAccountId) || (payMethod === 'kredi_karti' && !payCardId)}
                   className="btn-primary flex-1 py-3 text-sm">{paying ? 'Kaydediliyor...' : 'Onayla'}</button>

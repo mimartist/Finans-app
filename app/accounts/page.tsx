@@ -5,7 +5,7 @@ import { supabase, fmt, isDemo } from '@/lib/supabase'
 import type { Account, ExchangeRate, DebtRecord, Investment } from '@/lib/supabase'
 import { IconWallet, IconTrendUp, IconArrowsExchange, IconPlus } from '@/components/Icons'
 
-type Tab = 'hesaplar' | 'yatirimlar' | 'alacak'
+type Tab = 'hesaplar' | 'yatırımlar' | 'alacak'
 
 type InvestmentWithSnapshot = Investment & {
   latest_price?: number
@@ -26,7 +26,7 @@ const MOCK_ACCOUNTS: Account[] = [
   { id: 1, name: 'Ziraat TL', bank: 'Ziraat', type: 'vadesiz', currency: 'TRY', balance: 45200, is_active: true, updated_at: '' },
   { id: 2, name: 'Garanti EUR', bank: 'Garanti', type: 'vadesiz', currency: 'EUR', balance: 3200, is_active: true, updated_at: '' },
   { id: 3, name: 'Is Bankasi USD', bank: 'Is Bankasi', type: 'vadesiz', currency: 'USD', balance: 1500, is_active: true, updated_at: '' },
-  { id: 4, name: 'Vakifbank Vadeli', bank: 'Vakifbank', type: 'vadeli', currency: 'TRY', balance: 120000, is_active: true, updated_at: '' },
+  { id: 4, name: 'Vakıfbank Vadeli', bank: 'Vakifbank', type: 'vadeli', currency: 'TRY', balance: 120000, is_active: true, updated_at: '' },
 ]
 const MOCK_INVESTMENTS: InvestmentWithSnapshot[] = [
   { id: 1, name: 'BIST Hisse', type: 'hisse', symbol: 'BIST', quantity: 100, avg_cost: 488, currency: 'TRY', platform: 'Midas', is_active: true, total_value: 52000, cost_basis: 48800, pnl: 3200, pnl_pct: 6.5 },
@@ -34,8 +34,8 @@ const MOCK_INVESTMENTS: InvestmentWithSnapshot[] = [
   { id: 3, name: 'Altin', type: 'altin', symbol: 'XAU', quantity: 10, avg_cost: 3380, currency: 'TRY', platform: 'Ziraat', is_active: true, total_value: 33000, cost_basis: 33800, pnl: -800, pnl_pct: -2.4 },
 ]
 const MOCK_DEBTS: DebtRecord[] = [
-  { id: 1, person_name: 'Ahmet Yilmaz', type: 'alacak', amount: 15000, currency: 'TRY', description: 'Ofis kirasi', transaction_date: '2026-01-15', due_date: '2026-03-30', is_settled: false, is_recurring: true, frequency: 'aylik', expected_day: 15 },
-  { id: 2, person_name: 'Mehmet Demir', type: 'alacak', amount: 5000, currency: 'TRY', description: 'Proje odemesi', transaction_date: '2026-02-20', is_settled: false },
+  { id: 1, person_name: 'Ahmet Yılmaz', type: 'alacak', amount: 15000, currency: 'TRY', description: 'Ofis kirası', transaction_date: '2026-01-15', due_date: '2026-03-30', is_settled: false, is_recurring: true, frequency: 'aylik', expected_day: 15 },
+  { id: 2, person_name: 'Mehmet Demir', type: 'alacak', amount: 5000, currency: 'TRY', description: 'Proje ödemesi', transaction_date: '2026-02-20', is_settled: false },
   { id: 3, person_name: 'Kargo Firması', type: 'verecek', amount: 2400, currency: 'TRY', description: 'Kargo borcu', transaction_date: '2026-03-01', due_date: '2026-04-01', is_settled: false },
 ]
 const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('T')[0], usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
@@ -302,7 +302,7 @@ export default function AccountsPage() {
 
   const tabs: { key: Tab; label: string; Icon: any }[] = [
     { key: 'hesaplar', label: 'Hesaplar', Icon: IconWallet },
-    { key: 'yatirimlar', label: 'Yatirimlar', Icon: IconTrendUp },
+    { key: 'yatırımlar', label: 'Yatirimlar', Icon: IconTrendUp },
     { key: 'alacak', label: 'Alacak/Borc', Icon: IconArrowsExchange },
   ]
 
@@ -358,7 +358,7 @@ export default function AccountsPage() {
                 ].map(c => (
                   <div key={c.label} className="flex-1 rounded-2xl py-2.5 px-3 text-center"
                     style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>{c.label}</div>
+                    <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.72)' }}>{c.label}</div>
                     <div className="mono text-[11px] font-bold mt-0.5">{c.value}</div>
                     {c.sub && <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{c.sub}</div>}
                   </div>
@@ -451,21 +451,21 @@ export default function AccountsPage() {
             <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{editAcc ? 'Hesabi Duzenle' : 'Yeni Hesap'}</div>
+                <div className="text-sm font-semibold">{editAcc ? 'Hesabı Düzenle' : 'Yeni Hesap'}</div>
                 <button onClick={closeAccForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Hesap Adi</label>
-                  <input value={accForm.name} onChange={e => setAcc('name', e.target.value)} placeholder="Orn: Ziraat TL" className="input" />
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Hesap Adı</label>
+                  <input value={accForm.name} onChange={e => setAcc('name', e.target.value)} placeholder="Örn: Ziraat TL" className="input" />
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Banka</label>
-                    <input value={accForm.bank} onChange={e => setAcc('bank', e.target.value)} placeholder="Orn: Ziraat" className="input" />
+                    <input value={accForm.bank} onChange={e => setAcc('bank', e.target.value)} placeholder="Örn: Ziraat" className="input" />
                   </div>
                   <div>
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tür</label>
                     <select value={accForm.type} onChange={e => setAcc('type', e.target.value)} className="input">
                       <option value="vadesiz">Vadesiz</option><option value="vadeli">Vadeli</option><option value="yatirim">Yatirim</option>
                     </select>
@@ -477,7 +477,7 @@ export default function AccountsPage() {
                     <input value={accForm.balance} onChange={e => setAcc('balance', e.target.value)} type="number" placeholder="0" className="input mono" />
                   </div>
                   <div>
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={accForm.currency} onChange={e => setAcc('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -485,15 +485,15 @@ export default function AccountsPage() {
                 </div>
               </div>
               <button onClick={handleAccSave} disabled={accSaving || !accForm.name || !accForm.bank}
-                className="btn-primary w-full mt-4 py-3">{accSaving ? 'Kaydediliyor...' : editAcc ? 'Guncelle' : 'Ekle'}</button>
+                className="btn-primary w-full mt-4 py-3">{accSaving ? 'Kaydediliyor...' : editAcc ? 'Güncelle' : 'Ekle'}</button>
               {editAcc && !accDeleteConfirm && (
-                <button onClick={() => setAccDeleteConfirm(true)} className="w-full mt-2 py-2.5 text-sm font-medium" style={{ color: '#e5484d', background: 'transparent', border: 'none', cursor: 'pointer' }}>Hesabi Sil</button>
+                <button onClick={() => setAccDeleteConfirm(true)} className="w-full mt-2 py-2.5 text-sm font-medium" style={{ color: '#e5484d', background: 'transparent', border: 'none', cursor: 'pointer' }}>Hesabı Sil</button>
               )}
               {accDeleteConfirm && (
                 <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(229,72,77,0.06)' }}>
-                  <div className="text-[12px] mb-2 font-medium" style={{ color: '#e5484d' }}>Bu hesabi silmek istediginize emin misiniz?</div>
+                  <div className="text-[12px] mb-2 font-medium" style={{ color: '#e5484d' }}>Bu hesabi silmek istediğinize emin misiniz?</div>
                   <div className="flex gap-2">
-                    <button onClick={() => setAccDeleteConfirm(false)} className="btn-outline flex-1 py-2 text-xs">Iptal</button>
+                    <button onClick={() => setAccDeleteConfirm(false)} className="btn-outline flex-1 py-2 text-xs">İptal</button>
                     <button onClick={handleAccDelete} className="btn-danger flex-1 py-2 text-xs">Sil</button>
                   </div>
                 </div>
@@ -503,7 +503,7 @@ export default function AccountsPage() {
         )}
 
         {/* ===== TAB: YATIRIMLAR ===== */}
-        {tab === 'yatirimlar' && (() => {
+        {tab === 'yatırımlar' && (() => {
           const totalPortfoy = investments.reduce((s, i) => s + (i.total_value_try || toTry(i.total_value || 0, i.currency)), 0)
           const totalCost = investments.reduce((s, i) => s + toTry(i.cost_basis || 0, i.currency), 0)
           const totalPnl = totalPortfoy - totalCost
@@ -521,7 +521,7 @@ export default function AccountsPage() {
               <div className="flex gap-2 mt-4" style={{ position: 'relative', zIndex: 2 }}>
                 <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
                   style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
-                  <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>MALİYET</div>
+                  <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.72)' }}>MALİYET</div>
                   <div className="mono text-[11px] font-bold mt-0.5">{fmt(totalCost)}</div>
                 </div>
                 <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
@@ -595,13 +595,13 @@ export default function AccountsPage() {
                   style={{ border: '1px solid rgba(134,239,172,0.25)', background: 'rgba(134,239,172,0.08)' }}>
                   <div className="text-[9px] font-medium" style={{ color: 'rgba(134,239,172,0.7)' }}>ALACAK</div>
                   <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#86efac' }}>{fmt(totalAlacak)}</div>
-                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{alacaklar.length} kisi</div>
+                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{alacaklar.length} kişi</div>
                 </div>
                 <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
                   style={{ border: '1px solid rgba(255,138,138,0.25)', background: 'rgba(255,138,138,0.08)' }}>
                   <div className="text-[9px] font-medium" style={{ color: 'rgba(255,138,138,0.7)' }}>BORC</div>
                   <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#ff8a8a' }}>{fmt(totalVerecek)}</div>
-                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{verecekler.length} kisi</div>
+                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{verecekler.length} kişi</div>
                 </div>
               </div>
               {(overdueAlacak > 0 || upcomingAlacak > 0) && (
@@ -692,7 +692,7 @@ export default function AccountsPage() {
             <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">Yatirimi Duzenle</div>
+                <div className="text-sm font-semibold">Yatirimi Düzenle</div>
                 <button onClick={closeInvEdit} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
@@ -702,10 +702,10 @@ export default function AccountsPage() {
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tür</label>
                     <select value={invForm.type} onChange={e => setInv('type', e.target.value)} className="input">
                       <option value="hisse">Hisse</option><option value="fon">Fon</option><option value="altin">Altin</option>
-                      <option value="doviz">Doviz</option><option value="kripto">Kripto</option><option value="diger">Diger</option>
+                      <option value="doviz">Döviz</option><option value="kripto">Kripto</option><option value="diger">Diger</option>
                     </select>
                   </div>
                   <div className="flex-1">
@@ -775,7 +775,7 @@ export default function AccountsPage() {
 
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={invForm.currency} onChange={e => setInv('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -800,9 +800,9 @@ export default function AccountsPage() {
                   className="w-full mt-2 py-3 rounded-xl text-sm font-semibold">Sil</button>
               ) : (
                 <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
-                  <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu yatirimi silmek istediginize emin misiniz?</div>
+                  <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu yatirimi silmek istediğinize emin misiniz?</div>
                   <div className="flex gap-2">
-                    <button onClick={() => setInvDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--glass-fill-soft)', color: 'var(--text)' }}>Iptal</button>
+                    <button onClick={() => setInvDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--glass-fill-soft)', color: 'var(--text)' }}>İptal</button>
                     <button onClick={handleInvDelete} className="flex-1 py-2 rounded-lg text-sm font-semibold" style={{ background: '#dc2626', color: '#fff' }}>Evet, Sil</button>
                   </div>
                 </div>
@@ -891,23 +891,23 @@ export default function AccountsPage() {
             <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">Kaydi Duzenle</div>
+                <div className="text-sm font-semibold">Kaydı Düzenle</div>
                 <button onClick={closeDebtEdit} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kisi Adi</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Kişi Adi</label>
                   <input value={debtForm.person_name} onChange={e => setDbt('person_name', e.target.value)} className="input" />
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tür</label>
                     <select value={debtForm.type} onChange={e => setDbt('type', e.target.value)} className="input">
                       <option value="alacak">Alacak</option><option value="verecek">Verecek</option>
                     </select>
                   </div>
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={debtForm.currency} onChange={e => setDbt('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
@@ -934,9 +934,9 @@ export default function AccountsPage() {
                   className="w-full mt-2 py-3 rounded-xl text-sm font-semibold">Sil</button>
               ) : (
                 <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
-                  <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu kaydi silmek istediginize emin misiniz?</div>
+                  <div className="text-[12px] font-medium mb-2 text-center" style={{ color: '#dc2626' }}>Bu kaydi silmek istediğinize emin misiniz?</div>
                   <div className="flex gap-2">
-                    <button onClick={() => setDebtDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--glass-fill-soft)', color: 'var(--text)' }}>Iptal</button>
+                    <button onClick={() => setDebtDeleteConfirm(false)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--glass-fill-soft)', color: 'var(--text)' }}>İptal</button>
                     <button onClick={handleDebtDelete} className="flex-1 py-2 rounded-lg text-sm font-semibold" style={{ background: '#dc2626', color: '#fff' }}>Evet, Sil</button>
                   </div>
                 </div>

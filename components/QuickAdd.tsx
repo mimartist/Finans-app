@@ -65,7 +65,7 @@ export default function QuickAdd({ onClose }: Props) {
         setScanError(data.error || 'Fis okunamadi')
       }
     } catch (err: any) {
-      setScanError(err.message || 'Baglanti hatasi')
+      setScanError(err.message || 'Bağlantı hatasi')
     }
     setScanning(false)
   }
@@ -116,7 +116,7 @@ export default function QuickAdd({ onClose }: Props) {
         payload.payment_day = form.expense_date ? new Date(form.expense_date).getDate() : null
       }
       if (form.payment_method === 'kredi_karti') {
-        payload.subcategory = 'Kredi Karti'
+        payload.subcategory = 'Kredi Kartı'
       }
       let result = await supabase.from('recurring_expenses').insert(payload)
       if (result.error) {
@@ -177,8 +177,8 @@ export default function QuickAdd({ onClose }: Props) {
             {/* Income form */}
             <div className="flex flex-col gap-3">
               <div>
-                <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Kisi / Firma</label>
-                <input value={incomeForm.person_name} onChange={e => setInc('person_name', e.target.value)} placeholder="Orn: Mimosso" className="input" autoFocus />
+                <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Kişi / Firma</label>
+                <input value={incomeForm.person_name} onChange={e => setInc('person_name', e.target.value)} placeholder="Örn: Mimosso" className="input" autoFocus />
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
@@ -186,7 +186,7 @@ export default function QuickAdd({ onClose }: Props) {
                   <input value={incomeForm.amount} onChange={e => setInc('amount', e.target.value)} placeholder="0" type="number" className="input mono" />
                 </div>
                 <div style={{ width: 80 }}>
-                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Doviz</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Döviz</label>
                   <select value={incomeForm.currency} onChange={e => setInc('currency', e.target.value)} className="input">
                     <option value="TRY">₺ TRY</option><option value="EUR">€ EUR</option><option value="USD">$ USD</option>
                   </select>
@@ -202,7 +202,7 @@ export default function QuickAdd({ onClose }: Props) {
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={incomeForm.is_recurring} onChange={e => setInc('is_recurring', e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: '#2b2d6e' }} />
-                <span className="text-[12px]" style={{ color: 'var(--muted)' }}>Duzenli gelir (aylik)</span>
+                <span className="text-[12px]" style={{ color: 'var(--muted)' }}>Düzenli gelir (aylık)</span>
               </label>
             </div>
 
@@ -265,9 +265,9 @@ export default function QuickAdd({ onClose }: Props) {
               </div>
             )}
 
-            {/* Payment method: Nakit / Kredi Karti / Duzenli */}
+            {/* Payment method: Nakit / Kredi Kartı / Düzenli */}
             <div className="flex gap-2 mb-4 p-1 rounded-xl" style={{ background: 'var(--bg4)' }}>
-              {([['nakit', 'Nakit'], ['kredi_karti', 'Kredi Karti'], ['duzenli', 'Duzenli']] as const).map(([val, label]) => (
+              {([['nakit', 'Nakit'], ['kredi_karti', 'Kredi Kartı'], ['duzenli', 'Düzenli']] as const).map(([val, label]) => (
                 <button key={val} onClick={() => set('payment_method', val)}
                   className="flex-1 py-2 rounded-lg text-[11px] font-semibold text-center transition-all"
                   style={pillBtn(form.payment_method === val, '#2b2d6e')}>
@@ -280,7 +280,7 @@ export default function QuickAdd({ onClose }: Props) {
             <div className="flex flex-col gap-3">
               <div>
                 <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Aciklama</label>
-                <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Orn: Market alisverisi" className="input" autoFocus />
+                <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Örn: Market alisverisi" className="input" autoFocus />
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
@@ -288,7 +288,7 @@ export default function QuickAdd({ onClose }: Props) {
                   <input value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" type="number" className="input mono" />
                 </div>
                 <div style={{ width: 80 }}>
-                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Doviz</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Döviz</label>
                   <select value={form.currency} onChange={e => set('currency', e.target.value)} className="input">
                     <option value="TRY">₺ TRY</option><option value="EUR">€ EUR</option><option value="USD">$ USD</option>
                   </select>
@@ -308,7 +308,7 @@ export default function QuickAdd({ onClose }: Props) {
               </div>
               {form.payment_method === 'duzenli' ? (
                 <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Odeme Gunu (1-31)</label>
+                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Ödeme Günü (1-31)</label>
                   <input value={form.payment_day} onChange={e => set('payment_day', e.target.value)} placeholder="1-31" type="number" min="1" max="31" className="input" />
                 </div>
               ) : (

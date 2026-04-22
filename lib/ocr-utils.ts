@@ -53,34 +53,34 @@ export function buildOcrPrompt(type: 'ekstre' | 'fis'): string {
   const categoryList = EXPENSE_CATEGORIES.map(c => `${c.value} (${c.label})`).join(', ')
 
   if (type === 'fis') {
-    return `Bu bir Turkce fis/makbuz goruntusu. Goruntuden asagidaki bilgileri cikar:
-- Isyeri adi (description olarak)
+    return `Bu bir Türkçe fiş/makbuz görüntüsü. Görüntüden aşağıdaki bilgileri çıkar:
+- İşyeri adı (description olarak)
 - Toplam tutar (amount)
-- Tarih (transaction_date, YYYY-MM-DD formatinda)
-- Para birimi (currency, varsayilan TRY)
+- Tarih (transaction_date, YYYY-MM-DD formatında)
+- Para birimi (currency, varsayılan TRY)
 - Kategori (category)
 
-Kategori icin su degerlerden birini sec: ${categoryList}
+Kategori için şu değerlerden birini seç: ${categoryList}
 
-Yaniti SADECE su JSON formatinda ver, baska hicbir sey yazma:
+Yanıtı SADECE şu JSON formatında ver, başka hiçbir şey yazma:
 {"transactions": [{"transaction_date": "YYYY-MM-DD", "description": "...", "amount": 123.45, "category": "...", "currency": "TRY"}]}`
   }
 
-  return `Bu bir Turkce kredi karti ekstresi goruntusu. Goruntudeki TUM harcama satirlarini cikar.
+  return `Bu bir Türkçe kredi kartı ekstresi görüntüsü. Görüntüdeki TÜM harcama satırlarını çıkar.
 
-Her islem icin:
-- description: Isyeri/islem aciklamasi
-- amount: Tutar (pozitif sayi, virgul yerine nokta kullan)
-- transaction_date: Tarih (YYYY-MM-DD formatinda)
-- currency: Para birimi (varsayilan TRY)
+Her işlem için:
+- description: İşyeri/işlem açıklaması
+- amount: Tutar (pozitif sayı, virgül yerine nokta kullan)
+- transaction_date: Tarih (YYYY-MM-DD formatında)
+- currency: Para birimi (varsayılan TRY)
 - category: Kategori
 
-Kategori icin su degerlerden birini sec: ${categoryList}
+Kategori için şu değerlerden birini seç: ${categoryList}
 
-Eger tarih sadece gun/ay iceriyorsa, yili ekstre doneminden cikar veya mevcut yili kullan.
-Odeme, iade veya masraf satirlarini da dahil et.
+Eğer tarih sadece gün/ay içeriyorsa, yılı ekstre döneminden çıkar veya mevcut yılı kullan.
+Ödeme, iade veya masraf satırlarını da dahil et.
 
-Yaniti SADECE su JSON formatinda ver, baska hicbir sey yazma:
+Yanıtı SADECE şu JSON formatında ver, başka hiçbir şey yazma:
 {"transactions": [{"transaction_date": "YYYY-MM-DD", "description": "...", "amount": 123.45, "category": "...", "currency": "TRY"}]}`
 }
 

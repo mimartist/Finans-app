@@ -130,10 +130,10 @@ export default function OcrReview({ cardId, transactions, onClose, onSaved }: Pr
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
-            <div className="text-sm font-semibold">Ekstre Tarama Sonuclari</div>
+            <div className="text-sm font-semibold">Ekstre Tarama Sonuçları</div>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
               style={{ background: 'rgba(13,148,136,0.1)', color: '#0d9488' }}>
-              {items.length} islem
+              {items.length} işlem
             </span>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--bg4)' }}>
@@ -201,7 +201,7 @@ export default function OcrReview({ cardId, transactions, onClose, onSaved }: Pr
 
         {items.length === 0 && (
           <div className="text-center py-8 text-[13px]" style={{ color: 'var(--muted)' }}>
-            Islem bulunamadi
+            İşlem bulunamadı
           </div>
         )}
 
@@ -222,13 +222,13 @@ export default function OcrReview({ cardId, transactions, onClose, onSaved }: Pr
         <div className="flex gap-2">
           <button onClick={onClose}
             className="btn-outline flex-1 py-3 text-sm">
-            Iptal
+            İptal
           </button>
           <button onClick={handleSave}
             disabled={saving || selected.length === 0}
             className="btn-primary flex-1 py-3 text-sm font-bold"
             style={{ opacity: saving || selected.length === 0 ? 0.5 : 1 }}>
-            {saving ? 'Kaydediliyor...' : `${selected.length} Islemi Kaydet`}
+            {saving ? 'Kaydediliyor...' : `${selected.length} İşlemi Kaydet`}
           </button>
         </div>
       </div>

@@ -75,9 +75,9 @@ export default function NotificationBell({ payments }: Props) {
           {notifications.map(n => {
             let color = '#6366f1' // upcoming
             let bg = 'rgba(99,102,241,0.06)'
-            let label = `${n.days} gun sonra`
+            let label = `${n.days} gün sonra`
             if (n.overdue) { color = '#e5484d'; bg = 'rgba(229,72,77,0.06)'; label = 'Gecikti!' }
-            else if (n.days <= 3) { color = '#e5a000'; bg = 'rgba(229,160,0,0.06)'; label = n.days === 0 ? 'Bugun!' : n.days === 1 ? 'Yarin!' : `${n.days} gun` }
+            else if (n.days <= 3) { color = '#e5a000'; bg = 'rgba(229,160,0,0.06)'; label = n.days === 0 ? 'Bugün!' : n.days === 1 ? 'Yarın!' : `${n.days} gun` }
 
             return (
               <div key={n.id} className="mx-3 mb-2 px-3 py-2.5 rounded-xl flex items-center gap-3"

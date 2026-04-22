@@ -180,7 +180,7 @@ export default function InvestmentsPage() {
             <button onClick={updateRates} disabled={updatingRates}
               className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5"
               style={{ background: 'var(--glass-fill-soft)', border: '1px solid var(--border)', color: updatingRates ? 'var(--muted)' : 'var(--accent)' }}>
-              {updatingRates ? '↻ ...' : '↻ Kurlari Guncelle'}
+              {updatingRates ? '↻ ...' : '↻ Kurları Güncelle'}
             </button>
           </div>
         </div>
@@ -216,7 +216,7 @@ export default function InvestmentsPage() {
 
         {rates && (
           <>
-            <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Doviz Kurlari</div></div>
+            <div className="px-5 mb-2"><div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: 'var(--muted)' }}>Döviz Kurları</div></div>
             <div className="flex gap-2 mx-4 mb-4">
               {[{ label: 'USD/TRY', val: rates.usd_try, icon: '🇺🇸' }, { label: 'EUR/TRY', val: rates.eur_try, icon: '🇪🇺' }, { label: 'ALTIN/gr', val: rates.gold_try, icon: '🥇' }].map(r => (
                 <div key={r.label} className="flex-1 glass p-3 rounded-2xl">
@@ -333,7 +333,7 @@ export default function InvestmentsPage() {
                                   <button onClick={(e) => { e.stopPropagation(); setPriceEditId(inv.id); setPriceInput(inv.latest_price ? String(inv.latest_price) : '') }}
                                     className="text-[10px] font-medium px-2 py-0.5 rounded"
                                     style={{ background: 'rgba(13,148,136,0.08)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.2)' }}>
-                                    Guncelle
+                                    Güncelle
                                   </button>
                                 )}
                               </>
@@ -394,9 +394,9 @@ export default function InvestmentsPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
             <div className="glass-bold p-5 w-full max-w-sm rounded-2xl">
               <div className="text-sm font-semibold mb-2">Yatirimi Sil</div>
-              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu yatirimi silmek istediginize emin misiniz?</div>
+              <div className="text-[13px] mb-4" style={{ color: 'var(--muted)' }}>Bu yatirimi silmek istediğinize emin misiniz?</div>
               <div className="flex gap-2">
-                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">Iptal</button>
+                <button onClick={() => setDeleteConfirm(null)} className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
                 <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger flex-1 py-2.5 text-sm">Sil</button>
               </div>
             </div>
@@ -408,25 +408,25 @@ export default function InvestmentsPage() {
             <div className="glass-bold slide-up w-full max-w-lg rounded-t-3xl p-5" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
               <div className="flex justify-center mb-3"><div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border2)' }} /></div>
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm font-semibold">{editId ? 'Yatirimi Duzenle' : 'Yeni Yatirim'}</div>
+                <div className="text-sm font-semibold">{editId ? 'Yatirimi Düzenle' : 'Yeni Yatirim'}</div>
                 <button onClick={closeForm} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--glass-fill-soft)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
                   <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Yatirim Adi</label>
-                  <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Orn: BIST Hisse" className="input" />
+                  <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Örn: BIST Hisse" className="input" />
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tur</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tür</label>
                     <select value={form.type} onChange={e => set('type', e.target.value)} className="input">
                       <option value="hisse">Hisse</option><option value="fon">Fon</option><option value="altin">Altin</option>
-                      <option value="doviz">Doviz</option><option value="kripto">Kripto</option><option value="diger">Diger</option>
+                      <option value="doviz">Döviz</option><option value="kripto">Kripto</option><option value="diger">Diger</option>
                     </select>
                   </div>
                   <div className="flex-1">
                     <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Sembol</label>
-                    <input value={form.symbol} onChange={e => set('symbol', e.target.value)} placeholder="Orn: THYAO" className="input" />
+                    <input value={form.symbol} onChange={e => set('symbol', e.target.value)} placeholder="Örn: THYAO" className="input" />
                   </div>
                 </div>
                 <div className="flex gap-3">
@@ -441,19 +441,19 @@ export default function InvestmentsPage() {
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Doviz</label>
+                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Döviz</label>
                     <select value={form.currency} onChange={e => set('currency', e.target.value)} className="input">
                       <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
                     </select>
                   </div>
                   <div className="flex-1">
                     <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Platform</label>
-                    <input value={form.platform} onChange={e => set('platform', e.target.value)} placeholder="Orn: Midas" className="input" />
+                    <input value={form.platform} onChange={e => set('platform', e.target.value)} placeholder="Örn: Midas" className="input" />
                   </div>
                 </div>
               </div>
               <button onClick={handleSave} disabled={saving || !form.name || !form.quantity}
-                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Guncelle' : 'Ekle'}</button>
+                className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Güncelle' : 'Ekle'}</button>
             </div>
           </div>
         )}
