@@ -71,7 +71,7 @@ export default function AppLock({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center px-6"
-      style={{ background: 'var(--bg)', minHeight: '100dvh' }}>
+      style={{ background: 'var(--wallpaper)', minHeight: '100dvh' }}>
 
       {/* Logo / Icon */}
       <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-8 shadow-xl"

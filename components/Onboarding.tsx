@@ -152,7 +152,7 @@ export default function Onboarding({ children }: { children: React.ReactNode }) 
   return (
     <>
       <div className="fixed inset-0 flex items-center justify-center px-5"
-        style={{ background: 'var(--bg)', minHeight: '100dvh', zIndex: 9998 }}>
+        style={{ background: 'var(--wallpaper)', minHeight: '100dvh', zIndex: 9998 }}>
 
         <div className="w-full max-w-md">
 
