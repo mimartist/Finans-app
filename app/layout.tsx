@@ -7,7 +7,7 @@ import { AuthProvider } from '@/components/AuthProvider'
 import AuthGuard from '@/components/AuthGuard'
 
 export const metadata: Metadata = {
-  title: 'Finans Asistan',
+  title: 'Finans v2.1',
   description: 'Kisisel finans ve varlik takip asistani',
   manifest: '/manifest.json',
   appleWebApp: {
