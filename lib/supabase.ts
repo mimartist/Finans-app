@@ -130,6 +130,17 @@ export type ExchangeRate = {
   gold_try: number
 }
 
+export type DebtTransaction = {
+  id: number
+  debt_id: number
+  type: 'tahsilat' | 'ilave' | 'ilk_tutar'
+  amount: number
+  currency: string
+  transaction_date: string
+  notes?: string
+  created_at?: string
+}
+
 // Helper: format currency
 export function fmt(amount: number, currency = 'TRY'): string {
   const opts = { minimumFractionDigits: 2, maximumFractionDigits: 2 }

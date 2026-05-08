@@ -13,6 +13,15 @@ type PaymentItem = {
   name: string; amount: number; currency: string; day: number
   type: string; source: 'loan' | 'recurring'; sourceId: number
   days: number; paid: boolean; overdue: boolean
+  paidRecordId?: number
+  paidNotes?: string
+  paidAccountId?: number
+}
+
+type PastUnpaidItem = PaymentItem & {
+  monthLabel: string
+  periodYear: number
+  periodMonth: number
 }
 
 type MonthKey = { year: number; month: number }
@@ -62,6 +71,7 @@ export default function Dashboard() {
   const [hisseTry, setHisseTry] = useState(0)
   const [fonTry, setFonTry] = useState(0)
   const [payments, setPayments] = useState<PaymentItem[]>([])
+  const [pastUnpaid, setPastUnpaid] = useState<PastUnpaidItem[]>([])
   const [allAlacak, setAllAlacak] = useState<DebtRecord[]>([])
   const [kriptoTry, setKriptoTry] = useState(0)
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(currentMonth)
@@ -137,8 +147,9 @@ export default function Dashboard() {
     const todayDay = isCurrentMonth ? now.getDate() : 32
 
     const loanItems: PaymentItem[] = lnsList.filter(l => l.payment_day).map(l => {
-      const isPaid = paidList.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
-      return { id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, type: 'kredi', source: 'loan' as const, sourceId: l.id, days: isCurrentMonth ? daysUntil(l.payment_day) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && l.payment_day < todayDay }
+      const paidRecord = paidList.find(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
+      const isPaid = !!paidRecord
+      return { id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, type: 'kredi', source: 'loan' as const, sourceId: l.id, days: isCurrentMonth ? daysUntil(l.payment_day) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && l.payment_day < todayDay, paidRecordId: paidRecord?.id, paidNotes: paidRecord?.notes }
     })
 
     const expItems: PaymentItem[] = recList.filter(r => {
@@ -147,8 +158,9 @@ export default function Dashboard() {
       if (r.end_date) { const end = new Date(r.end_date); if (new Date(m.year, m.month - 1, 1) > end) return false }
       return true
     }).map(r => {
-      const isPaid = paidList.some(p => p.expense_id === r.id)
-      return { id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id, days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && r.payment_day! < todayDay }
+      const paidRecord = paidList.find(p => p.expense_id === r.id)
+      const isPaid = !!paidRecord
+      return { id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id, days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && r.payment_day! < todayDay, paidRecordId: paidRecord?.id, paidNotes: paidRecord?.notes }
     })
 
     const ccItems: PaymentItem[] = ccCards.map((card: any) => {
@@ -174,6 +186,51 @@ export default function Dashboard() {
       if (ta !== tb) return ta - tb
       return a.day - b.day
     }))
+
+    // Load past unpaid payments (only when viewing current month)
+    if (isCurrentMonth && !isDemo) {
+      const pastItems: PastUnpaidItem[] = []
+      for (let i = 1; i <= 6; i++) {
+        const pm = monthOffset(m, -i)
+        const { data: pastPaid } = await supabase.from('recurring_payments').select('*').eq('period_year', pm.year).eq('period_month', pm.month).eq('is_paid', true)
+        const pastPaidList = pastPaid || []
+        const pmLabel = `${MONTH_NAMES[pm.month - 1]} ${pm.year}`
+
+        lnsList.filter(l => l.payment_day).forEach(l => {
+          const wasPaid = pastPaidList.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
+          if (!wasPaid) {
+            pastItems.push({
+              id: `past_loan_${l.id}_${pm.year}_${pm.month}`,
+              name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day,
+              type: 'kredi', source: 'loan', sourceId: l.id,
+              days: 0, paid: false, overdue: true,
+              monthLabel: pmLabel, periodYear: pm.year, periodMonth: pm.month,
+            })
+          }
+        })
+
+        recList.filter(r => {
+          if (!r.payment_day || r.category === 'nakit') return false
+          if (r.expense_type === 'one_time') return false
+          if (r.end_date) { const end = new Date(r.end_date); if (new Date(pm.year, pm.month - 1, 1) > end) return false }
+          return true
+        }).forEach(r => {
+          const wasPaid = pastPaidList.some(p => p.expense_id === r.id)
+          if (!wasPaid) {
+            pastItems.push({
+              id: `past_exp_${r.id}_${pm.year}_${pm.month}`,
+              name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!,
+              type: r.category, source: 'recurring', sourceId: r.id,
+              days: 0, paid: false, overdue: true,
+              monthLabel: pmLabel, periodYear: pm.year, periodMonth: pm.month,
+            })
+          }
+        })
+      }
+      setPastUnpaid(pastItems)
+    } else {
+      setPastUnpaid([])
+    }
   }, [])
 
   useEffect(() => {
@@ -234,6 +291,8 @@ export default function Dashboard() {
   const [payMethod, setPayMethod] = useState<'hesap' | 'kredi_karti' | 'nakit'>('hesap')
   const [payCardId, setPayCardId] = useState<number | null>(null)
   const [paying, setPaying] = useState(false)
+  const [undoConfirm, setUndoConfirm] = useState<PaymentItem | null>(null)
+  const [undoing, setUndoing] = useState(false)
 
   async function handlePay() {
     if (!payModal) return
@@ -266,6 +325,33 @@ export default function Dashboard() {
     setPayments(prev => prev.map(p => p.source === payModal.source && p.sourceId === payModal.sourceId ? { ...p, paid: true, overdue: false } : p))
     setPaying(false); setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null)
     if (!isDemo) reloadAll()
+  }
+
+  async function handleUndo() {
+    if (!undoConfirm || !undoConfirm.paidRecordId) return
+    setUndoing(true)
+
+    const { data: paymentRecord } = await supabase.from('recurring_payments').select('*').eq('id', undoConfirm.paidRecordId).single()
+
+    if (paymentRecord) {
+      // Reverse loan installment if it's a loan payment
+      if (undoConfirm.source === 'loan') {
+        const loan = loans.find(l => l.id === undoConfirm.sourceId)
+        if (loan) {
+          await supabase.from('loans').update({
+            paid_installments: Math.max(0, loan.paid_installments - 1),
+            remaining_amount: (loan.remaining_amount || 0) + undoConfirm.amount,
+          }).eq('id', undoConfirm.sourceId)
+        }
+      }
+
+      // Delete the recurring_payments record
+      await supabase.from('recurring_payments').delete().eq('id', undoConfirm.paidRecordId)
+    }
+
+    setUndoing(false)
+    setUndoConfirm(null)
+    await reloadAll()
   }
 
   const hour = now.getHours()
@@ -326,6 +412,13 @@ export default function Dashboard() {
             <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
               className="tx-badge" style={{ background: p.overdue ? 'rgba(229,160,0,0.08)' : 'rgba(43,45,110,0.06)', color: p.overdue ? '#e5a000' : '#2b2d6e', border: 'none', cursor: 'pointer' }}>
               {p.overdue ? 'Onayla' : 'Öde'}
+            </button>
+          )}
+          {p.paid && p.paidRecordId && (
+            <button onClick={() => setUndoConfirm(p)}
+              className="text-[10px] font-medium mt-0.5"
+              style={{ color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, opacity: 0.7 }}>
+              ↩ Geri Al
             </button>
           )}
         </div>
@@ -614,6 +707,55 @@ export default function Dashboard() {
 
         {/* ===== PAYMENT LIST ===== */}
         <div style={{ opacity: monthLoading ? 0.5 : 1 }}>
+          {/* Past Unpaid Payments (only shown for current month) */}
+          {isCurrent && pastUnpaid.length > 0 && (
+            <>
+              <div className="mx-4 mb-3 mt-1">
+                <div className="flex items-center gap-2 mb-2.5 px-1">
+                  <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #dc2626, #f59e0b)' }} />
+                  <span className="text-xs font-bold px-2" style={{ color: '#dc2626', whiteSpace: 'nowrap' }}>Gecmis Odenmemis</span>
+                  <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #f59e0b, #dc2626)' }} />
+                </div>
+                <div className="tx-list">
+                  {(() => {
+                    const grouped: Record<string, PastUnpaidItem[]> = {}
+                    pastUnpaid.forEach(item => {
+                      if (!grouped[item.monthLabel]) grouped[item.monthLabel] = []
+                      grouped[item.monthLabel].push(item)
+                    })
+                    return Object.entries(grouped).map(([label, items]) => (
+                      <div key={label} className="mb-2">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide px-2 py-1 mb-1" style={{ color: '#e5a000' }}>
+                          {label}
+                        </div>
+                        {items.map(p => (
+                          <div key={p.id} className="tx-item" style={{ opacity: 0.85, borderLeft: '3px solid #dc2626' }}>
+                            <div className="tx-icon">
+                              {getCatIcon(p.type, { color: '#dc2626', size: 20 })}
+                            </div>
+                            <div className="tx-info">
+                              <div className="tx-name">{p.name}</div>
+                              <div className="tx-detail" style={{ color: '#dc2626' }}>
+                                Odenmedi · {p.monthLabel}
+                              </div>
+                            </div>
+                            <div className="tx-amount">
+                              <div className="tx-value" style={{ color: '#dc2626' }}>{fmt(p.amount, p.currency)}</div>
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>
+                                Gecikmiş
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  })()}
+                </div>
+              </div>
+              <div className="mx-4 mb-3" style={{ height: 1, background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
+            </>
+          )}
+
           {unpaidPayments.length > 0 && (
             <>
               <div className="flex items-center justify-between mx-5 mb-3">
@@ -696,6 +838,29 @@ export default function Dashboard() {
                 <button onClick={handlePay}
                   disabled={paying || (payMethod === 'hesap' && !payAccountId) || (payMethod === 'kredi_karti' && !payCardId)}
                   className="btn-primary flex-1 py-3 text-sm">{paying ? 'Kaydediliyor...' : 'Onayla'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== UNDO CONFIRMATION MODAL ===== */}
+        {undoConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(30,31,84,0.5)' }}
+            onClick={e => { if (e.target === e.currentTarget) setUndoConfirm(null) }}>
+            <div className="glass p-6 w-full max-w-sm scale-in">
+              <div className="text-base font-bold mb-1">Odemeyi Geri Al</div>
+              <div className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text)' }}>{undoConfirm.name}</span>
+                <span className="mono ml-2 font-bold">{fmt(undoConfirm.amount, undoConfirm.currency)}</span>
+                <div className="mt-2 text-[12px]">Bu odeme kaydini silmek istediginize emin misiniz? Odeme tekrar &quot;bekleyen&quot; durumuna donecektir.</div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setUndoConfirm(null)} className="btn-outline flex-1 py-3 text-sm">İptal</button>
+                <button onClick={handleUndo} disabled={undoing}
+                  className="flex-1 py-3 text-sm rounded-xl font-semibold"
+                  style={{ background: 'rgba(229,72,77,0.1)', color: '#e5484d', border: '1px solid rgba(229,72,77,0.3)' }}>
+                  {undoing ? 'Geri aliniyor...' : 'Geri Al'}
+                </button>
               </div>
             </div>
           </div>

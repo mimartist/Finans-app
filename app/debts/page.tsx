@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt } from '@/lib/supabase'
-import type { DebtRecord, Account } from '@/lib/supabase'
+import type { DebtRecord, Account, DebtTransaction } from '@/lib/supabase'
 
 const freqLabels: Record<string, string> = { aylik: 'Aylık', haftalik: 'Haftalık', '2haftada1': '2 Haftada 1', duzensiz: 'Düzensiz' }
 
@@ -53,6 +53,12 @@ export default function DebtsPage() {
   const [collectAccountId, setCollectAccountId] = useState<number | ''>('')
   const [accounts, setAccounts] = useState<Account[]>([])
   const [userId, setUserId] = useState<string | null>(null)
+  const [debtTransactions, setDebtTransactions] = useState<Record<number, DebtTransaction[]>>({})
+  const [loadingTransactions, setLoadingTransactions] = useState<number | null>(null)
+  const [ilaveModal, setIlaveModal] = useState<DebtRecord | null>(null)
+  const [ilaveAmount, setIlaveAmount] = useState('')
+  const [ilaveNotes, setIlaveNotes] = useState('')
+  const [ilaveSaving, setIlaveSaving] = useState(false)
 
   const [eurTry, setEurTry] = useState(0)
   const [usdTry, setUsdTry] = useState(0)
@@ -185,12 +191,63 @@ export default function DebtsPage() {
       }
     }
 
+    // Create debt_transaction record for tahsilat
+    await supabase.from('debt_transactions').insert({
+      debt_id: payModal.id,
+      type: 'tahsilat',
+      amount: amt,
+      currency: payModal.currency,
+      transaction_date: new Date().toISOString().split('T')[0],
+      notes: collectAccountId ? `hesap_${collectAccountId}` : null,
+      ...(userId ? { user_id: userId } : {}),
+    })
+
     if (isSettled) {
       setDebts(prev => prev.filter(d => d.id !== payModal.id))
     } else {
       setDebts(prev => prev.map(d => d.id === payModal.id ? { ...d, amount: Math.max(0, newRemaining), paid_amount: newPaid } : d))
     }
+    await loadTransactions(payModal.id)
     setPaying(false); setPayModal(null); setPayAmount(''); setCollectAccountId('')
+  }
+
+  async function loadTransactions(debtId: number) {
+    setLoadingTransactions(debtId)
+    const { data } = await supabase.from('debt_transactions').select('*').eq('debt_id', debtId).order('transaction_date', { ascending: true }).order('created_at', { ascending: true })
+    setDebtTransactions(prev => ({ ...prev, [debtId]: data || [] }))
+    setLoadingTransactions(null)
+  }
+
+  async function handleIlave() {
+    if (!ilaveModal || !ilaveAmount) return
+    setIlaveSaving(true)
+    const amt = parseFloat(ilaveAmount) || 0
+    const newTotal = (ilaveModal.total_amount || ((ilaveModal.paid_amount || 0) + ilaveModal.amount)) + amt
+    const newRemaining = ilaveModal.amount + amt
+
+    const { error } = await supabase.from('debt_records').update({
+      amount: newRemaining,
+      total_amount: newTotal,
+    }).eq('id', ilaveModal.id)
+    if (error) { alert('Hata: ' + error.message); setIlaveSaving(false); return }
+
+    await supabase.from('debt_transactions').insert({
+      debt_id: ilaveModal.id,
+      type: 'ilave',
+      amount: amt,
+      currency: ilaveModal.currency,
+      transaction_date: new Date().toISOString().split('T')[0],
+      notes: ilaveNotes || null,
+      ...(userId ? { user_id: userId } : {}),
+    })
+
+    setDebts(prev => prev.map(d => d.id === ilaveModal.id ? { ...d, amount: newRemaining, total_amount: newTotal } : d))
+    await loadTransactions(ilaveModal.id)
+
+    setIlaveSaving(false)
+    setIlaveModal(null)
+    setIlaveAmount('')
+    setIlaveNotes('')
   }
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
@@ -297,7 +354,7 @@ export default function DebtsPage() {
                     )}
 
                     {/* Name + subtitle — tıklanınca expand */}
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : d.id)}>
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { if (!isExpanded) { loadTransactions(d.id) }; setExpandedId(isExpanded ? null : d.id) }}>
                       <div className="text-[13px] font-semibold truncate">{d.person_name}</div>
                       <div className="text-[10px] mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-medium"
@@ -324,7 +381,7 @@ export default function DebtsPage() {
 
                     {/* Amount + tahsilat butonu + chevron */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <div className="text-right cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : d.id)}>
+                      <div className="text-right cursor-pointer" onClick={() => { if (!isExpanded) { loadTransactions(d.id) }; setExpandedId(isExpanded ? null : d.id) }}>
                         <div className="mono text-[13px] font-bold" style={{ color }}>{fmt(d.amount, d.currency)}</div>
                         {d.currency !== 'TRY' && (
                           <div className="mono text-[10px]" style={{ color: 'var(--muted)' }}>({fmt(toTry(d.amount, d.currency))})</div>
@@ -343,7 +400,7 @@ export default function DebtsPage() {
                         }}>
                         {d.type === 'alacak' ? '💰 Tahsil' : '💸 Öde'}
                       </button>
-                      <span className="text-[12px] cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : d.id)}
+                      <span className="text-[12px] cursor-pointer" onClick={() => { if (!isExpanded) { loadTransactions(d.id) }; setExpandedId(isExpanded ? null : d.id) }}
                         style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>›</span>
                     </div>
                   </div>
@@ -409,12 +466,75 @@ export default function DebtsPage() {
                         )}
                       </div>
 
+                      {/* Transaction Timeline */}
+                      {debtTransactions[d.id] && debtTransactions[d.id].length > 0 && (
+                        <div className="mb-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--muted)' }}>Islem Gecmisi</div>
+                          <div className="relative" style={{ paddingLeft: 16 }}>
+                            <div style={{ position: 'absolute', left: 5, top: 4, bottom: 4, width: 2, background: 'var(--border)', borderRadius: 1 }} />
+                            {(() => {
+                              const txns = debtTransactions[d.id]
+                              let runningTotal = 0
+                              return txns.map((tx, idx) => {
+                                if (tx.type === 'ilk_tutar') runningTotal = tx.amount
+                                else if (tx.type === 'ilave') runningTotal += tx.amount
+                                else if (tx.type === 'tahsilat') runningTotal -= tx.amount
+                                const typeColor = tx.type === 'tahsilat' ? '#059669' : tx.type === 'ilave' ? '#d97706' : '#6366f1'
+                                const typeLabel = tx.type === 'tahsilat' ? 'Tahsilat' : tx.type === 'ilave' ? 'Ilave' : 'Ilk Tutar'
+                                const typeIcon = tx.type === 'tahsilat' ? '✓' : tx.type === 'ilave' ? '+' : '◆'
+                                return (
+                                  <div key={tx.id} className="relative flex gap-3 pb-2.5" style={{ minHeight: 36 }}>
+                                    <div style={{
+                                      position: 'absolute', left: -14, top: 2,
+                                      width: 12, height: 12, borderRadius: '50%',
+                                      background: typeColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      fontSize: 7, color: '#fff', fontWeight: 700, zIndex: 1,
+                                    }}>{typeIcon}</div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: `${typeColor}15`, color: typeColor }}>{typeLabel}</span>
+                                          <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                                            {new Date(tx.transaction_date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                          </span>
+                                        </div>
+                                        <div className="text-right">
+                                          <span className="mono text-[11px] font-bold" style={{ color: tx.type === 'tahsilat' ? '#059669' : typeColor }}>
+                                            {tx.type === 'tahsilat' ? '-' : '+'}{fmt(tx.amount, tx.currency || d.currency)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center justify-between mt-0.5">
+                                        {tx.notes ? (
+                                          <span className="text-[9px]" style={{ color: 'var(--muted)' }}>{tx.notes.startsWith('hesap_') ? 'Hesaptan' : tx.notes}</span>
+                                        ) : <span />}
+                                        <span className="mono text-[9px]" style={{ color: 'var(--muted)' }}>
+                                          Bakiye: {fmt(Math.max(0, runningTotal), tx.currency || d.currency)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                      {loadingTransactions === d.id && (
+                        <div className="text-[11px] mb-3 text-center" style={{ color: 'var(--muted)' }}>Islemler yukleniyor...</div>
+                      )}
+
                       {/* Action buttons */}
                       <div className="flex gap-2">
                         <button onClick={() => { setPayModal(d); setPayAmount(String(d.amount)); setCollectAccountId('') }}
                           className="flex-1 py-2 rounded-lg text-[12px] font-semibold"
                           style={{ background: d.type === 'alacak' ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.06)', color, border: `1px solid ${d.type === 'alacak' ? 'rgba(5,150,105,0.2)' : 'rgba(220,38,38,0.2)'}` }}>
                           {d.type === 'alacak' ? 'Tahsilat Al' : 'Ödeme Yap'}
+                        </button>
+                        <button onClick={() => { setIlaveModal(d); setIlaveAmount(''); setIlaveNotes('') }}
+                          className="py-2 px-3 rounded-lg text-[12px] font-semibold"
+                          style={{ background: 'rgba(217,119,6,0.08)', color: '#d97706', border: '1px solid rgba(217,119,6,0.2)' }}>
+                          + Ilave
                         </button>
                         <button onClick={() => handleSettle(d.id)}
                           className="py-2 px-3 rounded-lg text-[12px] font-medium"
@@ -621,6 +741,58 @@ export default function DebtsPage() {
               </div>
               <button onClick={handleSave} disabled={saving || !form.person_name || !form.amount}
                 className="btn-primary w-full mt-4 py-3">{saving ? 'Kaydediliyor...' : editId ? 'Güncelle' : 'Ekle'}</button>
+            </div>
+          </div>
+        )}
+
+        {/* Ilave (Addition) Modal */}
+        {ilaveModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+            <div className="glass-bold p-5 w-full max-w-sm rounded-2xl">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
+                  style={{ background: 'rgba(217,119,6,0.1)' }}>+</div>
+                <div>
+                  <div className="text-sm font-semibold">Ilave Ekle</div>
+                  <div className="text-[11px]" style={{ color: 'var(--muted)' }}>{ilaveModal.person_name}</div>
+                </div>
+              </div>
+
+              <div className="rounded-lg px-3 py-2 mb-4 mt-3 flex justify-between items-center"
+                style={{ background: 'var(--glass-fill-soft)', border: '1px solid var(--border)' }}>
+                <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Mevcut kalan</span>
+                <span className="mono font-bold text-[14px]" style={{ color: '#d97706' }}>
+                  {fmt(ilaveModal.amount, ilaveModal.currency)}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Ilave Tutari</label>
+                  <input value={ilaveAmount} onChange={e => setIlaveAmount(e.target.value)}
+                    placeholder="0" type="number" className="input mono" />
+                </div>
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Not (Opsiyonel)</label>
+                  <input value={ilaveNotes} onChange={e => setIlaveNotes(e.target.value)}
+                    placeholder="Orn: Ek is yapildi" className="input" />
+                </div>
+              </div>
+
+              {ilaveAmount && parseFloat(ilaveAmount) > 0 && (
+                <div className="mt-3 p-2.5 rounded-lg text-[11px]" style={{ background: 'rgba(217,119,6,0.06)', color: '#d97706' }}>
+                  Yeni toplam: <span className="mono font-bold">{fmt(ilaveModal.amount + (parseFloat(ilaveAmount) || 0), ilaveModal.currency)}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => { setIlaveModal(null); setIlaveAmount(''); setIlaveNotes('') }}
+                  className="btn-outline flex-1 py-2.5 text-sm">İptal</button>
+                <button onClick={handleIlave} disabled={ilaveSaving || !ilaveAmount || parseFloat(ilaveAmount) <= 0}
+                  className="btn-primary flex-1 py-2.5 text-sm">
+                  {ilaveSaving ? 'Kaydediliyor...' : 'Ekle'}
+                </button>
+              </div>
             </div>
           </div>
         )}
