@@ -718,16 +718,17 @@ export default function DebtsPage() {
                     </div>
                   </>
                 ) : (
-                  <div>
-                    <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Vade Tarihi</label>
-                    <input value={form.due_date} onChange={e => set('due_date', e.target.value)} type="date" className="input" />
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Vade Tarihi</label>
+                      <input value={form.due_date} onChange={e => set('due_date', e.target.value)} type="date" className="input" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Aciklama</label>
+                      <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="Opsiyonel" className="input" />
+                    </div>
                   </div>
                 )}
-
-                <div>
-                  <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Aciklama</label>
-                  <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="Opsiyonel" className="input" />
-                </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>İşlem Tarihi</label>
