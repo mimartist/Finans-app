@@ -16,6 +16,8 @@ type PaymentItem = {
   paidRecordId?: number
   paidNotes?: string
   paidAccountId?: number
+  periodYear?: number
+  periodMonth?: number
 }
 
 type PastUnpaidItem = PaymentItem & {
@@ -286,6 +288,8 @@ export default function Dashboard() {
   })
   if (chartData.length > 0) chartData[chartData.length - 1].tutar = Math.round(monthlyTotalAll)
 
+  const defaultAccountId = () => accounts.find(a => /garanti/i.test(a.bank || ''))?.id ?? accounts[0]?.id ?? null
+
   const [payModal, setPayModal] = useState<PaymentItem | null>(null)
   const [payAccountId, setPayAccountId] = useState<number | null>(null)
   const [payMethod, setPayMethod] = useState<'hesap' | 'kredi_karti' | 'nakit'>('hesap')
@@ -300,7 +304,9 @@ export default function Dashboard() {
     if (payMethod === 'kredi_karti' && !payCardId) return
     setPaying(true)
     if (!isDemo) {
-      const year = now.getFullYear(), month = now.getMonth() + 1, today = now.toISOString().split('T')[0]
+      const year = payModal.periodYear ?? now.getFullYear()
+      const month = payModal.periodMonth ?? (now.getMonth() + 1)
+      const today = now.toISOString().split('T')[0]
       const paymentNotes = payMethod === 'nakit' ? 'nakit' : payMethod === 'kredi_karti' ? `kk_${payCardId}` : undefined
       if (payModal.source === 'recurring') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: payModal.sourceId, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(paymentNotes ? { notes: paymentNotes } : {}), ...(userId ? { user_id: userId } : {}) }); if (error) { alert('Hata: ' + error.message); setPaying(false); return } }
       if (payModal.source === 'loan') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: null, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) }); if (error) { alert('Hata: ' + error.message); setPaying(false); return }; const loan = loans.find(l => l.id === payModal.sourceId); if (loan) await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId) }
@@ -409,7 +415,7 @@ export default function Dashboard() {
         <div className="tx-amount">
           <div className="tx-value" style={{ color: p.paid ? '#30a46c' : isLoan ? '#e5484d' : 'var(--text)', textDecoration: p.paid ? 'line-through' : 'none', fontWeight: isHighlight ? 700 : undefined }}>{fmt(p.amount, p.currency)}</div>
           {isCurrent && !p.paid && (
-            <button onClick={() => { setPayModal(p); setPayAccountId(accounts[0]?.id || null); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
+            <button onClick={() => { setPayModal(p); setPayAccountId(defaultAccountId()); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
               className="tx-badge" style={{ background: p.overdue ? 'rgba(229,160,0,0.08)' : 'rgba(43,45,110,0.06)', color: p.overdue ? '#e5a000' : '#2b2d6e', border: 'none', cursor: 'pointer' }}>
               {p.overdue ? 'Onayla' : 'Öde'}
             </button>
@@ -741,9 +747,10 @@ export default function Dashboard() {
                             </div>
                             <div className="tx-amount">
                               <div className="tx-value" style={{ color: '#dc2626' }}>{fmt(p.amount, p.currency)}</div>
-                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>
-                                Gecikmiş
-                              </span>
+                              <button onClick={() => { setPayModal(p); setPayAccountId(defaultAccountId()); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
+                                className="tx-badge" style={{ background: 'rgba(229,160,0,0.12)', color: '#e5a000', border: 'none', cursor: 'pointer' }}>
+                                Öde
+                              </button>
                             </div>
                           </div>
                         ))}
