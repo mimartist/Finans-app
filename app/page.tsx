@@ -170,14 +170,16 @@ export default function Dashboard() {
       const dueDay = card.due_day || 10
       const amount = stmt?.total_amount || 0
       const days = isCurrentMonth ? daysUntil(dueDay) : 0
-      const isPaid = stmt?.is_paid || false
+      const isPaid = stmt?.is_paid || paidList.some(p => p.notes === `cc_${card.id}`)
       if (!isCurrentMonth && amount === 0) return null
+      const paidRecord = paidList.find(p => p.notes === `cc_${card.id}`)
       return {
         id: `cc_${card.id}`, name: card.name || 'Kredi Kartı', amount,
         currency: card.currency || 'TRY', day: dueDay, type: 'kredi_karti',
         source: 'recurring' as const, sourceId: card.id,
         days, paid: isPaid,
         overdue: isCurrentMonth && !isPaid && dueDay < todayDay && amount > 0,
+        paidRecordId: paidRecord?.id, paidNotes: paidRecord?.notes,
       }
     }).filter(Boolean) as PaymentItem[]
 
@@ -317,6 +319,10 @@ export default function Dashboard() {
           ...(userId ? { user_id: userId } : {})
         })
         if (error) { alert('Hata: ' + error.message); setPaying(false); return }
+        if (isCC) {
+          const stmt = await supabase.from('credit_card_statements').select('id').eq('card_id', payModal.sourceId).eq('period_year', year).eq('period_month', month).single()
+          if (stmt.data) await supabase.from('credit_card_statements').update({ is_paid: true }).eq('id', stmt.data.id)
+        }
       }
       if (payModal.source === 'loan') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: null, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) }); if (error) { alert('Hata: ' + error.message); setPaying(false); return }; const loan = loans.find(l => l.id === payModal.sourceId); if (loan) await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId) }
 
