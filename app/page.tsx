@@ -308,7 +308,16 @@ export default function Dashboard() {
       const month = payModal.periodMonth ?? (now.getMonth() + 1)
       const today = now.toISOString().split('T')[0]
       const paymentNotes = payMethod === 'nakit' ? 'nakit' : payMethod === 'kredi_karti' ? `kk_${payCardId}` : undefined
-      if (payModal.source === 'recurring') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: payModal.sourceId, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(paymentNotes ? { notes: paymentNotes } : {}), ...(userId ? { user_id: userId } : {}) }); if (error) { alert('Hata: ' + error.message); setPaying(false); return } }
+      if (payModal.source === 'recurring') {
+        const isCC = payModal.type === 'kredi_karti'
+        const { error } = await supabase.from('recurring_payments').insert({
+          expense_id: isCC ? null : payModal.sourceId,
+          notes: isCC ? `cc_${payModal.sourceId}` : (paymentNotes || null),
+          period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today,
+          ...(userId ? { user_id: userId } : {})
+        })
+        if (error) { alert('Hata: ' + error.message); setPaying(false); return }
+      }
       if (payModal.source === 'loan') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: null, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) }); if (error) { alert('Hata: ' + error.message); setPaying(false); return }; const loan = loans.find(l => l.id === payModal.sourceId); if (loan) await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId) }
 
       if (payMethod === 'hesap' && payAccountId) {
