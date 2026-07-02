@@ -110,3 +110,22 @@ Notlar:
 3. İkisini de Vercel environment variables'a ekle.
 
 Manuel test: `curl -H "Authorization: Bearer $CRON_SECRET" https://<site>/api/cron/daily-notification`
+
+---
+
+## Güvenlik: RLS Migration (ÖNEMLİ — bir kez çalıştırın)
+
+Uygulama artık satır düzeyi güvenlik (RLS) ile çalışacak şekilde güncellendi. Bunun aktifleşmesi için **yeni kodu deploy ettikten sonra** Supabase Dashboard → SQL Editor'de şu dosyayı çalıştırın:
+
+```
+supabase/migrations/20260702_rls_user_id.sql
+```
+
+Bu migration:
+- Tüm tablolara `user_id` ekler ve mevcut kayıtları ilk kullanıcıya atar
+- RLS'i açar: **giriş yapmadan (anon key ile) veri okunamaz/yazılamaz olur**
+- Ödeme geri alma için `recurring_payments.account_id` / `account_amount` kolonlarını ekler
+
+Migration sonrası gereksinimler:
+- Vercel'de `SUPABASE_SERVICE_ROLE_KEY` tanımlı olmalı (cron ve push bildirimleri RLS'ten muaf çalışabilsin diye). Supabase Dashboard → Settings → API → `service_role`.
+- Push aboneliği tablosu migration'ı da çalıştırılmış olmalı (`20260702_push_subscriptions.sql`).

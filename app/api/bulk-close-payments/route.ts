@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { getUserFromRequest } from '@/lib/api-auth'
+import { getAuthContext } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  // Ödeme kayıtları oluşturan bir uç — yalnızca giriş yapmış kullanıcı
-  const user = await getUserFromRequest(req)
-  if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ error: 'Missing env vars' }, { status: 500 })
-  }
-  const supabase = createClient(supabaseUrl, supabaseKey)
+  // Ödeme kayıtları oluşturan bir uç — yalnızca giriş yapmış kullanıcı.
+  // Sorgular kullanıcının JWT'siyle çalışır, RLS uygulanır.
+  const ctx = await getAuthContext(req)
+  if (!ctx) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+  const { supabase, user } = ctx
   const { excludeMonth, excludeYear } = await req.json()
 
   const [{ data: loans }, { data: expenses }] = await Promise.all([
@@ -54,6 +48,7 @@ export async function POST(req: NextRequest) {
         amount: loan.monthly_payment,
         is_paid: true,
         paid_date: `${year}-${String(month).padStart(2, '0')}-${String(loan.payment_day).padStart(2, '0')}`,
+        user_id: user.id,
       })
     }
 
@@ -68,6 +63,7 @@ export async function POST(req: NextRequest) {
         amount: exp.amount,
         is_paid: true,
         paid_date: `${year}-${String(month).padStart(2, '0')}-${String(exp.payment_day).padStart(2, '0')}`,
+        user_id: user.id,
       })
     }
   }

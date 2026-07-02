@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, authHeaders } from '@/lib/supabase'
+import { supabase, fmt, authHeaders, localDateStr } from '@/lib/supabase'
 import type { Investment, ExchangeRate } from '@/lib/supabase'
 
 type InvestmentWithSnapshot = Investment & {
@@ -119,13 +119,17 @@ export default function InvestmentsPage() {
     if (!form.name || !form.quantity) return
     setSaving(true)
     const payload = { name: form.name, type: form.type, symbol: form.symbol || null, quantity: parseFloat(form.quantity) || 0, avg_cost: parseFloat(form.avg_cost) || 0, currency: form.currency, platform: form.platform || null, is_active: true, ...(userId ? { user_id: userId } : {}) }
-    if (editId) { await supabase.from('investments').update(payload).eq('id', editId) }
-    else { await supabase.from('investments').insert(payload) }
-    setSaving(false); closeForm(); await load()
+    const { error } = editId
+      ? await supabase.from('investments').update(payload).eq('id', editId)
+      : await supabase.from('investments').insert(payload)
+    setSaving(false)
+    if (error) { alert('Hata: ' + error.message); return }
+    closeForm(); await load()
   }
 
   async function handleDelete(id: number) {
-    await supabase.from('investments').update({ is_active: false }).eq('id', id)
+    const { error } = await supabase.from('investments').update({ is_active: false }).eq('id', id)
+    if (error) { alert('Hata: ' + error.message); return }
     setDeleteConfirm(null); await load()
   }
 
@@ -141,13 +145,13 @@ export default function InvestmentsPage() {
       else if (inv.currency === 'USD') totalValueTry = totalValue * rates.usd_try
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = localDateStr()
 
     // Delete existing snapshot for today, then insert new
     await supabase.from('investment_snapshots').delete()
       .eq('investment_id', inv.id).eq('snapshot_date', today)
 
-    await supabase.from('investment_snapshots').insert({
+    const { error } = await supabase.from('investment_snapshots').insert({
       investment_id: inv.id,
       snapshot_date: today,
       price: newPrice,
@@ -155,6 +159,7 @@ export default function InvestmentsPage() {
       total_value_try: Math.round(totalValueTry * 100) / 100,
       ...(userId ? { user_id: userId } : {}),
     })
+    if (error) alert('Hata: Fiyat kaydedilemedi: ' + error.message)
 
     setPriceSaving(false)
     setPriceEditId(null)
@@ -270,7 +275,7 @@ export default function InvestmentsPage() {
                       <div className="text-[10px] mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
                         <span>{inv.type} · {inv.platform || '—'}</span>
                         <span>·</span>
-                        <span>{inv.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} {unitLabel}</span>
+                        <span>{inv.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 8 })} {unitLabel}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">

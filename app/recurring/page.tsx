@@ -25,10 +25,16 @@ export default function RecurringPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [rates, setRates] = useState<{ eur_try: number; usd_try: number } | null>(null)
 
   async function load() {
-    const { data } = await supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day', { nullsFirst: false })
-    setExpenses(data || []); setLoading(false)
+    const [{ data }, { data: rt }] = await Promise.all([
+      supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day', { nullsFirst: false }),
+      supabase.from('exchange_rates').select('eur_try, usd_try').order('date', { ascending: false }).limit(1),
+    ])
+    setExpenses(data || [])
+    setRates(rt?.[0] || null)
+    setLoading(false)
   }
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -48,8 +54,11 @@ export default function RecurringPage() {
   const filtered = (filter === 'tumu' ? expenses : expenses.filter(e => e.category === filter))
     .filter(e => typeFilter === 'all' ? true : (e.expense_type || 'recurring') === typeFilter)
     .sort((a, b) => getPayDay(a) - getPayDay(b))
-  const total = filtered.reduce((s, e) => s + e.amount, 0)
-  const totalAll = expenses.reduce((s, e) => s + e.amount, 0)
+  // Döviz cinsinden giderleri TL'ye çevirerek topla
+  const toTry = (amount: number, currency: string) =>
+    currency === 'EUR' ? amount * (rates?.eur_try || 0) : currency === 'USD' ? amount * (rates?.usd_try || 0) : amount
+  const total = filtered.reduce((s, e) => s + toTry(e.amount, e.currency), 0)
+  const totalAll = expenses.reduce((s, e) => s + toTry(e.amount, e.currency), 0)
   const recurringCount = expenses.filter(e => (e.expense_type || 'recurring') === 'recurring').length
   const oneTimeCount = expenses.filter(e => e.expense_type === 'one_time').length
 
@@ -112,7 +121,8 @@ export default function RecurringPage() {
   }
 
   async function handleDelete(id: number) {
-    await supabase.from('recurring_expenses').update({ is_active: false }).eq('id', id)
+    const { error } = await supabase.from('recurring_expenses').update({ is_active: false }).eq('id', id)
+    if (error) { alert('Hata: ' + error.message); return }
     setDeleteConfirm(null); await load()
   }
 
@@ -166,13 +176,13 @@ export default function RecurringPage() {
               style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
               <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.72)' }}>DÜZENLİ</div>
               <div className="mono text-[12px] font-bold mt-0.5">{recurringCount}</div>
-              <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{fmt(expenses.filter(e => (e.expense_type || 'recurring') === 'recurring').reduce((s, e) => s + e.amount, 0))}</div>
+              <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{fmt(expenses.filter(e => (e.expense_type || 'recurring') === 'recurring').reduce((s, e) => s + toTry(e.amount, e.currency), 0))}</div>
             </div>
             <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
               style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)' }}>
               <div className="text-[9px] font-medium" style={{ color: 'rgba(255,255,255,0.72)' }}>TEK SEFERLİK</div>
               <div className="mono text-[12px] font-bold mt-0.5">{oneTimeCount}</div>
-              <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{fmt(expenses.filter(e => e.expense_type === 'one_time').reduce((s, e) => s + e.amount, 0))}</div>
+              <div className="mono text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{fmt(expenses.filter(e => e.expense_type === 'one_time').reduce((s, e) => s + toTry(e.amount, e.currency), 0))}</div>
             </div>
             {filter !== 'tumu' && (
               <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"

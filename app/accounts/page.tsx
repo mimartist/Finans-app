@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, isDemo } from '@/lib/supabase'
+import { supabase, fmt, isDemo, localDateStr } from '@/lib/supabase'
 import type { Account, ExchangeRate, DebtRecord, Investment } from '@/lib/supabase'
 import { IconWallet, IconTrendUp, IconArrowsExchange, IconPlus } from '@/components/Icons'
 
@@ -38,7 +38,7 @@ const MOCK_DEBTS: DebtRecord[] = [
   { id: 2, person_name: 'Mehmet Demir', type: 'alacak', amount: 5000, currency: 'TRY', description: 'Proje ödemesi', transaction_date: '2026-02-20', is_settled: false },
   { id: 3, person_name: 'Kargo Firması', type: 'verecek', amount: 2400, currency: 'TRY', description: 'Kargo borcu', transaction_date: '2026-03-01', due_date: '2026-04-01', is_settled: false },
 ]
-const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('T')[0], usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
+const MOCK_RATES: ExchangeRate = { id: 1, date: localDateStr(), usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
 
 // Bank brand colors & domains for favicon
 const BANK_META: Record<string, { bg: string; text: string; domain: string }> = {
@@ -157,15 +157,20 @@ export default function AccountsPage() {
     setAccSaving(true)
     const payload = { name: accForm.name, bank: accForm.bank, type: accForm.type, currency: accForm.currency, balance: parseFloat(accForm.balance) || 0, is_active: true, ...(userId ? { user_id: userId } : {}) }
     if (!isDemo) {
-      if (editAcc) { await supabase.from('accounts').update(payload).eq('id', editAcc.id) }
-      else { await supabase.from('accounts').insert(payload) }
+      const { error } = editAcc
+        ? await supabase.from('accounts').update(payload).eq('id', editAcc.id)
+        : await supabase.from('accounts').insert(payload)
+      if (error) { alert('Hata: ' + error.message); setAccSaving(false); return }
     }
     setAccSaving(false); closeAccForm(); await loadData()
   }
   async function handleAccDelete() {
     if (!editAcc) return
     setAccSaving(true)
-    if (!isDemo) await supabase.from('accounts').update({ is_active: false }).eq('id', editAcc.id)
+    if (!isDemo) {
+      const { error } = await supabase.from('accounts').update({ is_active: false }).eq('id', editAcc.id)
+      if (error) { alert('Hata: ' + error.message); setAccSaving(false); return }
+    }
     setAccSaving(false); closeAccForm(); await loadData()
   }
   const setAcc = (k: string, v: string) => setAccForm(f => ({ ...f, [k]: v }))
@@ -220,19 +225,21 @@ export default function AccountsPage() {
     const avgCost = parseFloat(invForm.avg_cost) || 0
     const currentPrice = parseFloat(invForm.current_price) || 0
     const payload = { name: invForm.name, type: invForm.type, symbol: invForm.symbol || null, quantity: qty, avg_cost: avgCost, currency: invForm.currency, platform: invForm.platform || null, is_active: true }
-    await supabase.from('investments').update(payload).eq('id', editInv.id)
+    const { error } = await supabase.from('investments').update(payload).eq('id', editInv.id)
+    if (error) { alert('Hata: ' + error.message); setInvSaving(false); return }
     // Update or insert snapshot with current price
     if (currentPrice > 0) {
       const totalValue = currentPrice * qty
-      const today = new Date().toISOString().split('T')[0]
+      const today = localDateStr()
       const totalValueTry = invForm.currency === 'EUR' ? totalValue * eurTry : invForm.currency === 'USD' ? totalValue * usdTry : totalValue
-      // Upsert: delete old snapshot for this investment, insert new one
-      await supabase.from('investment_snapshots').delete().eq('investment_id', editInv.id)
-      await supabase.from('investment_snapshots').insert({
+      // Yalnızca bugünün snapshot'ını değiştir — fiyat geçmişini koru
+      await supabase.from('investment_snapshots').delete().eq('investment_id', editInv.id).eq('snapshot_date', today)
+      const { error: snapErr } = await supabase.from('investment_snapshots').insert({
         investment_id: editInv.id, snapshot_date: today, price: currentPrice,
         total_value: totalValue, total_value_try: totalValueTry,
         ...(userId ? { user_id: userId } : {}),
       })
+      if (snapErr) alert('Uyarı: Güncel fiyat kaydedilemedi: ' + snapErr.message)
     }
     setInvSaving(false); closeInvEdit(); await loadData()
   }
@@ -240,7 +247,8 @@ export default function AccountsPage() {
   async function handleInvDelete() {
     if (!editInv) return
     if (isDemo) { closeInvEdit(); return }
-    await supabase.from('investments').update({ is_active: false }).eq('id', editInv.id)
+    const { error } = await supabase.from('investments').update({ is_active: false }).eq('id', editInv.id)
+    if (error) { alert('Hata: ' + error.message); return }
     closeInvEdit(); await loadData()
   }
 
@@ -257,14 +265,16 @@ export default function AccountsPage() {
     if (isDemo) { closeDebtEdit(); return }
     setDebtSaving(true)
     const payload = { person_name: debtForm.person_name, type: debtForm.type, amount: parseFloat(debtForm.amount) || 0, currency: debtForm.currency, description: debtForm.description || null, due_date: debtForm.due_date || null }
-    await supabase.from('debt_records').update(payload).eq('id', editDebt.id)
+    const { error } = await supabase.from('debt_records').update(payload).eq('id', editDebt.id)
+    if (error) { alert('Hata: ' + error.message); setDebtSaving(false); return }
     setDebtSaving(false); closeDebtEdit(); await loadData()
   }
 
   async function handleDebtDelete() {
     if (!editDebt) return
     if (isDemo) { closeDebtEdit(); return }
-    await supabase.from('debt_records').delete().eq('id', editDebt.id)
+    const { error } = await supabase.from('debt_records').delete().eq('id', editDebt.id)
+    if (error) { alert('Hata: ' + error.message); return }
     closeDebtEdit(); await loadData()
   }
 
@@ -291,9 +301,22 @@ export default function AccountsPage() {
       const acc = accounts.find(a => a.id === collectAccountId)
       if (acc) {
         const newBalance = collectModal.type === 'alacak' ? acc.balance + amt : acc.balance - amt
-        await supabase.from('accounts').update({ balance: Math.max(0, newBalance) }).eq('id', collectAccountId)
+        const { error: balErr } = await supabase.from('accounts').update({ balance: Math.max(0, newBalance) }).eq('id', collectAccountId)
+        if (balErr) alert('Uyarı: Hesap bakiyesi güncellenemedi: ' + balErr.message)
       }
     }
+
+    // Borçlar sayfasıyla tutarlı: tahsilat işlem geçmişine de yazılsın
+    const { error: txErr } = await supabase.from('debt_transactions').insert({
+      debt_id: collectModal.id,
+      type: 'tahsilat',
+      amount: amt,
+      currency: collectModal.currency,
+      transaction_date: localDateStr(),
+      notes: collectAccountId ? `hesap_${collectAccountId}` : null,
+      ...(userId ? { user_id: userId } : {}),
+    })
+    if (txErr) alert('Uyarı: Tahsilat geçmişe kaydedilemedi: ' + txErr.message)
 
     setCollecting(false)
     setCollectModal(null); setCollectAmount(''); setCollectAccountId('')

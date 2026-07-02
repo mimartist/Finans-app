@@ -1,18 +1,15 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { getUserFromRequest } from '@/lib/api-auth'
+import { getAuthContext } from '@/lib/api-auth'
+import { localDateStr } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  // Veritabanına yazan ve dış API çağıran bir uç — yalnızca giriş yapmış kullanıcı
-  const user = await getUserFromRequest(request)
-  if (!user) return NextResponse.json({ success: false, error: 'Yetkisiz' }, { status: 401 })
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  // Veritabanına yazan ve dış API çağıran bir uç — yalnızca giriş yapmış kullanıcı.
+  // Sorgular kullanıcının JWT'siyle çalışır, RLS uygulanır.
+  const ctx = await getAuthContext(request)
+  if (!ctx) return NextResponse.json({ success: false, error: 'Yetkisiz' }, { status: 401 })
+  const { supabase } = ctx
   try {
     let usd_try = 0
     let eur_try = 0
@@ -72,7 +69,8 @@ export async function GET(request: Request) {
         btc_usd = cryptoData.bitcoin?.usd || 0
         eth_usd = cryptoData.ethereum?.usd || 0
         peaq_usd = cryptoData.peaq?.usd || 0
-        usdc_usd = cryptoData['usd-coin']?.usd || 1
+        // Veri yoksa 0 bırak: uydurma 1$ fiyatı snapshot'a yazılmasın
+        usdc_usd = cryptoData['usd-coin']?.usd || 0
         console.log('CoinGecko — BTC:', btc_usd, 'ETH:', eth_usd, 'PEAQ:', peaq_usd, 'USDC:', usdc_usd)
       }
     } catch (e) {
@@ -121,7 +119,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Kur verisi alinamadi — TCMB erisim hatasi' }, { status: 502 })
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = localDateStr()
 
     const rates = {
       date: today,
@@ -155,6 +153,7 @@ export async function GET(request: Request) {
     const priceMap: Record<string, { price: number; currency: string }> = {}
     if (tnztpPrice > 0) priceMap['TNZTP'] = { price: tnztpPrice, currency: 'TRY' }
     if (btc_usd > 0) priceMap['BTC'] = { price: btc_usd, currency: 'USD' }
+    if (eth_usd > 0) priceMap['ETH'] = { price: eth_usd, currency: 'USD' }
     if (usdc_usd > 0) priceMap['USDC'] = { price: usdc_usd, currency: 'USD' }
     if (peaq_usd > 0) priceMap['PEAQ'] = { price: peaq_usd, currency: 'USD' }
     if (gtaPrice > 0) priceMap['GTA'] = { price: gtaPrice, currency: 'TRY' }

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { supabase, localDateStr } from '@/lib/supabase'
 import { useUser } from './AuthProvider'
 
 const DONE_KEY = 'finans_onboarding_done'
@@ -88,13 +88,17 @@ export default function Onboarding({ children }: { children: React.ReactNode }) 
     setShow(false)
   }
 
+  // Diğer sayfalardaki insertlerle tutarlı: kayıtlar kullanıcıya bağlansın
+  const uid = user ? { user_id: user.id } : {}
+
   async function handleAccountSave() {
     if (!accBank || !accName) { next(); return }
     setSaving(true)
-    await supabase.from('accounts').insert({
+    const { error } = await supabase.from('accounts').insert({
       name: accName, bank: accBank, type: 'vadesiz',
-      currency: accCurrency, balance: parseFloat(accBalance) || 0, is_active: true,
+      currency: accCurrency, balance: parseFloat(accBalance) || 0, is_active: true, ...uid,
     })
+    if (error) alert('Hesap kaydedilemedi: ' + error.message)
     setSaving(false)
     next()
   }
@@ -102,12 +106,13 @@ export default function Onboarding({ children }: { children: React.ReactNode }) 
   async function handleCcSave() {
     if (!ccBank || !ccName) { next(); return }
     setSaving(true)
-    await supabase.from('credit_cards').insert({
+    const { error } = await supabase.from('credit_cards').insert({
       name: ccName, bank: ccBank, credit_limit: parseFloat(ccLimit) || 0,
-      currency: 'TRY', payment_day: parseInt(ccDueDay) || 1,
+      currency: 'TRY', due_day: parseInt(ccDueDay) || 1,
       statement_day: Math.max(1, (parseInt(ccDueDay) || 1) - 10),
-      is_active: true,
+      is_active: true, ...uid,
     })
+    if (error) alert('Kart kaydedilemedi: ' + error.message)
     setSaving(false)
     next()
   }
@@ -115,7 +120,7 @@ export default function Onboarding({ children }: { children: React.ReactNode }) 
   async function handleLoanSave() {
     if (!loanBank || !loanName) { next(); return }
     setSaving(true)
-    await supabase.from('loans').insert({
+    const { error } = await supabase.from('loans').insert({
       name: loanName, bank: loanBank, type: 'tuketici',
       currency: 'TRY',
       original_amount: parseFloat(loanRemaining) || 0,
@@ -123,9 +128,10 @@ export default function Onboarding({ children }: { children: React.ReactNode }) 
       monthly_payment: parseFloat(loanMonthly) || 0,
       payment_day: parseInt(loanDay) || 1,
       interest_rate: 0, total_installments: 0, paid_installments: 0,
-      start_date: new Date().toISOString().split('T')[0],
-      is_active: true,
+      start_date: localDateStr(),
+      is_active: true, ...uid,
     })
+    if (error) alert('Kredi kaydedilemedi: ' + error.message)
     setSaving(false)
     next()
   }
@@ -133,12 +139,13 @@ export default function Onboarding({ children }: { children: React.ReactNode }) 
   async function handleDebtSave() {
     if (!debtPerson || !debtAmount) { next(); return }
     setSaving(true)
-    await supabase.from('debt_records').insert({
+    const { error } = await supabase.from('debt_records').insert({
       person_name: debtPerson, type: debtType,
       amount: parseFloat(debtAmount) || 0, currency: debtCurrency,
-      transaction_date: new Date().toISOString().split('T')[0],
-      is_settled: false,
+      transaction_date: localDateStr(),
+      is_settled: false, ...uid,
     })
+    if (error) alert('Kayıt eklenemedi: ' + error.message)
     setSaving(false)
     next()
   }

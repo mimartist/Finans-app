@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { getUserFromRequest } from '@/lib/api-auth'
+import { getAuthContext } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  // Tüm finansal veriyi döndürür — yalnızca giriş yapmış kullanıcı erişebilir
-  const user = await getUserFromRequest(request)
-  if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !key) return NextResponse.json({ error: 'env missing' }, { status: 500 })
-  const supabase = createClient(url, key)
+  // Tüm finansal veriyi döndürür — yalnızca giriş yapmış kullanıcı erişebilir.
+  // Sorgular kullanıcının JWT'siyle çalışır, RLS uygulanır.
+  const ctx = await getAuthContext(request)
+  if (!ctx) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+  const { supabase } = ctx
 
   const [
     { data: accounts }, { data: loans }, { data: recurring },

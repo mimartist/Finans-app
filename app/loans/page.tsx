@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, daysUntil, daysUntilLabel } from '@/lib/supabase'
+import { supabase, fmt, daysUntil, daysUntilLabel, localDateStr } from '@/lib/supabase'
 import type { Loan, CreditCard, CreditCardStatement, CreditCardTransaction, ExchangeRate } from '@/lib/supabase'
 import { EXPENSE_CATEGORIES, CATEGORY_GROUPS } from '@/lib/categories'
 import OcrUpload from '@/components/OcrUpload'
@@ -13,7 +13,7 @@ const emptyLoan = {
 }
 
 const emptyTx = {
-  transaction_date: new Date().toISOString().split('T')[0],
+  transaction_date: localDateStr(),
   description: '', category: '', amount: '', currency: 'TRY',
 }
 
@@ -27,6 +27,7 @@ export default function LoansPage() {
   const [statements, setStatements] = useState<CreditCardStatement[]>([])
   const [transactions, setTransactions] = useState<CreditCardTransaction[]>([])
   const [eurTry, setEurTry] = useState<number>(0)
+  const [usdTry, setUsdTry] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
@@ -57,13 +58,14 @@ export default function LoansPage() {
       supabase.from('loans').select('*').eq('is_active', true).order('monthly_payment', { ascending: false }),
       supabase.from('credit_cards').select('*').eq('is_active', true),
       supabase.from('credit_card_statements').select('*').eq('period_year', now.getFullYear()).eq('period_month', now.getMonth() + 1),
-      supabase.from('exchange_rates').select('eur_try').order('date', { ascending: false }).limit(1),
+      supabase.from('exchange_rates').select('eur_try, usd_try').order('date', { ascending: false }).limit(1),
       supabase.from('credit_card_transactions').select('*').order('transaction_date', { ascending: false }),
       supabase.from('recurring_payments').select('*').eq('period_year', now.getFullYear()).eq('period_month', now.getMonth() + 1).eq('is_paid', true),
     ])
     setLoans(lns || []); setCards(crd || []); setStatements(stm || []); setTransactions(txs || [])
     setPaidLoans(paidThisMonth || [])
     if (rates?.[0]?.eur_try) setEurTry(rates[0].eur_try)
+    if ((rates?.[0] as any)?.usd_try) setUsdTry((rates![0] as any).usd_try)
     setLoading(false)
   }
 
@@ -74,7 +76,7 @@ export default function LoansPage() {
     load()
   }, [])
 
-  const toTry = (loan: Loan, amount: number) => loan.currency === 'EUR' ? amount * eurTry : amount
+  const toTry = (loan: Loan, amount: number) => loan.currency === 'EUR' ? amount * eurTry : loan.currency === 'USD' ? amount * usdTry : amount
   const totalMonthly = loans.reduce((s, l) => s + toTry(l, l.monthly_payment), 0)
   const totalRemaining = loans.reduce((s, l) => s + toTry(l, l.remaining_amount || 0), 0)
   const totalKK = statements.reduce((s, st) => s + (st.total_amount || 0), 0)
@@ -111,13 +113,17 @@ export default function LoansPage() {
       collateral: form.collateral || null, notes: form.notes || null, is_active: true,
       ...(userId ? { user_id: userId } : {}),
     }
-    if (editId) { await supabase.from('loans').update(payload).eq('id', editId) }
-    else { await supabase.from('loans').insert(payload) }
-    setSaving(false); closeForm(); await load()
+    const { error } = editId
+      ? await supabase.from('loans').update(payload).eq('id', editId)
+      : await supabase.from('loans').insert(payload)
+    setSaving(false)
+    if (error) { alert('Hata: ' + error.message); return }
+    closeForm(); await load()
   }
 
   async function handleDelete(id: number) {
-    await supabase.from('loans').update({ is_active: false }).eq('id', id)
+    const { error } = await supabase.from('loans').update({ is_active: false }).eq('id', id)
+    if (error) { alert('Hata: ' + error.message); return }
     setDeleteConfirm(null); await load()
   }
 
@@ -151,10 +157,13 @@ export default function LoansPage() {
       ...(userId ? { user_id: userId } : {}),
     }
     let cardId = editCardId
-    if (editCardId) { await supabase.from('credit_cards').update(payload).eq('id', editCardId) }
-    else {
-      const { data: newCard } = await supabase.from('credit_cards').insert(payload).select().single()
-      if (newCard) cardId = newCard.id
+    if (editCardId) {
+      const { error } = await supabase.from('credit_cards').update(payload).eq('id', editCardId)
+      if (error) { alert('Hata: ' + error.message); setCardSaving(false); return }
+    } else {
+      const { data: newCard, error } = await supabase.from('credit_cards').insert(payload).select().single()
+      if (error || !newCard) { alert('Hata: ' + (error?.message || 'Kart kaydedilemedi')); setCardSaving(false); return }
+      cardId = newCard.id
     }
 
     const spending = parseFloat(cardForm.current_spending)
@@ -177,14 +186,15 @@ export default function LoansPage() {
   }
 
   async function handleCardDelete(id: number) {
-    await supabase.from('credit_cards').update({ is_active: false }).eq('id', id)
+    const { error } = await supabase.from('credit_cards').update({ is_active: false }).eq('id', id)
+    if (error) { alert('Hata: ' + error.message); return }
     setCardDeleteConfirm(null); await load()
   }
 
   // Credit card transaction handlers
   function openTxForm(cardId: number) {
     setTxFormCardId(cardId); setTxEditId(null)
-    setTxForm({ ...emptyTx, transaction_date: new Date().toISOString().split('T')[0] })
+    setTxForm({ ...emptyTx, transaction_date: localDateStr() })
   }
   function openTxEdit(tx: CreditCardTransaction) {
     setTxFormCardId(tx.card_id); setTxEditId(tx.id)
@@ -204,8 +214,21 @@ export default function LoansPage() {
     const now = new Date()
     const amount = parseFloat(txForm.amount) || 0
 
-    // Find or create statement for current month
+    // Ekstre yoksa ÖNCE oluştur — harcama hiçbir zaman ekstresiz kalmasın
     let stmt = statements.find(s => s.card_id === txFormCardId)
+    if (!stmt && !txEditId) {
+      const { data: newStmt, error: stmtErr } = await supabase.from('credit_card_statements').insert({
+        card_id: txFormCardId,
+        period_year: now.getFullYear(),
+        period_month: now.getMonth() + 1,
+        total_amount: 0,
+        minimum_payment: 0,
+        is_paid: false,
+        ...(userId ? { user_id: userId } : {}),
+      }).select().single()
+      if (stmtErr || !newStmt) { alert('Hata: Ekstre oluşturulamadı: ' + (stmtErr?.message || '')); setTxSaving(false); return }
+      stmt = newStmt
+    }
 
     const txPayload = {
       card_id: txFormCardId,
@@ -221,32 +244,24 @@ export default function LoansPage() {
     if (txEditId) {
       // Get old amount to adjust statement
       const oldTx = transactions.find(t => t.id === txEditId)
-      await supabase.from('credit_card_transactions').update(txPayload).eq('id', txEditId)
+      const { error } = await supabase.from('credit_card_transactions').update(txPayload).eq('id', txEditId)
+      if (error) { alert('Hata: ' + error.message); setTxSaving(false); return }
       // Adjust statement total
       if (stmt && oldTx) {
         const diff = amount - oldTx.amount
-        await supabase.from('credit_card_statements').update({
+        const { error: updErr } = await supabase.from('credit_card_statements').update({
           total_amount: (stmt.total_amount || 0) + diff,
         }).eq('id', stmt.id)
+        if (updErr) alert('Uyarı: Ekstre toplamı güncellenemedi: ' + updErr.message)
       }
     } else {
-      await supabase.from('credit_card_transactions').insert(txPayload)
-      // Update statement total
+      const { error } = await supabase.from('credit_card_transactions').insert(txPayload)
+      if (error) { alert('Hata: ' + error.message); setTxSaving(false); return }
       if (stmt) {
-        await supabase.from('credit_card_statements').update({
+        const { error: updErr } = await supabase.from('credit_card_statements').update({
           total_amount: (stmt.total_amount || 0) + amount,
         }).eq('id', stmt.id)
-      } else {
-        // Create statement if none exists
-        await supabase.from('credit_card_statements').insert({
-          card_id: txFormCardId,
-          period_year: now.getFullYear(),
-          period_month: now.getMonth() + 1,
-          total_amount: amount,
-          minimum_payment: 0,
-          is_paid: false,
-          ...(userId ? { user_id: userId } : {}),
-        })
+        if (updErr) alert('Uyarı: Ekstre toplamı güncellenemedi: ' + updErr.message)
       }
     }
 
@@ -256,13 +271,15 @@ export default function LoansPage() {
   async function handleTxDelete(txId: number) {
     const tx = transactions.find(t => t.id === txId)
     if (tx) {
-      await supabase.from('credit_card_transactions').delete().eq('id', txId)
+      const { error } = await supabase.from('credit_card_transactions').delete().eq('id', txId)
+      if (error) { alert('Hata: ' + error.message); return }
       // Adjust statement
       const stmt = statements.find(s => s.card_id === tx.card_id)
       if (stmt) {
-        await supabase.from('credit_card_statements').update({
+        const { error: updErr } = await supabase.from('credit_card_statements').update({
           total_amount: Math.max(0, (stmt.total_amount || 0) - tx.amount),
         }).eq('id', stmt.id)
+        if (updErr) alert('Uyarı: Ekstre toplamı güncellenemedi: ' + updErr.message)
       }
     }
     setTxDeleteConfirm(null); await load()

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { supabase, fmt, isDemo, authHeaders } from '@/lib/supabase'
+import { supabase, fmt, isDemo, authHeaders, localDateStr } from '@/lib/supabase'
 import { EXPENSE_CATEGORIES, CATEGORY_GROUPS } from '@/lib/categories'
 
 type Props = { onClose: () => void }
@@ -11,7 +11,7 @@ export default function QuickAdd({ onClose }: Props) {
   const [form, setForm] = useState({
     name: '', amount: '', category: 'market', currency: 'TRY',
     expense_type: 'one_time' as 'recurring' | 'one_time',
-    expense_date: new Date().toISOString().split('T')[0],
+    expense_date: localDateStr(),
     payment_day: '',
     payment_method: 'nakit' as 'nakit' | 'kredi_karti' | 'duzenli',
   })
@@ -87,7 +87,7 @@ export default function QuickAdd({ onClose }: Props) {
         currency: incomeForm.currency,
         description: incomeForm.description || null,
         due_date: incomeForm.due_date || null,
-        transaction_date: new Date().toISOString().split('T')[0],
+        transaction_date: localDateStr(),
         is_settled: false,
         is_recurring: incomeForm.is_recurring,
         frequency: incomeForm.is_recurring ? 'aylik' : null,

@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt } from '@/lib/supabase'
+import { supabase, fmt, localDateStr } from '@/lib/supabase'
 import type { DebtRecord, Account, DebtTransaction } from '@/lib/supabase'
 
 const freqLabels: Record<string, string> = { aylik: 'Aylık', haftalik: 'Haftalık', '2haftada1': '2 Haftada 1', duzensiz: 'Düzensiz' }
@@ -120,7 +120,7 @@ export default function DebtsPage() {
       amount: parseFloat(form.amount) || 0,
       currency: form.currency,
       description: form.description || null,
-      transaction_date: form.transaction_date || new Date().toISOString().split('T')[0],
+      transaction_date: form.transaction_date || localDateStr(),
       due_date: form.is_recurring ? null : (form.due_date || null),
       notes: form.notes || null,
       is_settled: false,
@@ -197,7 +197,7 @@ export default function DebtsPage() {
       type: 'tahsilat',
       amount: amt,
       currency: payModal.currency,
-      transaction_date: new Date().toISOString().split('T')[0],
+      transaction_date: localDateStr(),
       notes: collectAccountId ? `hesap_${collectAccountId}` : null,
       ...(userId ? { user_id: userId } : {}),
     })
@@ -236,7 +236,7 @@ export default function DebtsPage() {
       type: 'ilave',
       amount: amt,
       currency: ilaveModal.currency,
-      transaction_date: new Date().toISOString().split('T')[0],
+      transaction_date: localDateStr(),
       notes: ilaveNotes || null,
       ...(userId ? { user_id: userId } : {}),
     })

@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, daysUntil, daysUntilLabel, isDemo, authHeaders } from '@/lib/supabase'
+import { supabase, fmt, daysUntil, daysUntilLabel, isDemo, authHeaders, localDateStr } from '@/lib/supabase'
 import { getCatIcon, IconWallet, IconPieChart, IconTarget, IconBank, IconTrendUp, IconRefresh, IconCheck, IconDollar, IconBriefcase, IconShield, IconCalendar, IconCreditCard, IconSettings, IconCash } from '@/components/Icons'
 import NotificationBell from '@/components/NotificationBell'
 import type { Account, Loan, RecurringExpense, ExchangeRate, DebtRecord, CreditCard } from '@/lib/supabase'
@@ -56,7 +56,7 @@ const MOCK_RECURRING: RecurringExpense[] = [
   { id: 7, name: 'Mimar Fatma', category: 'hizmet', amount: 30000, currency: 'TRY', payment_day: 30, is_variable: false, is_active: true, remind_days_before: 3, expense_type: 'one_time', expense_date: '2026-03-30' },
   { id: 8, name: 'Su Faturası', category: 'su', amount: 250, currency: 'TRY', payment_day: 15, is_variable: true, is_active: true, remind_days_before: 3, expense_type: 'recurring' },
 ]
-const MOCK_RATES: ExchangeRate = { id: 1, date: new Date().toISOString().split('T')[0], usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
+const MOCK_RATES: ExchangeRate = { id: 1, date: localDateStr(), usd_try: 38.5, eur_try: 41.2, btc_usd: 84500, eth_usd: 3200, gold_try: 3950 }
 
 export default function Dashboard() {
   const router = useRouter()
@@ -74,6 +74,8 @@ export default function Dashboard() {
   const [fonTry, setFonTry] = useState(0)
   const [payments, setPayments] = useState<PaymentItem[]>([])
   const [pastUnpaid, setPastUnpaid] = useState<PastUnpaidItem[]>([])
+  // Son 6 ayın gerçekleşen (ödenen) gider toplamları — grafik için
+  const [monthlySpend, setMonthlySpend] = useState<{ name: string; tutar: number }[]>([])
   const [allAlacak, setAllAlacak] = useState<DebtRecord[]>([])
   const [kriptoTry, setKriptoTry] = useState(0)
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(currentMonth)
@@ -194,13 +196,25 @@ export default function Dashboard() {
     // Load past unpaid payments (only when viewing current month)
     if (isCurrentMonth && !isDemo) {
       const pastItems: PastUnpaidItem[] = []
+      const spendHistory: { name: string; tutar: number }[] = []
       for (let i = 1; i <= 6; i++) {
         const pm = monthOffset(m, -i)
         const { data: pastPaid } = await supabase.from('recurring_payments').select('*').eq('period_year', pm.year).eq('period_month', pm.month).eq('is_paid', true)
         const pastPaidList = pastPaid || []
         const pmLabel = `${MONTH_NAMES[pm.month - 1]} ${pm.year}`
+        // Kayıt bu aydan sonra başladıysa o ay için "ödenmemiş" sayma
+        const monthEnd = new Date(pm.year, pm.month, 0)
+
+        // Grafik: geçen 5 ayın gerçekleşen ödeme toplamı
+        if (i <= 5) {
+          spendHistory.unshift({
+            name: new Date(pm.year, pm.month - 1, 1).toLocaleDateString('tr-TR', { month: 'short' }),
+            tutar: Math.round(pastPaidList.reduce((s: number, p: any) => s + (p.amount || 0), 0)),
+          })
+        }
 
         lnsList.filter(l => l.payment_day).forEach(l => {
+          if (l.start_date && new Date(l.start_date) > monthEnd) return
           const wasPaid = pastPaidList.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
           if (!wasPaid) {
             pastItems.push({
@@ -217,6 +231,8 @@ export default function Dashboard() {
           if (!r.payment_day || r.category === 'nakit') return false
           if (r.expense_type === 'one_time') return false
           if (r.end_date) { const end = new Date(r.end_date); if (new Date(pm.year, pm.month - 1, 1) > end) return false }
+          const createdAt = (r as any).created_at ? new Date((r as any).created_at) : null
+          if (createdAt && createdAt > monthEnd) return false
           return true
         }).forEach(r => {
           const wasPaid = pastPaidList.some(p => p.expense_id === r.id)
@@ -231,6 +247,12 @@ export default function Dashboard() {
           }
         })
       }
+      // Grafiğin son çubuğu: bu ay şimdiye kadar ödenenler
+      spendHistory.push({
+        name: new Date(m.year, m.month - 1, 1).toLocaleDateString('tr-TR', { month: 'short' }),
+        tutar: Math.round(paidList.reduce((s: number, p: any) => s + (p.amount || 0), 0)),
+      })
+      setMonthlySpend(spendHistory)
       setPastUnpaid(pastItems)
     } else {
       setPastUnpaid([])
@@ -284,11 +306,13 @@ export default function Dashboard() {
   const remainingTotal = unpaidPayments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
   const paidPct = totalObligation > 0 ? Math.round((paidTotal / totalObligation) * 100) : 0
 
-  const chartData = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(); d.setMonth(d.getMonth() - (5 - i))
-    return { name: d.toLocaleDateString('tr-TR', { month: 'short' }), tutar: Math.round(monthlyTotalAll * (0.85 + Math.random() * 0.3)) }
-  })
-  if (chartData.length > 0) chartData[chartData.length - 1].tutar = Math.round(monthlyTotalAll)
+  // Gerçek veri: son 6 ayın ödenen toplamları (demo/ilk yüklemede bu ayın yükümlülüğü gösterilir)
+  const chartData = monthlySpend.length > 0
+    ? monthlySpend
+    : Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(); d.setMonth(d.getMonth() - (5 - i))
+        return { name: d.toLocaleDateString('tr-TR', { month: 'short' }), tutar: Math.round(monthlyTotalAll) }
+      })
 
   const defaultAccountId = () => accounts.find(a => /garanti/i.test(a.bank || ''))?.id ?? accounts[0]?.id ?? null
 
@@ -308,11 +332,36 @@ export default function Dashboard() {
     if (!isDemo) {
       const year = payModal.periodYear ?? now.getFullYear()
       const month = payModal.periodMonth ?? (now.getMonth() + 1)
-      const today = now.toISOString().split('T')[0]
+      const today = localDateStr(now)
       const paymentNotes = payMethod === 'nakit' ? 'nakit' : payMethod === 'kredi_karti' ? `kk_${payCardId}` : undefined
+
+      // Hesaptan ödemede düşülecek tutarı önceden hesapla — geri alma için
+      // ödeme kaydına account_id/account_amount olarak yazılır
+      let payAccount: Account | undefined
+      let deduct = 0
+      if (payMethod === 'hesap' && payAccountId) {
+        payAccount = accounts.find(a => a.id === payAccountId)
+        if (payAccount) {
+          deduct = payModal.amount
+          if (payModal.currency !== payAccount.currency) {
+            const tryAmt = toTry(payModal.amount, payModal.currency)
+            deduct = payAccount.currency === 'EUR' ? tryAmt / eurTry : payAccount.currency === 'USD' ? tryAmt / usdTry : tryAmt
+          }
+        }
+      }
+      const accountCols = payAccount ? { account_id: payAccount.id, account_amount: deduct } : {}
+      // account_id kolonları henüz migrate edilmemiş DB'lerde kolonsuz tekrar dene
+      const insertPayment = async (rec: any) => {
+        let res = await supabase.from('recurring_payments').insert({ ...rec, ...accountCols })
+        if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
+          res = await supabase.from('recurring_payments').insert(rec)
+        }
+        return res
+      }
+
       if (payModal.source === 'recurring') {
         const isCC = payModal.type === 'kredi_karti'
-        const { error } = await supabase.from('recurring_payments').insert({
+        const { error } = await insertPayment({
           expense_id: isCC ? null : payModal.sourceId,
           notes: isCC ? `cc_${payModal.sourceId}` : (paymentNotes || null),
           period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today,
@@ -321,14 +370,28 @@ export default function Dashboard() {
         if (error) { alert('Hata: ' + error.message); setPaying(false); return }
         if (isCC) {
           const stmt = await supabase.from('credit_card_statements').select('id').eq('card_id', payModal.sourceId).eq('period_year', year).eq('period_month', month).single()
-          if (stmt.data) await supabase.from('credit_card_statements').update({ is_paid: true }).eq('id', stmt.data.id)
+          if (stmt.data) {
+            const { error: stmtErr } = await supabase.from('credit_card_statements').update({ is_paid: true }).eq('id', stmt.data.id)
+            if (stmtErr) alert('Uyarı: Ekstre ödendi olarak işaretlenemedi: ' + stmtErr.message)
+          }
         }
       }
-      if (payModal.source === 'loan') { const { error } = await supabase.from('recurring_payments').insert({ expense_id: null, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) }); if (error) { alert('Hata: ' + error.message); setPaying(false); return }; const loan = loans.find(l => l.id === payModal.sourceId); if (loan) await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId) }
+      if (payModal.source === 'loan') {
+        const { error } = await insertPayment({ expense_id: null, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) })
+        if (error) { alert('Hata: ' + error.message); setPaying(false); return }
+        const loan = loans.find(l => l.id === payModal.sourceId)
+        if (loan) {
+          const { error: loanErr } = await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId)
+          if (loanErr) alert('Uyarı: Kredi taksit bilgisi güncellenemedi: ' + loanErr.message)
+        }
+      }
 
       if (payMethod === 'hesap' && payAccountId) {
-        const account = accounts.find(a => a.id === payAccountId)
-        if (account) { let deduct = payModal.amount; if (payModal.currency !== account.currency) { const tryAmt = toTry(payModal.amount, payModal.currency); deduct = account.currency === 'EUR' ? tryAmt / eurTry : account.currency === 'USD' ? tryAmt / usdTry : tryAmt }; await supabase.from('accounts').update({ balance: account.balance - deduct }).eq('id', payAccountId); setAccounts(prev => prev.map(a => a.id === payAccountId ? { ...a, balance: a.balance - deduct } : a)) }
+        if (payAccount) {
+          const { error: balErr } = await supabase.from('accounts').update({ balance: payAccount.balance - deduct }).eq('id', payAccountId)
+          if (balErr) alert('Uyarı: Hesap bakiyesi düşülemedi: ' + balErr.message)
+          else setAccounts(prev => prev.map(a => a.id === payAccountId ? { ...a, balance: a.balance - deduct } : a))
+        }
       } else if (payMethod === 'kredi_karti' && payCardId) {
         // Add as credit card transaction
         const stmtMonth = month, stmtYear = year
@@ -343,7 +406,12 @@ export default function Dashboard() {
       }
       // nakit: no account deduction, just record the payment
     }
-    setPayments(prev => prev.map(p => p.source === payModal.source && p.sourceId === payModal.sourceId ? { ...p, paid: true, overdue: false } : p))
+    // Optimistik güncelleme yalnızca bu ayın listesi için — geçmiş bir ayın
+    // ödemesi mevcut ayın satırını yanlışlıkla "ödendi" yapmasın
+    const isCurrentPeriod = !payModal.periodYear || (payModal.periodYear === now.getFullYear() && payModal.periodMonth === now.getMonth() + 1)
+    if (isCurrentPeriod) {
+      setPayments(prev => prev.map(p => p.source === payModal.source && p.sourceId === payModal.sourceId ? { ...p, paid: true, overdue: false } : p))
+    }
     setPaying(false); setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null)
     if (!isDemo) reloadAll()
   }
@@ -359,10 +427,20 @@ export default function Dashboard() {
       if (undoConfirm.source === 'loan') {
         const loan = loans.find(l => l.id === undoConfirm.sourceId)
         if (loan) {
-          await supabase.from('loans').update({
+          const { error } = await supabase.from('loans').update({
             paid_installments: Math.max(0, loan.paid_installments - 1),
             remaining_amount: (loan.remaining_amount || 0) + undoConfirm.amount,
           }).eq('id', undoConfirm.sourceId)
+          if (error) alert('Uyarı: Kredi taksit bilgisi geri alınamadı: ' + error.message)
+        }
+      }
+
+      // Ödeme bir hesaptan yapıldıysa düşülen tutarı hesaba iade et
+      if (paymentRecord.account_id && paymentRecord.account_amount) {
+        const { data: acc } = await supabase.from('accounts').select('id, balance').eq('id', paymentRecord.account_id).single()
+        if (acc) {
+          const { error } = await supabase.from('accounts').update({ balance: (acc.balance || 0) + paymentRecord.account_amount }).eq('id', acc.id)
+          if (error) alert('Uyarı: Hesap bakiyesi iade edilemedi: ' + error.message)
         }
       }
 

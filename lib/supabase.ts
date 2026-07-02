@@ -156,6 +156,15 @@ export function fmt(amount: number, currency = 'TRY'): string {
   return amount.toLocaleString('tr-TR', opts) + ' ' + currency
 }
 
+// Helper: yerel saate göre YYYY-MM-DD (toISOString UTC döndürdüğü için
+// TR'de gece 00:00-03:00 arası kayıtlar önceki güne yazılıyordu)
+export function localDateStr(d: Date = new Date()): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 // Helper: API rotalarına istek atarken Supabase oturum token'ını ekler
 export async function authHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession()
