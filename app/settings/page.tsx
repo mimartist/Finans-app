@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
-import { supabase, isDemo } from '@/lib/supabase'
+import { supabase, isDemo, authHeaders } from '@/lib/supabase'
 import { IconSettings, IconRefresh } from '@/components/Icons'
 import { useAppLock } from '@/components/AppLock'
 import { useUser } from '@/components/AuthProvider'
@@ -64,10 +64,106 @@ export default function SettingsPage() {
   const [pinMsg, setPinMsg] = useState('')
   const [pinHasValue, setPinHasValue] = useState(false)
 
+  // Push bildirimleri
+  const [pushSupported, setPushSupported] = useState(true)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushMsg, setPushMsg] = useState('')
+  const [isIosBrowser, setIsIosBrowser] = useState(false)
+
   useEffect(() => {
     setSettings(loadSettings())
     setPinHasValue(isPinSet())
+
+    const supported = typeof window !== 'undefined'
+      && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+    setPushSupported(supported)
+    // iOS'ta push yalnizca ana ekrana eklenmis PWA'da calisir — ipucu gostermek icin tespit et
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true
+    setIsIosBrowser(isIos && !isStandalone)
+    if (supported) {
+      navigator.serviceWorker.getRegistration()
+        .then(reg => reg?.pushManager.getSubscription())
+        .then(sub => setPushEnabled(!!sub))
+        .catch(() => {})
+    }
   }, [])
+
+  function urlBase64ToUint8Array(base64: string) {
+    const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+    const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const raw = window.atob(b64)
+    return Uint8Array.from(Array.from(raw).map(c => c.charCodeAt(0)))
+  }
+
+  async function enablePush() {
+    setPushBusy(true); setPushMsg('')
+    try {
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!vapidKey) { setPushMsg('Hata: NEXT_PUBLIC_VAPID_PUBLIC_KEY ayarlanmamış'); return }
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') { setPushMsg('Bildirim izni verilmedi. Tarayıcı ayarlarından izin verin.'); return }
+      const reg = await navigator.serviceWorker.getRegistration()
+      if (!reg) { setPushMsg('Hata: Service worker bulunamadı (dev modunda kapalıdır, production build gerekir)'); return }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      })
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        await sub.unsubscribe().catch(() => {})
+        setPushMsg('Hata: ' + (data.error || 'abonelik kaydedilemedi'))
+        return
+      }
+      setPushEnabled(true)
+      setPushMsg('✓ Push bildirimleri aktif — her sabah 08:00\'de ödeme özeti gelecek')
+    } catch (e: any) {
+      setPushMsg('Hata: ' + (e?.message || 'bilinmeyen'))
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
+  async function disablePush() {
+    setPushBusy(true); setPushMsg('')
+    try {
+      const reg = await navigator.serviceWorker.getRegistration()
+      const sub = await reg?.pushManager.getSubscription()
+      if (sub) {
+        await fetch('/api/push/subscribe', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        }).catch(() => {})
+        await sub.unsubscribe()
+      }
+      setPushEnabled(false)
+      setPushMsg('Push bildirimleri kapatıldı')
+    } catch (e: any) {
+      setPushMsg('Hata: ' + (e?.message || 'bilinmeyen'))
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
+  async function testPush() {
+    setPushBusy(true); setPushMsg('')
+    try {
+      const res = await fetch('/api/push/test', { method: 'POST', headers: await authHeaders() })
+      const data = await res.json().catch(() => ({}))
+      setPushMsg(data.success ? `✓ Test bildirimi gönderildi (${data.sent}/${data.total} cihaz)` : 'Hata: ' + (data.error || 'gönderilemedi'))
+    } catch {
+      setPushMsg('Hata: bağlantı sorunu')
+    } finally {
+      setPushBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (user) {
@@ -142,7 +238,7 @@ export default function SettingsPage() {
     if (!confirm('Mevcut tüm veriler silinip demo veriler yüklenecek. Emin misiniz?')) return
     setSeeding(true); setSeedMsg('')
     try {
-      const res = await fetch('/api/seed-demo', { method: 'POST' })
+      const res = await fetch('/api/seed-demo', { method: 'POST', headers: await authHeaders() })
       const data = await res.json()
       setSeedMsg(data.success ? '✓ Demo veriler yüklendi! Sayfa yenileniyor...' : 'Hata: ' + data.error)
       if (data.success) setTimeout(() => window.location.href = '/', 1500)
@@ -153,7 +249,7 @@ export default function SettingsPage() {
   async function updateRates() {
     setRateUpdating(true); setRateMsg('')
     try {
-      const res = await fetch('/api/update-rates')
+      const res = await fetch('/api/update-rates', { headers: await authHeaders() })
       const data = await res.json()
       setRateMsg(data.success ? 'Kurlar güncellendi!' : 'Hata: ' + (data.error || 'Bilinmeyen'))
     } catch { setRateMsg('Bağlantı hatası') }
@@ -324,6 +420,29 @@ export default function SettingsPage() {
 
           {/* Bildirimler */}
           <Section title="Bildirimler">
+            <Row label="Push Bildirimleri"
+              desc={!pushSupported ? 'Bu tarayıcı desteklemiyor' : pushEnabled ? 'Aktif — her sabah ödeme özeti' : 'Ödeme hatırlatmaları için önerilir'}>
+              <div className="flex items-center gap-2">
+                {pushEnabled && (
+                  <button onClick={testPush} disabled={pushBusy}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg"
+                    style={{ background: 'var(--glass-fill-soft)', color: 'var(--text)', border: 'none', cursor: 'pointer', opacity: pushBusy ? 0.5 : 1 }}>
+                    Test
+                  </button>
+                )}
+                {pushSupported && <Toggle value={pushEnabled} onChange={v => { if (!pushBusy) (v ? enablePush() : disablePush()) }} />}
+              </div>
+            </Row>
+            {isIosBrowser && (
+              <div className="px-4 py-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+                📱 iPhone&apos;da push için: Safari&apos;de <b>Paylaş → Ana Ekrana Ekle</b> ile kurun, sonra uygulama içinden açın (iOS 16.4+).
+              </div>
+            )}
+            {pushMsg && (
+              <div className="px-4 py-2 text-[11px] font-medium" style={{ color: pushMsg.startsWith('Hata') ? '#e5484d' : '#30a46c' }}>
+                {pushMsg}
+              </div>
+            )}
             <Row label="Hatırlatma Zamani" desc="Ödeme gununen kac gün önce">
               <select value={settings.remindDaysBefore} onChange={e => update('remindDaysBefore', Number(e.target.value))}
                 className="text-[13px] font-medium rounded-lg px-3 py-1.5"
