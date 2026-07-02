@@ -1,17 +1,28 @@
 import { NextResponse } from 'next/server'
 import { buildOcrPrompt, parseOcrResponse } from '@/lib/ocr-utils'
+import { getUserFromRequest } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 const GOOGLE_API_KEY = process.env.GOOGLE_VISION_API_KEY // same key for Vision + Gemini
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024 // faturali Google API'ye giden görseli sınırla
 
 export async function POST(request: Request) {
+  // Faturalı bir dış API'yi çağırır — yalnızca giriş yapmış kullanıcı
+  const user = await getUserFromRequest(request)
+  if (!user) {
+    return NextResponse.json({ success: false, error: 'Yetkisiz' }, { status: 401 })
+  }
+
   try {
     const body = await request.json()
     const { image, type = 'ekstre' } = body as { image: string; type?: 'ekstre' | 'fis' }
 
     if (!image) {
       return NextResponse.json({ success: false, error: 'Görsel gerekli' }, { status: 400 })
+    }
+    if (image.length > MAX_IMAGE_BYTES) {
+      return NextResponse.json({ success: false, error: 'Görsel çok büyük (max ~6MB)' }, { status: 413 })
     }
 
     if (!GOOGLE_API_KEY) {

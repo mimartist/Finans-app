@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt } from '@/lib/supabase'
+import { supabase, fmt, authHeaders } from '@/lib/supabase'
 import type { Investment, ExchangeRate } from '@/lib/supabase'
 
 type InvestmentWithSnapshot = Investment & {
@@ -41,7 +41,7 @@ export default function InvestmentsPage() {
 
   async function updateRates() {
     setUpdatingRates(true)
-    await fetch('/api/update-rates')
+    await fetch('/api/update-rates', { headers: await authHeaders() })
     await load()
     setUpdatingRates(false)
   }

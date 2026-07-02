@@ -1,13 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getUserFromRequest } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
-  // Güvenlik: sadece özel header ile çalışır, kazara production'da çalışmasın
-  const secret = req.headers.get('x-seed-secret')
-  if (secret !== 'DEMO_ONLY_2025') {
-    return NextResponse.json({ success: false, error: 'Yetkisiz. Bu endpoint sadece demo amaçlıdır.' }, { status: 403 })
+  // Güvenlik: tüm verileri silip demo veri yükler — yalnızca giriş yapmış kullanıcı çalıştırabilir
+  const user = await getUserFromRequest(req)
+  if (!user) {
+    return NextResponse.json({ success: false, error: 'Yetkisiz. Giriş yapmanız gerekiyor.' }, { status: 401 })
   }
 
   const supabase = createClient(

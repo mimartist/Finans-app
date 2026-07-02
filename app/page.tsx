@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, daysUntil, daysUntilLabel, isDemo } from '@/lib/supabase'
+import { supabase, fmt, daysUntil, daysUntilLabel, isDemo, authHeaders } from '@/lib/supabase'
 import { getCatIcon, IconWallet, IconPieChart, IconTarget, IconBank, IconTrendUp, IconRefresh, IconCheck, IconDollar, IconBriefcase, IconShield, IconCalendar, IconCreditCard, IconSettings, IconCash } from '@/components/Icons'
 import NotificationBell from '@/components/NotificationBell'
 import type { Account, Loan, RecurringExpense, ExchangeRate, DebtRecord, CreditCard } from '@/lib/supabase'
@@ -366,6 +366,14 @@ export default function Dashboard() {
         }
       }
 
+      // Kredi kartı ödemesi geri alınıyorsa ekstredeki is_paid işaretini de kaldır
+      if (undoConfirm.source === 'recurring' && undoConfirm.type === 'kredi_karti') {
+        const year = undoConfirm.periodYear ?? now.getFullYear()
+        const month = undoConfirm.periodMonth ?? (now.getMonth() + 1)
+        await supabase.from('credit_card_statements').update({ is_paid: false })
+          .eq('card_id', undoConfirm.sourceId).eq('period_year', year).eq('period_month', month)
+      }
+
       // Delete the recurring_payments record
       await supabase.from('recurring_payments').delete().eq('id', undoConfirm.paidRecordId)
     }
@@ -472,7 +480,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={async () => { if (isDemo) return; setLoading(true); await fetch('/api/update-rates'); await reloadAll(); setLoading(false) }}
+            <button onClick={async () => { if (isDemo) return; setLoading(true); await fetch('/api/update-rates', { headers: await authHeaders() }); await reloadAll(); setLoading(false) }}
               className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ background: 'var(--glass-fill-soft)' }}>
               <IconRefresh color="var(--primary)" size={18} strokeWidth={2} />

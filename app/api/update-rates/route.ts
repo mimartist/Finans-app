@@ -1,9 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getUserFromRequest } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Veritabanına yazan ve dış API çağıran bir uç — yalnızca giriş yapmış kullanıcı
+  const user = await getUserFromRequest(request)
+  if (!user) return NextResponse.json({ success: false, error: 'Yetkisiz' }, { status: 401 })
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

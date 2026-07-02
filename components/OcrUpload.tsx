@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 import OcrReview from './OcrReview'
+import { authHeaders } from '@/lib/supabase'
 import type { ExtractedTransaction } from '@/lib/ocr-utils'
 
 type Props = {
@@ -50,7 +51,7 @@ export default function OcrUpload({ cardId, onComplete }: Props) {
 
       const res = await fetch('/api/ocr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ image: compressed, type: scanType }),
       })
 

@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getUserFromRequest } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  // Ödeme kayıtları oluşturan bir uç — yalnızca giriş yapmış kullanıcı
+  const user = await getUserFromRequest(req)
+  if (!user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseKey) {

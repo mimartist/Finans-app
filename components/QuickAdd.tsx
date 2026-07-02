@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { supabase, fmt, isDemo } from '@/lib/supabase'
+import { supabase, fmt, isDemo, authHeaders } from '@/lib/supabase'
 import { EXPENSE_CATEGORIES, CATEGORY_GROUPS } from '@/lib/categories'
 
 type Props = { onClose: () => void }
@@ -51,7 +51,7 @@ export default function QuickAdd({ onClose }: Props) {
     try {
       const res = await fetch('/api/ocr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ image: photo, type: 'fis' }),
       })
       const data = await res.json()

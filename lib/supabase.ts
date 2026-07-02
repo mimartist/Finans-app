@@ -156,14 +156,24 @@ export function fmt(amount: number, currency = 'TRY'): string {
   return amount.toLocaleString('tr-TR', opts) + ' ' + currency
 }
 
+// Helper: API rotalarına istek atarken Supabase oturum token'ını ekler
+export async function authHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+}
+
 // Helper: days until payment
+// Gün bazında karşılaştırır (saat etkisi yok) ve ödeme günü ay uzunluğunu
+// aşarsa ayın son gününe çeker (31 → 30/28), yoksa bir sonraki aya taşar.
 export function daysUntil(paymentDay: number): number {
-  const today = new Date()
-  const thisMonth = new Date(today.getFullYear(), today.getMonth(), paymentDay)
-  if (thisMonth < today) {
-    thisMonth.setMonth(thisMonth.getMonth() + 1)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const clamped = (y: number, m: number) => Math.min(paymentDay, new Date(y, m + 1, 0).getDate())
+  let due = new Date(today.getFullYear(), today.getMonth(), clamped(today.getFullYear(), today.getMonth()))
+  if (due < today) {
+    due = new Date(today.getFullYear(), today.getMonth() + 1, clamped(today.getFullYear(), today.getMonth() + 1))
   }
-  return Math.ceil((thisMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 export function daysUntilLabel(days: number): string {
