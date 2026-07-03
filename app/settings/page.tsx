@@ -104,9 +104,23 @@ export default function SettingsPage() {
       if (!vapidKey) { setPushMsg('Hata: NEXT_PUBLIC_VAPID_PUBLIC_KEY ayarlanmamış'); return }
       const permission = await Notification.requestPermission()
       if (permission !== 'granted') { setPushMsg('Bildirim izni verilmedi. Tarayıcı ayarlarından izin verin.'); return }
-      const reg = await navigator.serviceWorker.getRegistration()
-      if (!reg) { setPushMsg('Hata: Service worker bulunamadı (dev modunda kapalıdır, production build gerekir)'); return }
-      const sub = await reg.pushManager.subscribe({
+      // SW henüz kayıtlı değilse (ilk ziyaret / sayfa yüklenirken tıklama) kendimiz kaydet
+      let reg = await navigator.serviceWorker.getRegistration()
+      if (!reg) {
+        try {
+          reg = await navigator.serviceWorker.register('/sw.js')
+        } catch (regErr: any) {
+          setPushMsg('Hata: Service worker kaydedilemedi (' + (regErr?.message || regErr) + '). Gizli pencerede push çalışmaz; normal pencerede deneyin.')
+          return
+        }
+      }
+      // Abonelik için SW'nin aktifleşmesi gerekir — hazır olmasını bekle (max 8 sn)
+      const ready = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 8000)),
+      ])
+      if (!ready) { setPushMsg('Hata: Service worker aktifleşmedi — sayfayı yenileyip tekrar deneyin'); return }
+      const sub = await ready.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
       })
