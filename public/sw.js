@@ -1,11 +1,20 @@
-// next-pwa custom worker — sw.js icine derlenir.
-// Web Push bildirimlerini gosterir ve tiklamada uygulamayi acar.
+/* Finans Asistan service worker — push bildirimleri.
+   Elle yazildi (next-pwa yerine): precache yok, ek dosya yok,
+   kurulum aninda tamamlanir. Tek gorevi push gostermek. */
+
+self.addEventListener('install', () => {
+  self.skipWaiting()
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
 
 self.addEventListener('push', (event) => {
   let data = {}
   try {
     data = event.data ? event.data.json() : {}
-  } catch {
+  } catch (e) {
     data = { title: 'Finans Asistan', body: event.data ? event.data.text() : '' }
   }
   const title = data.title || 'Finans Asistan'

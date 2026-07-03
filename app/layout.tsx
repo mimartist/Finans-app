@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import '../styles/globals.css'
 import AppLockWrapper from '@/components/AppLockWrapper'
 import ThemeProvider from '@/components/ThemeProvider'
+import SwRegister from '@/components/SwRegister'
 import OnboardingWrapper from '@/components/OnboardingWrapper'
 import { AuthProvider } from '@/components/AuthProvider'
 import AuthGuard from '@/components/AuthGuard'
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body className="safe-top">
+        <SwRegister />
         <ThemeProvider>
           <AuthProvider>
             <AuthGuard>

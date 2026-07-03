@@ -1,11 +1,4 @@
 /** @type {import('next').NextConfig} */
-const withPWA = require('next-pwa')({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-})
-
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -25,4 +18,4 @@ const nextConfig = {
   },
 }
 
-module.exports = withPWA(nextConfig)
+module.exports = nextConfig
