@@ -56,6 +56,11 @@ export async function GET(request: Request) {
   const todayDay = tr.getUTCDate()
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
 
+  // İkinci cron (öğlen 13:00 TR) "gün içi hatırlatma" modunda çalışır:
+  // yalnızca hâlâ ödenmemiş (gecikmiş / günü bugün olan) kalemleri bildirir,
+  // sabah zaten duyurulan "yaklaşan" ödemeleri tekrarlamaz.
+  const isEveningRun = tr.getUTCHours() >= 12
+
   // Fetch active recurring expenses, loans, credit cards, paid records for this month
   const [
     { data: recurring },
@@ -131,10 +136,12 @@ export async function GET(request: Request) {
     add({ name: `${c.name} (KK)`, amount: stmt.total_amount, currency: c.currency || 'TRY', day: dueDay, daysFromToday: clampDay(dueDay) - todayDay })
   }
 
+  if (isEveningRun) upcoming.length = 0
+
   const totalCount = overdue.length + today.length + upcoming.length
   if (totalCount === 0) {
     // Don't spam if nothing due
-    return NextResponse.json({ sent: false, reason: 'No payments due' })
+    return NextResponse.json({ sent: false, reason: isEveningRun ? 'Bekleyen ödeme yok — akşam hatırlatması atlandı' : 'No payments due' })
   }
 
   overdue.sort((a, b) => a.daysFromToday - b.daysFromToday)
@@ -144,7 +151,11 @@ export async function GET(request: Request) {
   const line = (p: Payment) => `• ${escapeHtml(p.name)} — <b>${fmt(p.amount, p.currency)}</b>`
   const parts: string[] = []
   const dateStr = tr.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'UTC' })
-  parts.push(`🌅 <b>Günaydın!</b>  <i>${dateStr}</i>`)
+  if (isEveningRun) {
+    parts.push(`⏰ <b>Hatırlatma</b> — gün bitmeden bekleyen ödemeler  <i>${dateStr}</i>`)
+  } else {
+    parts.push(`🌅 <b>Günaydın!</b>  <i>${dateStr}</i>`)
+  }
 
   if (overdue.length) {
     parts.push('')
@@ -207,10 +218,12 @@ export async function GET(request: Request) {
 
   if (pushConfigured) {
     results.push = await sendPushToAll({
-      title: `💰 Ödeme hatırlatması: ${pushTitleBits.join(', ')}`,
+      title: isEveningRun
+        ? `⏰ Hâlâ ödenmemiş: ${pushTitleBits.join(', ')}`
+        : `💰 Ödeme hatırlatması: ${pushTitleBits.join(', ')}`,
       body: pushLines.join('\n'),
       url: '/',
-      tag: 'finans-daily',
+      tag: isEveningRun ? 'finans-evening' : 'finans-daily',
     })
   }
 
