@@ -114,12 +114,18 @@ export default function SettingsPage() {
           return
         }
       }
-      // Abonelik için SW'nin aktifleşmesi gerekir — hazır olmasını bekle (max 8 sn)
+      // Abonelik için SW'nin aktifleşmesi gerekir. İlk kurulumda tüm uygulama
+      // önbelleğe alındığından yavaş bağlantıda süre uzayabilir — 25 sn bekle,
+      // olmazsa teşhis için SW'nin hangi durumda takıldığını göster.
       const ready = await Promise.race([
         navigator.serviceWorker.ready,
-        new Promise<null>(resolve => setTimeout(() => resolve(null), 8000)),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 25000)),
       ])
-      if (!ready) { setPushMsg('Hata: Service worker aktifleşmedi — sayfayı yenileyip tekrar deneyin'); return }
+      if (!ready) {
+        const state = reg.installing ? 'kuruluyor' : reg.waiting ? 'bekliyor' : reg.active ? 'aktif' : 'kurulum başarısız'
+        setPushMsg(`Hata: Service worker aktifleşmedi (durum: ${state}). Birkaç saniye bekleyip tekrar deneyin; olmazsa bu mesajı destek için not edin.`)
+        return
+      }
       const sub = await ready.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
