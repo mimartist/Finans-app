@@ -77,6 +77,8 @@ export default function Dashboard() {
   const [hisseTry, setHisseTry] = useState(0)
   const [fonTry, setFonTry] = useState(0)
   const [payments, setPayments] = useState<PaymentItem[]>([])
+  // İçinde olunan ayın kalemleri — hangi aya bakılırsa bakılsın değişmez (zil için)
+  const [currentPayments, setCurrentPayments] = useState<PaymentItem[]>([])
   const [pastUnpaid, setPastUnpaid] = useState<PastUnpaidItem[]>([])
   const [projOpen, setProjOpen] = useState(false)   // 12 aylık projeksiyon açık mı
   // Son 6 ayın gerçekleşen (ödenen) gider toplamları — grafik için
@@ -202,7 +204,11 @@ export default function Dashboard() {
 
     // Takvim sırası: ayın günü küçükten büyüğe. Ödenmiş/ödenmemiş ayrımı zaten
     // ayrı listelerde yapıldığı için burada tür önceliği uygulanmaz.
-    setPayments([...loanItems, ...expItems, ...ccItems].sort((a, b) => a.day - b.day))
+    const monthItems = [...loanItems, ...expItems, ...ccItems].sort((a, b) => a.day - b.day)
+    setPayments(monthItems)
+    // Zil her zaman İÇİNDE OLUNAN ayı gösterir — başka bir aya bakarken
+    // o ayın kalemleri "bugün" diye bildirilmemeli
+    if (isCurrentMonth) setCurrentPayments(monthItems)
 
     // Load past unpaid payments (only when viewing current month)
     if (isCurrentMonth && !isDemo) {
@@ -654,13 +660,13 @@ export default function Dashboard() {
           <div className="tx-name" style={{ textDecoration: p.paid ? 'line-through' : 'none', fontWeight: isHighlight ? 700 : undefined }}>{p.name}</div>
           <div className="tx-detail" style={{ color: statusColor }}>
             {p.paid ? 'Ödendi' : (() => {
-              if (p.type === 'kredi_karti') {
-                const payDate = new Date(); payDate.setDate(payDate.getDate() + p.days)
-                const payMonthStr = payDate.toLocaleDateString('tr-TR', { month: 'short' })
-                const dateStr = `${p.day} ${payMonthStr}`
-                return p.overdue ? `Gecikti · ${dateStr}` : `${dateStr} · ${daysUntilLabel(p.days)}`
-              }
-              return p.overdue ? `Gecikti · ${p.day} ${selMonthShort}` : `${p.day} ${selMonthShort} · ${daysUntilLabel(p.days)}`
+              const dateStr = `${p.day} ${selMonthShort}`
+              if (p.overdue) return `Gecikti · ${dateStr}`
+              // "3 gün sonra / Bugün" yalnızca içinde olunan ay için anlamlı.
+              // Başka bir aya bakarken days = 0 olduğundan her satır "Bugün"
+              // görünüyordu — orada sadece tarihi göster.
+              if (!isCurrent) return dateStr
+              return `${dateStr} · ${daysUntilLabel(p.days)}`
             })()}
           </div>
         </div>
@@ -730,7 +736,7 @@ export default function Dashboard() {
               style={{ background: 'var(--glass-fill-soft)' }}>
               <IconRefresh color="var(--primary)" size={18} strokeWidth={2} />
             </button>
-            <NotificationBell payments={payments} />
+            <NotificationBell payments={currentPayments} />
             <button onClick={() => router.push('/settings')} className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ background: 'var(--glass-fill-soft)' }}>
               <IconSettings color="var(--primary)" size={18} strokeWidth={2} />
