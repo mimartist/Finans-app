@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, daysUntil, daysUntilLabel, localDateStr } from '@/lib/supabase'
+import { supabase, fmt, daysUntil, daysUntilLabel, localDateStr, isActiveInMonth } from '@/lib/supabase'
 import type { Loan, CreditCard, CreditCardStatement, CreditCardTransaction, ExchangeRate } from '@/lib/supabase'
 import { EXPENSE_CATEGORIES, CATEGORY_GROUPS } from '@/lib/categories'
 import OcrUpload from '@/components/OcrUpload'
@@ -371,12 +371,27 @@ export default function LoansPage() {
         )}
 
         {(() => {
-          const unpaidLoans = loans.filter(l => !paidLoans.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id)))
-          const paidLoansList = loans.filter(l => paidLoans.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id)))
+          // Bu ay gerçekten ödenecek olanlarla henüz başlamamış/bitmiş planları ayır.
+          // Ekim'de başlayan bir plan "19 gün sonra" diye gösterilmemeli.
+          const now = new Date()
+          const curY = now.getFullYear(), curM = now.getMonth() + 1
+          const isLoanPaid = (l: Loan) => paidLoans.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
+          const byDay = (a: Loan, b: Loan) => (a.payment_day || 32) - (b.payment_day || 32)
 
-          const renderLoanCard = (loan: Loan, isPaid: boolean) => {
+          const currentLoans = loans.filter(l => isActiveInMonth(l.start_date, l.end_date, curY, curM))
+          const upcomingLoans = loans
+            .filter(l => !isActiveInMonth(l.start_date, l.end_date, curY, curM))
+            .sort((a, b) => new Date(a.start_date || 0).getTime() - new Date(b.start_date || 0).getTime())
+          const unpaidLoans = currentLoans.filter(l => !isLoanPaid(l)).sort(byDay)
+          const paidLoansList = currentLoans.filter(isLoanPaid).sort(byDay)
+
+          const renderLoanCard = (loan: Loan, isPaid: boolean, notStarted = false) => {
             const pct = progressPct(loan)
             const days = loan.payment_day ? daysUntil(loan.payment_day) : null
+            // Henüz başlamamış planda gün sayacı değil, başlangıç ayı gösterilir
+            const startLabel = notStarted && loan.start_date
+              ? new Date(loan.start_date).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) + '’da başlıyor'
+              : null
             return (
               <div key={loan.id} className="glass p-4" style={{ borderLeft: isPaid ? '3px solid #4ade9a' : undefined }}>
                 <div className="flex justify-between items-start mb-3">
@@ -395,6 +410,8 @@ export default function LoansPage() {
                       </div>
                       {isPaid ? (
                         <div className="text-[11px] mt-0.5 font-semibold" style={{ color: '#059669' }}>✓ Bu ay ödendi</div>
+                      ) : startLabel ? (
+                        <div className="text-[11px] mt-0.5 font-medium" style={{ color: '#6366f1' }}>{startLabel}</div>
                       ) : days !== null ? (
                         <div className="text-[11px] mt-0.5" style={{ color: days <= 3 ? '#dc2626' : 'var(--muted)' }}>{daysUntilLabel(days)}</div>
                       ) : null}
@@ -449,6 +466,18 @@ export default function LoansPage() {
                   </div>
                   <div className="flex flex-col gap-2 mx-4 mb-4">
                     {paidLoansList.map(l => renderLoanCard(l, true))}
+                  </div>
+                </>
+              )}
+              {upcomingLoans.length > 0 && (
+                <>
+                  <div className="px-5 mb-2 flex items-center gap-2">
+                    <div className="text-[12px] uppercase tracking-wide font-semibold" style={{ color: '#6366f1' }}>Henüz Başlamamış</div>
+                    <div className="flex-1 h-px" style={{ background: 'rgba(99,102,241,0.25)' }} />
+                    <div className="text-[10px] font-medium" style={{ color: '#6366f1' }}>{upcomingLoans.length} plan</div>
+                  </div>
+                  <div className="flex flex-col gap-2 mx-4 mb-4" style={{ opacity: 0.75 }}>
+                    {upcomingLoans.map(l => renderLoanCard(l, false, true))}
                   </div>
                 </>
               )}
