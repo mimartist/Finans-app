@@ -209,6 +209,25 @@ export function localDateStr(d: Date = new Date()): string {
   return `${y}-${m}-${day}`
 }
 
+// ── Kredi taksiti ↔ ödeme kaydı eşleştirmesi ────────────────────────────────
+// Taksit ödemesi iki şekilde krediye bağlanır:
+//   1) loan_id kolonu (tercih edilen — 20260703 migration'ı ile geldi)
+//   2) notes alanındaki "loan_<id>" öneki (kolon yoksa tek bağ budur)
+// Ödeme yöntemi bilgisi notes'a "loan_<id>|nakit" gibi ikinci parça olarak
+// yazılır; böylece nakit/kart ile ödenen taksit de krediyle eşleşir.
+export function loanNote(loanId: number, method?: string | null): string {
+  return method ? `loan_${loanId}|${method}` : `loan_${loanId}`
+}
+
+export function isLoanPayment(
+  p: { loan_id?: number | null; notes?: string | null },
+  loanId: number
+): boolean {
+  if (p.loan_id && p.loan_id === loanId) return true
+  const n = p.notes || ''
+  return n === `loan_${loanId}` || n.startsWith(`loan_${loanId}|`)
+}
+
 // Helper: API rotalarına istek atarken Supabase oturum token'ını ekler
 export async function authHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession()

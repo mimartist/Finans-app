@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/api-auth'
+import { loanNote, isLoanPayment, isActiveInMonth } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,21 +29,23 @@ export async function POST(req: NextRequest) {
 
     const { data: existing } = await supabase
       .from('recurring_payments')
-      .select('expense_id, notes')
+      .select('*')
       .eq('period_year', year)
       .eq('period_month', month)
       .eq('is_paid', true)
 
     const paidExpenseIds = new Set((existing || []).map((e: any) => e.expense_id).filter(Boolean))
-    const paidLoanNotes = new Set((existing || []).map((e: any) => e.notes).filter(Boolean))
+    const paidRows = existing || []
 
     for (const loan of (loans || [])) {
       if (!loan.payment_day) continue
-      const noteKey = `loan_${loan.id}`
-      if (paidLoanNotes.has(noteKey)) continue
+      // O ayda henüz başlamamış / bitmiş plan için ödeme kaydı uydurma
+      if (!isActiveInMonth(loan.start_date, loan.end_date, year, month)) continue
+      if (paidRows.some((p: any) => isLoanPayment(p, loan.id))) continue
       records.push({
         expense_id: null,
-        notes: noteKey,
+        loan_id: loan.id,
+        notes: loanNote(loan.id),
         period_year: year,
         period_month: month,
         amount: loan.monthly_payment,
@@ -72,7 +75,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Tum odemeler zaten kapali', count: 0 })
   }
 
-  const { error } = await supabase.from('recurring_payments').insert(records)
+  let { error } = await supabase.from('recurring_payments').insert(records)
+  // loan_id kolonu henüz migrate edilmemişse kolonsuz tekrar dene —
+  // krediyle bağ notes içindeki "loan_<id>" öneki ile korunur
+  if (error && (error.code === '42703' || error.message.includes('column'))) {
+    const stripped = records.map(({ loan_id, ...rest }) => rest)
+    ;({ error } = await supabase.from('recurring_payments').insert(stripped))
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ message: `${records.length} odeme kapatildi`, count: records.length })

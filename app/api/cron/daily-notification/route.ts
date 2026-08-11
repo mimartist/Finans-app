@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { sendPushToAll } from '@/lib/push'
-import { isActiveInMonth } from '@/lib/supabase'
+import { isActiveInMonth, isLoanPayment } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -116,7 +116,7 @@ export async function GET(request: Request) {
   const paidExpenseIds = new Set(paid.map((p: any) => p.expense_id).filter(Boolean))
   // Tek seferlik giderler için son 2 ayın kayıtları geçerli (ödeme kaydı gider ayına yazılır)
   const paidOnceExpenseIds = new Set(paidRecent.map((p: any) => p.expense_id).filter(Boolean))
-  const isLoanPaid = (id: number) => paid.some((p: any) => p.loan_id === id || p.notes === `loan_${id}`)
+  const isLoanPaid = (id: number) => paid.some((p: any) => isLoanPayment(p, id))
   const isCardPaid = (id: number) => paid.some((p: any) => p.notes === `cc_${id}`)
 
   const overdue: Payment[] = []

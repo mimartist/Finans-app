@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, daysUntil, daysUntilLabel, isDemo, authHeaders, localDateStr, isActiveInMonth, depositGain } from '@/lib/supabase'
+import { supabase, fmt, daysUntil, daysUntilLabel, isDemo, authHeaders, localDateStr, isActiveInMonth, depositGain, loanNote, isLoanPayment } from '@/lib/supabase'
 import { getCatIcon, IconWallet, IconPieChart, IconTarget, IconBank, IconTrendUp, IconRefresh, IconCheck, IconDollar, IconBriefcase, IconShield, IconCalendar, IconCreditCard, IconSettings, IconCash } from '@/components/Icons'
 import NotificationBell from '@/components/NotificationBell'
 import type { Account, Loan, RecurringExpense, ExchangeRate, DebtRecord, CreditCard } from '@/lib/supabase'
@@ -162,7 +162,7 @@ export default function Dashboard() {
     const todayDay = isCurrentMonth ? now.getDate() : 32
 
     const loanItems: PaymentItem[] = lnsList.filter(l => l.payment_day && isActiveInMonth(l.start_date, l.end_date, m.year, m.month)).map(l => {
-      const paidRecord = paidList.find(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
+      const paidRecord = paidList.find(p => isLoanPayment(p, l.id))
       const isPaid = !!paidRecord
       return { id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, type: 'kredi', source: 'loan' as const, sourceId: l.id, days: isCurrentMonth ? daysUntil(l.payment_day) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && l.payment_day < todayDay, paidRecordId: paidRecord?.id, paidNotes: paidRecord?.notes }
     })
@@ -225,7 +225,7 @@ export default function Dashboard() {
         }
 
         lnsList.filter(l => l.payment_day && isActiveInMonth(l.start_date, l.end_date, pm.year, pm.month)).forEach(l => {
-          const wasPaid = pastPaidList.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
+          const wasPaid = pastPaidList.some(p => isLoanPayment(p, l.id))
           if (!wasPaid) {
             pastItems.push({
               id: `past_loan_${l.id}_${pm.year}_${pm.month}`,
@@ -488,12 +488,14 @@ export default function Dashboard() {
         }
       }
       const accountCols = payAccount ? { account_id: payAccount.id, account_amount: deduct } : {}
-      // account_id/loan_id kolonları henüz migrate edilmemiş DB'lerde kolonsuz tekrar dene
+      // account_id/loan_id kolonları henüz migrate edilmemiş DB'lerde kolonsuz tekrar dene.
+      // Kolon düşse bile krediyle bağ notes içindeki "loan_<id>" öneki sayesinde korunur.
+      const missingColumn = (e: any) => !!e && (e.code === '42703' || (e.message || '').includes('column'))
       const insertPayment = async (rec: any) => {
         let res = await supabase.from('recurring_payments').insert({ ...rec, ...accountCols })
-        if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
+        if (missingColumn(res.error)) {
           res = await supabase.from('recurring_payments').insert(rec)
-          if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
+          if (missingColumn(res.error)) {
             const { loan_id, ...rest } = rec
             res = await supabase.from('recurring_payments').insert(rest)
           }
@@ -519,9 +521,10 @@ export default function Dashboard() {
         }
       }
       if (payModal.source === 'loan') {
-        // loan_id her zaman yazılır — ödeme yöntemi ne olursa olsun taksit
-        // krediyle eşleşsin (notes yalnızca yöntem bilgisi taşır)
-        const { error } = await insertPayment({ expense_id: null, loan_id: payModal.sourceId, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) })
+        // Krediyle bağ HEM loan_id kolonuna HEM de notes'a ("loan_<id>|nakit")
+        // yazılır. Yöntem bilgisi ikinci parçada durur; böylece nakit/kart ile
+        // ödenen taksit de eşleşir ve kolon olmayan kurulumlarda kaybolmaz.
+        const { error } = await insertPayment({ expense_id: null, loan_id: payModal.sourceId, notes: loanNote(payModal.sourceId, paymentNotes), period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) })
         if (error) { alert('Hata: ' + error.message); setPaying(false); return }
         const loan = loans.find(l => l.id === payModal.sourceId)
         if (loan) {

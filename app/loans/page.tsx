@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, daysUntil, daysUntilLabel, localDateStr, isActiveInMonth } from '@/lib/supabase'
+import { supabase, fmt, daysUntil, daysUntilLabel, localDateStr, isActiveInMonth, isLoanPayment } from '@/lib/supabase'
 import type { Loan, CreditCard, CreditCardStatement, CreditCardTransaction, ExchangeRate } from '@/lib/supabase'
 import { EXPENSE_CATEGORIES, CATEGORY_GROUPS } from '@/lib/categories'
 import OcrUpload from '@/components/OcrUpload'
@@ -375,7 +375,7 @@ export default function LoansPage() {
           // Ekim'de başlayan bir plan "19 gün sonra" diye gösterilmemeli.
           const now = new Date()
           const curY = now.getFullYear(), curM = now.getMonth() + 1
-          const isLoanPaid = (l: Loan) => paidLoans.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
+          const isLoanPaid = (l: Loan) => paidLoans.some(p => isLoanPayment(p, l.id))
           const byDay = (a: Loan, b: Loan) => (a.payment_day || 32) - (b.payment_day || 32)
 
           const currentLoans = loans.filter(l => isActiveInMonth(l.start_date, l.end_date, curY, curM))
