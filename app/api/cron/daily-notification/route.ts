@@ -61,6 +61,10 @@ export async function GET(request: Request) {
   // sabah zaten duyurulan "yaklaşan" ödemeleri tekrarlamaz.
   const isEveningRun = tr.getUTCHours() >= 12
 
+  // Önceki ay (tek seferlik gider ödemelerini ay geçişinde de görebilmek için)
+  const prevMonth = month === 1 ? 12 : month - 1
+  const prevYear = month === 1 ? year - 1 : year
+
   // Fetch active recurring expenses, loans, credit cards, paid records for this month
   const [
     { data: recurring },
@@ -72,12 +76,20 @@ export async function GET(request: Request) {
     supabase.from('recurring_expenses').select('*').eq('is_active', true),
     supabase.from('loans').select('*').eq('is_active', true),
     supabase.from('credit_cards').select('*').eq('is_active', true),
-    supabase.from('recurring_payments').select('expense_id,loan_id,notes').eq('period_year', year).eq('period_month', month).eq('is_paid', true),
+    // Tek seferlik giderler önceki ayda ödenmiş olabilir (ödeme kaydı o aya
+    // yazılır) — son 2 ayın kayıtlarını al ki ay geçişinde tekrar bildirilmesin
+    supabase.from('recurring_payments').select('expense_id,loan_id,notes,period_year,period_month').eq('is_paid', true)
+      .or(`and(period_year.eq.${year},period_month.eq.${month}),and(period_year.eq.${prevYear},period_month.eq.${prevMonth})`),
     supabase.from('credit_card_statements').select('card_id,total_amount,is_paid').eq('period_year', year).eq('period_month', month),
   ])
 
-  const paid = paidRecords || []
+  const paidRecent = paidRecords || []
+  // Aylık yükümlülükler (kredi, düzenli gider, KK) YALNIZCA bu ayın kaydına bakar;
+  // geçen ayın ödemesi bu ayki taksiti kapatmaz.
+  const paid = paidRecent.filter((p: any) => p.period_year === year && p.period_month === month)
   const paidExpenseIds = new Set(paid.map((p: any) => p.expense_id).filter(Boolean))
+  // Tek seferlik giderler için son 2 ayın kayıtları geçerli (ödeme kaydı gider ayına yazılır)
+  const paidOnceExpenseIds = new Set(paidRecent.map((p: any) => p.expense_id).filter(Boolean))
   const isLoanPaid = (id: number) => paid.some((p: any) => p.loan_id === id || p.notes === `loan_${id}`)
   const isCardPaid = (id: number) => paid.some((p: any) => p.notes === `cc_${id}`)
 
@@ -109,7 +121,7 @@ export async function GET(request: Request) {
   for (const r of (recurring || [])) {
     if (!r.payment_day && r.expense_type !== 'one_time') continue
     if (r.expense_type === 'one_time') {
-      if (paidExpenseIds.has(r.id)) continue
+      if (paidOnceExpenseIds.has(r.id)) continue
       if (r.expense_date) {
         const d = new Date(r.expense_date)
         const diffDays = Math.round((d.getTime() - new Date(`${year}-${String(month).padStart(2, '0')}-${String(todayDay).padStart(2, '0')}`).getTime()) / 86400000)

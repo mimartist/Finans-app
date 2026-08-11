@@ -350,11 +350,15 @@ export default function Dashboard() {
         }
       }
       const accountCols = payAccount ? { account_id: payAccount.id, account_amount: deduct } : {}
-      // account_id kolonları henüz migrate edilmemiş DB'lerde kolonsuz tekrar dene
+      // account_id/loan_id kolonları henüz migrate edilmemiş DB'lerde kolonsuz tekrar dene
       const insertPayment = async (rec: any) => {
         let res = await supabase.from('recurring_payments').insert({ ...rec, ...accountCols })
         if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
           res = await supabase.from('recurring_payments').insert(rec)
+          if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
+            const { loan_id, ...rest } = rec
+            res = await supabase.from('recurring_payments').insert(rest)
+          }
         }
         return res
       }
@@ -377,7 +381,9 @@ export default function Dashboard() {
         }
       }
       if (payModal.source === 'loan') {
-        const { error } = await insertPayment({ expense_id: null, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) })
+        // loan_id her zaman yazılır — ödeme yöntemi ne olursa olsun taksit
+        // krediyle eşleşsin (notes yalnızca yöntem bilgisi taşır)
+        const { error } = await insertPayment({ expense_id: null, loan_id: payModal.sourceId, notes: paymentNotes || `loan_${payModal.sourceId}`, period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) })
         if (error) { alert('Hata: ' + error.message); setPaying(false); return }
         const loan = loans.find(l => l.id === payModal.sourceId)
         if (loan) {
