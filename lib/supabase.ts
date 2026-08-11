@@ -156,6 +156,28 @@ export function fmt(amount: number, currency = 'TRY'): string {
   return amount.toLocaleString('tr-TR', opts) + ' ' + currency
 }
 
+// Helper: bir kredi/taksit planı verilen ay içinde aktif mi?
+// Henüz başlamamış (start_date ileride) veya bitmiş (end_date geçmiş) krediler
+// o ayın ödeme listesinde ve hatırlatmalarında görünmemeli.
+export function isActiveInMonth(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined,
+  year: number,
+  month: number
+): boolean {
+  const monthStart = new Date(year, month - 1, 1)
+  const monthEnd = new Date(year, month, 0)
+  if (startDate) {
+    const s = new Date(startDate)
+    if (!isNaN(s.getTime()) && s > monthEnd) return false
+  }
+  if (endDate) {
+    const e = new Date(endDate)
+    if (!isNaN(e.getTime()) && e < monthStart) return false
+  }
+  return true
+}
+
 // Helper: yerel saate göre YYYY-MM-DD (toISOString UTC döndürdüğü için
 // TR'de gece 00:00-03:00 arası kayıtlar önceki güne yazılıyordu)
 export function localDateStr(d: Date = new Date()): string {

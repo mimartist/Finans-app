@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { sendPushToAll } from '@/lib/push'
+import { isActiveInMonth } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -72,6 +73,7 @@ export async function GET(request: Request) {
     { data: cards },
     { data: paidRecords },
     { data: statements },
+    overridesRes,
   ] = await Promise.all([
     supabase.from('recurring_expenses').select('*').eq('is_active', true),
     supabase.from('loans').select('*').eq('is_active', true),
@@ -81,7 +83,15 @@ export async function GET(request: Request) {
     supabase.from('recurring_payments').select('expense_id,loan_id,notes,period_year,period_month').eq('is_paid', true)
       .or(`and(period_year.eq.${year},period_month.eq.${month}),and(period_year.eq.${prevYear},period_month.eq.${prevMonth})`),
     supabase.from('credit_card_statements').select('card_id,total_amount,is_paid').eq('period_year', year).eq('period_month', month),
+    // Aya özel tutarlar (ör. Garanti KK bu ay 200.000) — tablo yoksa sessizce boş geç
+    supabase.from('recurring_expense_overrides').select('expense_id,amount').eq('period_year', year).eq('period_month', month),
   ])
+
+  const overrides = overridesRes?.data || []
+  const amountFor = (expenseId: number, baseAmount: number) => {
+    const o = overrides.find((x: any) => x.expense_id === expenseId)
+    return o ? Number(o.amount) : baseAmount
+  }
 
   const paidRecent = paidRecords || []
   // Aylık yükümlülükler (kredi, düzenli gider, KK) YALNIZCA bu ayın kaydına bakar;
@@ -126,17 +136,19 @@ export async function GET(request: Request) {
         const d = new Date(r.expense_date)
         const diffDays = Math.round((d.getTime() - new Date(`${year}-${String(month).padStart(2, '0')}-${String(todayDay).padStart(2, '0')}`).getTime()) / 86400000)
         if (diffDays >= -30 && diffDays <= 7) {
-          add({ name: r.name, amount: r.amount, currency: r.currency, day: d.getDate(), daysFromToday: diffDays })
+          add({ name: r.name, amount: amountFor(r.id, r.amount), currency: r.currency, day: d.getDate(), daysFromToday: diffDays })
         }
       }
       continue
     }
-    addMonthly(r.name, r.amount, r.currency, r.payment_day, paidExpenseIds.has(r.id))
+    addMonthly(r.name, amountFor(r.id, r.amount), r.currency, r.payment_day, paidExpenseIds.has(r.id))
   }
 
   // Loans
   for (const l of (loans || [])) {
     if (!l.payment_day) continue
+    // Henüz başlamamış veya bitmiş taksit planları hatırlatılmaz
+    if (!isActiveInMonth(l.start_date, l.end_date, year, month)) continue
     addMonthly(l.name, l.monthly_payment, l.currency, l.payment_day, isLoanPaid(l.id))
   }
 

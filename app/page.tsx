@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, daysUntil, daysUntilLabel, isDemo, authHeaders, localDateStr } from '@/lib/supabase'
+import { supabase, fmt, daysUntil, daysUntilLabel, isDemo, authHeaders, localDateStr, isActiveInMonth } from '@/lib/supabase'
 import { getCatIcon, IconWallet, IconPieChart, IconTarget, IconBank, IconTrendUp, IconRefresh, IconCheck, IconDollar, IconBriefcase, IconShield, IconCalendar, IconCreditCard, IconSettings, IconCash } from '@/components/Icons'
 import NotificationBell from '@/components/NotificationBell'
 import type { Account, Loan, RecurringExpense, ExchangeRate, DebtRecord, CreditCard } from '@/lib/supabase'
@@ -18,6 +18,10 @@ type PaymentItem = {
   paidAccountId?: number
   periodYear?: number
   periodMonth?: number
+  // Aya özel tutar override'ı: baseAmount giderin normal tutarı,
+  // overrideId doluysa bu ay için özel bir tutar girilmiş demektir
+  baseAmount?: number
+  overrideId?: number
 }
 
 type PastUnpaidItem = PaymentItem & {
@@ -136,21 +140,26 @@ export default function Dashboard() {
     let paidList: any[] = []
     let ccStatements: any[] = []
     let ccCards: any[] = []
+    let overrideList: any[] = []
     if (!isDemo) {
-      const [{ data: paid }, { data: stmts }, { data: crds }] = await Promise.all([
+      const [{ data: paid }, { data: stmts }, { data: crds }, ovr] = await Promise.all([
         supabase.from('recurring_payments').select('*').eq('period_year', m.year).eq('period_month', m.month).eq('is_paid', true),
         supabase.from('credit_card_statements').select('*').eq('period_year', m.year).eq('period_month', m.month),
         supabase.from('credit_cards').select('*').eq('is_active', true),
+        // Aya özel tutar override'ları (tablo henüz migrate edilmemişse sessizce boş geç)
+        supabase.from('recurring_expense_overrides').select('*').eq('period_year', m.year).eq('period_month', m.month),
       ])
       paidList = paid || []
       ccStatements = stmts || []
       ccCards = crds || []
+      overrideList = ovr?.data || []
     }
+    const overrideFor = (expenseId: number) => overrideList.find((o: any) => o.expense_id === expenseId)
     const now = new Date()
     const isCurrentMonth = m.year === now.getFullYear() && m.month === now.getMonth() + 1
     const todayDay = isCurrentMonth ? now.getDate() : 32
 
-    const loanItems: PaymentItem[] = lnsList.filter(l => l.payment_day).map(l => {
+    const loanItems: PaymentItem[] = lnsList.filter(l => l.payment_day && isActiveInMonth(l.start_date, l.end_date, m.year, m.month)).map(l => {
       const paidRecord = paidList.find(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
       const isPaid = !!paidRecord
       return { id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, type: 'kredi', source: 'loan' as const, sourceId: l.id, days: isCurrentMonth ? daysUntil(l.payment_day) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && l.payment_day < todayDay, paidRecordId: paidRecord?.id, paidNotes: paidRecord?.notes }
@@ -164,7 +173,10 @@ export default function Dashboard() {
     }).map(r => {
       const paidRecord = paidList.find(p => p.expense_id === r.id)
       const isPaid = !!paidRecord
-      return { id: `exp_${r.id}`, name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id, days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && r.payment_day! < todayDay, paidRecordId: paidRecord?.id, paidNotes: paidRecord?.notes }
+      // Bu ay için özel tutar girilmişse onu kullan, yoksa giderin normal tutarı
+      const ovr = overrideFor(r.id)
+      const amount = ovr ? Number(ovr.amount) : r.amount
+      return { id: `exp_${r.id}`, name: r.name, amount, currency: r.currency, day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id, days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && r.payment_day! < todayDay, paidRecordId: paidRecord?.id, paidNotes: paidRecord?.notes, baseAmount: r.amount, overrideId: ovr?.id }
     })
 
     const ccItems: PaymentItem[] = ccCards.map((card: any) => {
@@ -213,8 +225,7 @@ export default function Dashboard() {
           })
         }
 
-        lnsList.filter(l => l.payment_day).forEach(l => {
-          if (l.start_date && new Date(l.start_date) > monthEnd) return
+        lnsList.filter(l => l.payment_day && isActiveInMonth(l.start_date, l.end_date, pm.year, pm.month)).forEach(l => {
           const wasPaid = pastPaidList.some(p => p.notes === `loan_${l.id}` || (p.loan_id && p.loan_id === l.id))
           if (!wasPaid) {
             pastItems.push({
@@ -323,6 +334,53 @@ export default function Dashboard() {
   const [paying, setPaying] = useState(false)
   const [undoConfirm, setUndoConfirm] = useState<PaymentItem | null>(null)
   const [undoing, setUndoing] = useState(false)
+
+  // Aya özel tutar düzenleme (ör. Garanti KK normalde 125.000, bu ay 200.000)
+  const [amountModal, setAmountModal] = useState<PaymentItem | null>(null)
+  const [amountInput, setAmountInput] = useState('')
+  const [amountSaving, setAmountSaving] = useState(false)
+
+  function openAmountModal(p: PaymentItem) {
+    setAmountModal(p)
+    setAmountInput(String(p.amount ?? ''))
+  }
+
+  // Bu ayın tutarını kaydet (upsert) — giderin normal tutarına dokunmaz
+  async function handleAmountSave() {
+    if (!amountModal) return
+    const value = parseFloat(amountInput.replace(',', '.'))
+    if (isNaN(value) || value < 0) { alert('Geçerli bir tutar girin'); return }
+    setAmountSaving(true)
+    const year = amountModal.periodYear ?? selectedMonth.year
+    const month = amountModal.periodMonth ?? selectedMonth.month
+    const { error } = await supabase.from('recurring_expense_overrides').upsert({
+      expense_id: amountModal.sourceId,
+      period_year: year,
+      period_month: month,
+      amount: value,
+      ...(userId ? { user_id: userId } : {}),
+    }, { onConflict: 'expense_id,period_year,period_month' })
+    setAmountSaving(false)
+    if (error) {
+      alert(error.message?.includes('recurring_expense_overrides')
+        ? 'Bu özellik için veritabanı güncellemesi gerekiyor (20260811_expense_month_overrides.sql)'
+        : 'Hata: ' + error.message)
+      return
+    }
+    setAmountModal(null)
+    await reloadAll()
+  }
+
+  // Override'ı sil → gider normal tutarına döner
+  async function handleAmountReset() {
+    if (!amountModal?.overrideId) { setAmountModal(null); return }
+    setAmountSaving(true)
+    const { error } = await supabase.from('recurring_expense_overrides').delete().eq('id', amountModal.overrideId)
+    setAmountSaving(false)
+    if (error) { alert('Hata: ' + error.message); return }
+    setAmountModal(null)
+    await reloadAll()
+  }
 
   async function handlePay() {
     if (!payModal) return
@@ -520,7 +578,23 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="tx-amount">
-          <div className="tx-value" style={{ color: p.paid ? '#30a46c' : isLoan ? '#e5484d' : 'var(--text)', textDecoration: p.paid ? 'line-through' : 'none', fontWeight: isHighlight ? 700 : undefined }}>{fmt(p.amount, p.currency)}</div>
+          <div className="tx-value" style={{ color: p.paid ? '#30a46c' : isLoan ? '#e5484d' : 'var(--text)', textDecoration: p.paid ? 'line-through' : 'none', fontWeight: isHighlight ? 700 : undefined }}>
+            {fmt(p.amount, p.currency)}
+            {/* Bu ay normal tutardan farklıysa göster */}
+            {p.overrideId && p.baseAmount != null && p.baseAmount !== p.amount && (
+              <span className="text-[10px] font-normal ml-1" style={{ color: 'var(--muted)' }}>
+                (normal {fmt(p.baseAmount, p.currency)})
+              </span>
+            )}
+          </div>
+          {/* Düzenli giderlerde bu ayın tutarını değiştir */}
+          {p.source === 'recurring' && !isCC && (
+            <button onClick={() => openAmountModal(p)}
+              className="tx-badge" style={{ background: 'var(--glass-fill-soft)', color: 'var(--muted)', border: 'none', cursor: 'pointer', marginRight: 4 }}
+              title="Bu ayın tutarını düzenle">
+              ₺ Tutar
+            </button>
+          )}
           {isCurrent && !p.paid && (
             <button onClick={() => { setPayModal(p); setPayAccountId(defaultAccountId()); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
               className="tx-badge" style={{ background: p.overdue ? 'rgba(229,160,0,0.08)' : 'rgba(43,45,110,0.06)', color: p.overdue ? '#e5a000' : '#2b2d6e', border: 'none', cursor: 'pointer' }}>
@@ -976,6 +1050,43 @@ export default function Dashboard() {
                   {undoing ? 'Geri aliniyor...' : 'Geri Al'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== BU AYIN TUTARINI DÜZENLE ===== */}
+        {amountModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(30,31,84,0.5)' }}
+            onClick={e => { if (e.target === e.currentTarget) setAmountModal(null) }}>
+            <div className="glass p-6 w-full max-w-sm scale-in">
+              <div className="text-base font-bold mb-1">{amountModal.name}</div>
+              <div className="text-[12px] mb-4" style={{ color: 'var(--muted)' }}>
+                {monthLabel(selectedMonth)} için tutar. Giderin normal tutarı
+                <span className="mono font-semibold" style={{ color: 'var(--text)' }}> {fmt(amountModal.baseAmount ?? amountModal.amount, amountModal.currency)} </span>
+                olarak kalır, yalnızca bu ay değişir.
+              </div>
+              <input
+                value={amountInput}
+                onChange={e => setAmountInput(e.target.value)}
+                type="number"
+                inputMode="decimal"
+                autoFocus
+                className="input mono text-lg"
+                placeholder="0"
+              />
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => setAmountModal(null)} className="btn-outline flex-1 py-3 text-sm">İptal</button>
+                <button onClick={handleAmountSave} disabled={amountSaving} className="btn-primary flex-1 py-3 text-sm">
+                  {amountSaving ? 'Kaydediliyor...' : 'Kaydet'}
+                </button>
+              </div>
+              {amountModal.overrideId && (
+                <button onClick={handleAmountReset} disabled={amountSaving}
+                  className="w-full mt-2 py-2.5 text-[12px] rounded-xl font-semibold"
+                  style={{ background: 'transparent', color: 'var(--muted)', border: 'none', cursor: 'pointer' }}>
+                  Normal tutara dön ({fmt(amountModal.baseAmount ?? 0, amountModal.currency)})
+                </button>
+              )}
             </div>
           </div>
         )}
