@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, daysUntil, daysUntilLabel, isDemo, authHeaders, localDateStr, isActiveInMonth } from '@/lib/supabase'
@@ -92,8 +92,9 @@ export default function Dashboard() {
   const isPast = selectedMonth.year < currentMonth.year || (selectedMonth.year === currentMonth.year && selectedMonth.month < currentMonth.month)
   const isFuture = selectedMonth.year > currentMonth.year || (selectedMonth.year === currentMonth.year && selectedMonth.month > currentMonth.month)
 
+  // 6 ay geri, 12 ay ileri — ileriye dönük planlama için (yatay kaydırılır)
   const monthPills: MonthKey[] = []
-  for (let i = -3; i <= 2; i++) monthPills.push(monthOffset(currentMonth, i))
+  for (let i = -6; i <= 12; i++) monthPills.push(monthOffset(currentMonth, i))
 
   const loadGlobal = useCallback(async () => {
     if (isDemo) {
@@ -300,14 +301,53 @@ export default function Dashboard() {
   const usdTotal = accounts.filter(a => a.currency === 'USD').reduce((s, a) => s + a.balance, 0)
   const totalDebtTry = loans.reduce((s, l) => s + toTry(l.remaining_amount || 0, l.currency), 0)
   const monthlyTotalAll = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
-  // Runway: tüm aktif kredi + düzenli giderlerin aylık toplamı (ay bağımsız)
-  const avgMonthlyExpense = loans.filter(l => l.payment_day).reduce((s, l) => s + toTry(l.monthly_payment, l.currency), 0)
-    + recurring.filter(r => r.payment_day && r.category !== 'nakit' && r.expense_type !== 'one_time').reduce((s, r) => s + toTry(r.amount, r.currency), 0)
+  // Belirli bir ayın düzenli yükümlülüğü: yalnızca o ay GERÇEKTEN aktif olan
+  // taksit planları ve giderler. Henüz başlamamış (Yalova Arsa → Ekim) veya
+  // bitmiş (araç kirası → Aralık) kalemler sayılmaz.
+  const monthlyObligation = useCallback((y: number, mo: number) => {
+    const loanSum = loans
+      .filter(l => l.payment_day && isActiveInMonth(l.start_date, l.end_date, y, mo))
+      .reduce((s, l) => s + toTry(l.monthly_payment, l.currency), 0)
+    const expSum = recurring
+      .filter(r => r.payment_day && r.category !== 'nakit' && r.expense_type !== 'one_time'
+        && isActiveInMonth(null, r.end_date, y, mo))
+      .reduce((s, r) => s + toTry(r.amount, r.currency), 0)
+    return loanSum + expSum
+  }, [loans, recurring, eurTry, usdTry]) // eslint-disable-line
+
+  // Tek seferlik giderler (perde, yaz ekstra vb.) o aya düşüyorsa
+  const oneTimeForMonth = useCallback((y: number, mo: number) =>
+    recurring
+      .filter(r => r.expense_type === 'one_time' && r.expense_date)
+      .filter(r => { const d = new Date(r.expense_date!); return d.getFullYear() === y && d.getMonth() + 1 === mo })
+      .reduce((s, r) => s + toTry(r.amount, r.currency), 0)
+  , [recurring, eurTry, usdTry]) // eslint-disable-line
+
+  const avgMonthlyExpense = monthlyObligation(currentMonth.year, currentMonth.month)
   const recurringAlacak = allAlacak.filter(d => d.is_recurring)
   const monthlyIncome = recurringAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
   const netMonthly = Math.max(0, avgMonthlyExpense - monthlyIncome)
   const runwayMonths = netMonthly > 0 ? (totalAssetsTry / netMonthly).toFixed(1) : '∞'
   const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
+
+  // ── 12 AYLIK PROJEKSİYON ────────────────────────────────────────────────
+  // Her ay için: yükümlülük (taksit + düzenli gider + o aya düşen tek seferlik)
+  // eksi düzenli gelir; nakitten başlayarak kümülatif bakiye.
+  const projection = useMemo(() => {
+    const rows: { m: MonthKey; out: number; income: number; net: number; cumulative: number }[] = []
+    let cumulative = cashTry
+    for (let i = 0; i < 12; i++) {
+      const m = monthOffset(currentMonth, i)
+      const out = monthlyObligation(m.year, m.month) + oneTimeForMonth(m.year, m.month)
+      const net = monthlyIncome - out
+      cumulative += net
+      rows.push({ m, out, income: monthlyIncome, net, cumulative })
+    }
+    return rows
+  }, [cashTry, monthlyIncome, monthlyObligation, oneTimeForMonth]) // eslint-disable-line
+
+  // Nakit hangi ay tükeniyor (yoksa null)
+  const depletionMonth = projection.find(r => r.cumulative < 0)?.m ?? null
 
   const unpaidPayments = payments.filter(p => !p.paid)
   const paidPayments = payments.filter(p => p.paid)
@@ -822,6 +862,55 @@ export default function Dashboard() {
               <defs><linearGradient id="navyGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2b2d6e" /><stop offset="100%" stopColor="#4a4db0" /></linearGradient></defs>
             </BarChart>
           </ResponsiveContainer>
+        </div>
+
+        {/* ===== 12 AYLIK PROJEKSİYON ===== */}
+        <div className="mx-4 mt-4 glass p-4">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-xs font-bold" style={{ color: 'var(--text)' }}>12 Aylık Projeksiyon</div>
+            <div className="text-[11px] font-semibold" style={{ color: depletionMonth ? '#e5484d' : '#30a46c' }}>
+              {depletionMonth ? `${monthLabel(depletionMonth)}: nakit biter` : '12 ay boyunca nakit yeterli'}
+            </div>
+          </div>
+          <div className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>
+            Nakitten başlar; her ay taksit + düzenli gider + o aya düşen tek seferlikler düşülür,
+            düzenli gelir eklenir. Mevduat faizi ve beklenen yeni iş geliri dahil değildir.
+          </div>
+
+          {/* Başlık satırı */}
+          <div className="flex items-center gap-2 pb-1.5 mb-1 text-[10px] font-semibold uppercase tracking-wide"
+            style={{ color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ width: 52 }}>Ay</div>
+            <div className="flex-1 text-right">Gider</div>
+            <div className="flex-1 text-right">Net</div>
+            <div className="flex-1 text-right">Kalan Nakit</div>
+          </div>
+
+          <div className="flex flex-col">
+            {projection.map((r, i) => {
+              const negative = r.cumulative < 0
+              const tight = !negative && r.cumulative < 80000 // kendi belirlediğin min tampon
+              return (
+                <div key={`${r.m.year}-${r.m.month}`} className="flex items-center gap-2 py-1.5"
+                  style={{ borderBottom: i < projection.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <div className="text-[11px] font-medium" style={{ width: 52 }}>
+                    {MONTH_NAMES[r.m.month - 1].substring(0, 3)} {String(r.m.year).slice(2)}
+                  </div>
+                  <div className="flex-1 text-right mono text-[11px]" style={{ color: 'var(--muted)' }}>
+                    {fmt(r.out)}
+                  </div>
+                  <div className="flex-1 text-right mono text-[11px] font-semibold"
+                    style={{ color: r.net >= 0 ? '#30a46c' : '#e5484d' }}>
+                    {r.net >= 0 ? '+' : ''}{fmt(r.net)}
+                  </div>
+                  <div className="flex-1 text-right mono text-[11px] font-bold"
+                    style={{ color: negative ? '#e5484d' : tight ? '#e5a000' : 'var(--text)' }}>
+                    {fmt(r.cumulative)}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         {/* ===== MONTH SELECTOR ===== */}
