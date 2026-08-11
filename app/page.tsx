@@ -187,7 +187,8 @@ export default function Dashboard() {
       const amount = stmt?.total_amount || 0
       const days = isCurrentMonth ? daysUntil(dueDay) : 0
       const isPaid = stmt?.is_paid || paidList.some(p => p.notes === `cc_${card.id}`)
-      if (!isCurrentMonth && amount === 0) return null
+      // Ekstresi girilmemiş / borcu olmayan kart ödeme listesinde yer kaplamasın
+      if (amount === 0 && !isPaid) return null
       const paidRecord = paidList.find(p => p.notes === `cc_${card.id}`)
       return {
         id: `cc_${card.id}`, name: card.name || 'Kredi Kartı', amount,
@@ -626,19 +627,12 @@ export default function Dashboard() {
 
     const isLoan = p.source === 'loan'
     const isCC = p.type === 'kredi_karti'
-    const isHighlight = isLoan || isCC
+    // Tüm satırlar aynı biçimde: çerçeve/zemin farkı listeyi okunmaz yapıyordu.
+    // Vurgu artık yalnızca ikon ve tutar renginden geliyor.
+    const isHighlight = isLoan
 
     return (
-      <div key={p.id} className="tx-item" style={{
-        opacity: p.paid ? 0.5 : 1,
-        ...(isHighlight && !p.paid ? {
-          border: `1.5px solid ${isLoan ? 'rgba(229,72,77,0.25)' : 'rgba(43,45,110,0.2)'}`,
-          borderRadius: 14,
-          padding: '12px 14px',
-          margin: '4px 0',
-          background: isLoan ? 'rgba(229,72,77,0.03)' : 'rgba(43,45,110,0.02)',
-        } : {}),
-      }}>
+      <div key={p.id} className="tx-item" style={{ opacity: p.paid ? 0.5 : 1 }}>
         <div className="tx-icon">
           {p.paid ? <IconCheck color="#30a46c" size={20} strokeWidth={2.5} /> : getCatIcon(p.type, { color: isLoan ? '#e5484d' : 'var(--primary)', size: 20 })}
         </div>
