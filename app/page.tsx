@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, daysUntil, daysUntilLabel, isDemo, authHeaders, localDateStr, isActiveInMonth } from '@/lib/supabase'
+import { supabase, fmt, daysUntil, daysUntilLabel, isDemo, authHeaders, localDateStr, isActiveInMonth, depositGain } from '@/lib/supabase'
 import { getCatIcon, IconWallet, IconPieChart, IconTarget, IconBank, IconTrendUp, IconRefresh, IconCheck, IconDollar, IconBriefcase, IconShield, IconCalendar, IconCreditCard, IconSettings, IconCash } from '@/components/Icons'
 import NotificationBell from '@/components/NotificationBell'
 import type { Account, Loan, RecurringExpense, ExchangeRate, DebtRecord, CreditCard } from '@/lib/supabase'
@@ -78,6 +78,7 @@ export default function Dashboard() {
   const [fonTry, setFonTry] = useState(0)
   const [payments, setPayments] = useState<PaymentItem[]>([])
   const [pastUnpaid, setPastUnpaid] = useState<PastUnpaidItem[]>([])
+  const [projOpen, setProjOpen] = useState(false)   // 12 aylık projeksiyon açık mı
   // Son 6 ayın gerçekleşen (ödenen) gider toplamları — grafik için
   const [monthlySpend, setMonthlySpend] = useState<{ name: string; tutar: number }[]>([])
   const [allAlacak, setAllAlacak] = useState<DebtRecord[]>([])
@@ -326,6 +327,47 @@ export default function Dashboard() {
   const avgMonthlyExpense = monthlyObligation(currentMonth.year, currentMonth.month)
   const recurringAlacak = allAlacak.filter(d => d.is_recurring)
   const monthlyIncome = recurringAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+
+  // Belirli bir ayın gelir kalemleri:
+  //   1) her ay tekrarlayan alacaklar (maaş, kira yardımı)
+  //   2) vadesi o ay dolan mevduatların faiz getirisi
+  //   3) vade tarihi o aya düşen tek seferlik alacaklar (Zanzibar, araç güvence…)
+  const incomeItemsForMonth = useCallback((y: number, mo: number) => {
+    const items: { id: string; name: string; amount: number; currency: string; kind: 'duzenli' | 'mevduat' | 'alacak'; day?: number }[] = []
+
+    allAlacak.filter(d => d.is_recurring).forEach(d => items.push({
+      id: `inc_rec_${d.id}`,
+      name: d.person_name, amount: d.amount, currency: d.currency,
+      kind: 'duzenli', day: d.expected_day,
+    }))
+
+    accounts.filter(a => a.type === 'vadeli' && a.maturity_date).forEach(a => {
+      const dt = new Date(a.maturity_date!)
+      if (dt.getFullYear() !== y || dt.getMonth() + 1 !== mo) return
+      const gain = depositGain(a)
+      if (gain) items.push({
+        id: `inc_dep_${a.id}`,
+        name: `${a.name} · faiz getirisi`, amount: gain, currency: a.currency,
+        kind: 'mevduat', day: dt.getDate(),
+      })
+    })
+
+    allAlacak.filter(d => !d.is_recurring && d.due_date).forEach(d => {
+      const dt = new Date(d.due_date!)
+      if (dt.getFullYear() !== y || dt.getMonth() + 1 !== mo) return
+      items.push({
+        id: `inc_one_${d.id}`,
+        name: d.person_name + (d.description ? ` · ${d.description}` : ''),
+        amount: d.amount, currency: d.currency, kind: 'alacak', day: dt.getDate(),
+      })
+    })
+
+    return items.sort((a, b) => (a.day ?? 32) - (b.day ?? 32))
+  }, [allAlacak, accounts]) // eslint-disable-line
+
+  const incomeForMonth = useCallback((y: number, mo: number) =>
+    incomeItemsForMonth(y, mo).reduce((s, i) => s + toTry(i.amount, i.currency), 0)
+  , [incomeItemsForMonth]) // eslint-disable-line
   const netMonthly = Math.max(0, avgMonthlyExpense - monthlyIncome)
   const runwayMonths = netMonthly > 0 ? (totalAssetsTry / netMonthly).toFixed(1) : '∞'
   const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
@@ -339,12 +381,13 @@ export default function Dashboard() {
     for (let i = 0; i < 12; i++) {
       const m = monthOffset(currentMonth, i)
       const out = monthlyObligation(m.year, m.month) + oneTimeForMonth(m.year, m.month)
-      const net = monthlyIncome - out
+      const income = incomeForMonth(m.year, m.month)
+      const net = income - out
       cumulative += net
-      rows.push({ m, out, income: monthlyIncome, net, cumulative })
+      rows.push({ m, out, income, net, cumulative })
     }
     return rows
-  }, [cashTry, monthlyIncome, monthlyObligation, oneTimeForMonth]) // eslint-disable-line
+  }, [cashTry, incomeForMonth, monthlyObligation, oneTimeForMonth]) // eslint-disable-line
 
   // Nakit hangi ay tükeniyor (yoksa null)
   const depletionMonth = projection.find(r => r.cumulative < 0)?.m ?? null
@@ -864,53 +907,74 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* ===== 12 AYLIK PROJEKSİYON ===== */}
-        <div className="mx-4 mt-4 glass p-4">
-          <div className="flex items-center justify-between mb-1">
-            <div className="text-xs font-bold" style={{ color: 'var(--text)' }}>12 Aylık Projeksiyon</div>
-            <div className="text-[11px] font-semibold" style={{ color: depletionMonth ? '#e5484d' : '#30a46c' }}>
-              {depletionMonth ? `${monthLabel(depletionMonth)}: nakit biter` : '12 ay boyunca nakit yeterli'}
+        {/* ===== 12 AYLIK PROJEKSİYON (açılır) ===== */}
+        <div className="mx-4 mt-4 glass overflow-hidden">
+          <button onClick={() => setProjOpen(o => !o)}
+            className="w-full flex items-center justify-between p-4 text-left"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <div>
+              <div className="text-xs font-bold" style={{ color: 'var(--text)' }}>12 Aylık Projeksiyon</div>
+              <div className="text-[11px] font-semibold mt-0.5" style={{ color: depletionMonth ? '#e5484d' : '#30a46c' }}>
+                {depletionMonth ? `${monthLabel(depletionMonth)}: nakit biter` : '12 ay boyunca nakit yeterli'}
+                <span className="font-normal" style={{ color: 'var(--muted)' }}>
+                  {' · '}{projection.length ? fmt(projection[projection.length - 1].cumulative) : ''} kalır
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>
-            Nakitten başlar; her ay taksit + düzenli gider + o aya düşen tek seferlikler düşülür,
-            düzenli gelir eklenir. Mevduat faizi ve beklenen yeni iş geliri dahil değildir.
-          </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: projOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
 
-          {/* Başlık satırı */}
-          <div className="flex items-center gap-2 pb-1.5 mb-1 text-[10px] font-semibold uppercase tracking-wide"
-            style={{ color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ width: 52 }}>Ay</div>
-            <div className="flex-1 text-right">Gider</div>
-            <div className="flex-1 text-right">Net</div>
-            <div className="flex-1 text-right">Kalan Nakit</div>
-          </div>
+          {projOpen && (
+            <div className="px-4 pb-4">
+              <div className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>
+                Nakitten başlar. Gider: taksit + düzenli gider + o aya düşen tek seferlikler.
+                Gelir: düzenli gelirler + vadesi o ay dolan mevduat faizi + vade tarihi o aya
+                düşen alacaklar. Beklenen yeni iş geliri dahil değildir.
+              </div>
 
-          <div className="flex flex-col">
-            {projection.map((r, i) => {
-              const negative = r.cumulative < 0
-              const tight = !negative && r.cumulative < 80000 // kendi belirlediğin min tampon
-              return (
-                <div key={`${r.m.year}-${r.m.month}`} className="flex items-center gap-2 py-1.5"
-                  style={{ borderBottom: i < projection.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <div className="text-[11px] font-medium" style={{ width: 52 }}>
-                    {MONTH_NAMES[r.m.month - 1].substring(0, 3)} {String(r.m.year).slice(2)}
-                  </div>
-                  <div className="flex-1 text-right mono text-[11px]" style={{ color: 'var(--muted)' }}>
-                    {fmt(r.out)}
-                  </div>
-                  <div className="flex-1 text-right mono text-[11px] font-semibold"
-                    style={{ color: r.net >= 0 ? '#30a46c' : '#e5484d' }}>
-                    {r.net >= 0 ? '+' : ''}{fmt(r.net)}
-                  </div>
-                  <div className="flex-1 text-right mono text-[11px] font-bold"
-                    style={{ color: negative ? '#e5484d' : tight ? '#e5a000' : 'var(--text)' }}>
-                    {fmt(r.cumulative)}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+              <div className="flex items-center gap-2 pb-1.5 mb-1 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ width: 48 }}>Ay</div>
+                <div className="flex-1 text-right">Gelir</div>
+                <div className="flex-1 text-right">Gider</div>
+                <div className="flex-1 text-right">Net</div>
+                <div className="flex-1 text-right">Kalan</div>
+              </div>
+
+              <div className="flex flex-col">
+                {projection.map((r, i) => {
+                  const negative = r.cumulative < 0
+                  const tight = !negative && r.cumulative < 80000 // kendi belirlediğin min tampon
+                  return (
+                    <div key={`${r.m.year}-${r.m.month}`} className="flex items-center gap-2 py-1.5"
+                      style={{ borderBottom: i < projection.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <div className="text-[11px] font-medium" style={{ width: 48 }}>
+                        {MONTH_NAMES[r.m.month - 1].substring(0, 3)} {String(r.m.year).slice(2)}
+                      </div>
+                      <div className="flex-1 text-right mono text-[11px]" style={{ color: '#30a46c' }}>
+                        {fmt(r.income)}
+                      </div>
+                      <div className="flex-1 text-right mono text-[11px]" style={{ color: 'var(--muted)' }}>
+                        {fmt(r.out)}
+                      </div>
+                      <div className="flex-1 text-right mono text-[11px] font-semibold"
+                        style={{ color: r.net >= 0 ? '#30a46c' : '#e5484d' }}>
+                        {r.net >= 0 ? '+' : ''}{fmt(r.net)}
+                      </div>
+                      <div className="flex-1 text-right mono text-[11px] font-bold"
+                        style={{ color: negative ? '#e5484d' : tight ? '#e5a000' : 'var(--text)' }}>
+                        {fmt(r.cumulative)}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ===== MONTH SELECTOR ===== */}
@@ -1057,6 +1121,62 @@ export default function Dashboard() {
               <div className="tx-list mx-4 mb-4">{paidPayments.map(renderPaymentItem)}</div>
             </>
           )}
+
+          {/* ===== BU AYIN GELİRLERİ ===== */}
+          {(() => {
+            const incomes = incomeItemsForMonth(selectedMonth.year, selectedMonth.month)
+            if (incomes.length === 0) return null
+            const totalIncome = incomes.reduce((s, i) => s + toTry(i.amount, i.currency), 0)
+            const monthOut = monthlyObligation(selectedMonth.year, selectedMonth.month)
+              + oneTimeForMonth(selectedMonth.year, selectedMonth.month)
+            const net = totalIncome - monthOut
+            const kindLabel = { duzenli: 'Düzenli', mevduat: 'Mevduat faizi', alacak: 'Alacak' }
+            return (
+              <>
+                {/* Gider/gelir ayrımı */}
+                <div className="mx-4 mb-3 mt-1" style={{ height: 1, background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
+                <div className="flex items-center justify-between mx-5 mb-3">
+                  <span className="text-xs font-bold" style={{ color: '#30a46c' }}>Gelirler</span>
+                  <span className="mono text-[11px] font-bold" style={{ color: '#30a46c' }}>+{fmt(totalIncome)}</span>
+                </div>
+                <div className="tx-list mx-4 mb-3">
+                  {incomes.map(inc => (
+                    <div key={inc.id} className="tx-item">
+                      <div className="tx-icon" style={{ background: 'rgba(48,164,108,0.08)' }}>
+                        <IconTrendUp color="#30a46c" size={18} strokeWidth={2.2} />
+                      </div>
+                      <div className="tx-info">
+                        <div className="tx-name">{inc.name}</div>
+                        <div className="tx-detail" style={{ color: 'var(--muted)' }}>
+                          {kindLabel[inc.kind]}{inc.day ? ` · ${inc.day} ${selMonthShort}` : ''}
+                        </div>
+                      </div>
+                      <div className="tx-amount">
+                        <div className="tx-value" style={{ color: '#30a46c' }}>+{fmt(inc.amount, inc.currency)}</div>
+                        {inc.currency !== 'TRY' && (
+                          <div className="mono text-[10px]" style={{ color: 'var(--muted)' }}>{fmt(toTry(inc.amount, inc.currency))}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Ayın net durumu */}
+                <div className="mx-4 mb-4 px-4 py-3 rounded-2xl flex items-center justify-between"
+                  style={{ background: net >= 0 ? 'rgba(48,164,108,0.06)' : 'rgba(229,72,77,0.05)' }}>
+                  <div>
+                    <div className="text-[11px] font-bold">{monthLabel(selectedMonth)} Net</div>
+                    <div className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                      {fmt(totalIncome)} gelir − {fmt(monthOut)} gider
+                    </div>
+                  </div>
+                  <div className="mono text-base font-extrabold" style={{ color: net >= 0 ? '#30a46c' : '#e5484d' }}>
+                    {net >= 0 ? '+' : ''}{fmt(net)}
+                  </div>
+                </div>
+              </>
+            )
+          })()}
         </div>
 
         {/* ===== PAY MODAL ===== */}
