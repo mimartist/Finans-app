@@ -199,13 +199,9 @@ export default function Dashboard() {
       }
     }).filter(Boolean) as PaymentItem[]
 
-    // Sort: unpaid loans first (by day), then unpaid expenses/cc (by day), then paid items (by day)
-    const typeOrder = (p: PaymentItem) => p.paid ? 2 : p.source === 'loan' ? 0 : 1
-    setPayments([...loanItems, ...expItems, ...ccItems].sort((a, b) => {
-      const ta = typeOrder(a), tb = typeOrder(b)
-      if (ta !== tb) return ta - tb
-      return a.day - b.day
-    }))
+    // Takvim sırası: ayın günü küçükten büyüğe. Ödenmiş/ödenmemiş ayrımı zaten
+    // ayrı listelerde yapıldığı için burada tür önceliği uygulanmaz.
+    setPayments([...loanItems, ...expItems, ...ccItems].sort((a, b) => a.day - b.day))
 
     // Load past unpaid payments (only when viewing current month)
     if (isCurrentMonth && !isDemo) {

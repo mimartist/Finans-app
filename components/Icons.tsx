@@ -51,27 +51,69 @@ export function IconBell(p: IconProps) { return <I {...p}><path d="M18 8A6 6 0 0
 export function IconCash(p: IconProps) { return <I {...p}><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="3" /><path d="M2 10h2" /><path d="M20 10h2" /><path d="M2 14h2" /><path d="M20 14h2" /></I> }
 
 // Map category string to icon component
+// lib/categories.ts içindeki 50 kategorinin tamamı burada karşılanır.
+// Eksik kalan kategori genel kutu ikonuna düşer; bu yüzden liste tam tutulmalı.
 export const CATEGORY_ICON_MAP: Record<string, (p: IconProps) => JSX.Element> = {
-  kredi: IconBank,
-  elektrik: IconBolt,
-  sgk: IconShield,
-  muhasebe: IconClipboard,
-  internet: IconWifi,
-  aidat: IconBuilding,
-  gsm: IconPhone,
-  hizmet: IconTool,
-  su: IconDroplet,
-  dogalgaz: IconFlame,
-  vergi: IconClipboard,
+  // Konut
   kira: IconHome,
+  aidat: IconBuilding,
+  elektrik: IconBolt,
+  dogalgaz: IconFlame,
+  su: IconDroplet,
+  internet: IconWifi,
+  telefon: IconPhone,
+  tv_streaming: IconImage,
+  temizlik: IconTool,
+  ev_esya: IconBox,
+  tamir_tadilat: IconTool,
+  // Ulaşım
+  yakit: IconCar,
+  arac_bakim: IconCar,
+  arac_sigorta: IconShield,
+  toplu_tasima: IconCar,
+  otopark: IconCar,
+  kopru_otoyol: IconCar,
+  taksi: IconCar,
+  // Kişisel
   market: IconCart,
-  ulasim: IconCar,
+  restoran: IconUtensils,
+  saglik: IconHeart,
+  eczane: IconHeart,
+  giyim: IconCart,
+  kozmetik: IconCart,
+  spor: IconHeart,
   egitim: IconGrad,
+  eglence: IconImage,
+  seyahat: IconCar,
+  elektronik: IconBolt,
+  abonelik: IconRefresh,
+  cocuk_okul: IconGrad,
+  evcil_hayvan: IconHeart,
+  // İş
+  personel: IconBriefcase,
+  sgk: IconShield,
+  vergi: IconClipboard,
+  muhasebe: IconClipboard,
+  ofis: IconBriefcase,
+  reklam: IconTarget,
+  yazilim_saas: IconWifi,
+  kargo: IconBox,
+  is_seyahat: IconBriefcase,
+  // Finans
+  kredi_odeme: IconBank,
+  kk_odeme: IconCreditCard,
   sigorta: IconShield,
-  yemek: IconUtensils,
-  genel: IconBox,
+  yatirim: IconTrendUp,
+  komisyon: IconDollar,
+  // Diğer
+  hediye: IconBox,
+  bagis: IconHeart,
+  hizmet: IconTool,
+  diger: IconBox,
+  // Kategori listesinde olmayan ama kodda kullanılan tipler
+  kredi: IconBank,       // taksit planı satırları (source === 'loan')
+  kredi_karti: IconCreditCard, // credit_cards tablosundan gelen kartlar
   nakit: IconWallet,
-  kredi_karti: IconCreditCard,
 }
 
 export function getCatIcon(category: string, props?: IconProps) {

@@ -74,6 +74,7 @@ export async function GET(request: Request) {
     { data: paidRecords },
     { data: statements },
     overridesRes,
+    depositsRes,
   ] = await Promise.all([
     supabase.from('recurring_expenses').select('*').eq('is_active', true),
     supabase.from('loans').select('*').eq('is_active', true),
@@ -85,7 +86,22 @@ export async function GET(request: Request) {
     supabase.from('credit_card_statements').select('card_id,total_amount,is_paid').eq('period_year', year).eq('period_month', month),
     // Aya özel tutarlar (ör. Garanti KK bu ay 200.000) — tablo yoksa sessizce boş geç
     supabase.from('recurring_expense_overrides').select('expense_id,amount').eq('period_year', year).eq('period_month', month),
+    // Vadeli mevduatlar — vade dolduğunda yenileyip tutarı güncellemek için hatırlat
+    supabase.from('accounts').select('name,balance,currency,maturity_date,maturity_value,interest_rate')
+      .eq('is_active', true).eq('type', 'vadeli'),
   ])
+
+  // Vadesi 3 gün içinde dolan veya vadesi geçmiş mevduatlar
+  const todayTr = new Date(Date.UTC(year, month - 1, todayDay))
+  const maturing = (depositsRes?.data || [])
+    .filter((a: any) => a.maturity_date)
+    .map((a: any) => {
+      const d = new Date(a.maturity_date)
+      const days = Math.round((Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - todayTr.getTime()) / 86400000)
+      return { ...a, days }
+    })
+    .filter((a: any) => a.days <= 3)
+    .sort((a: any, b: any) => a.days - b.days)
 
   const overrides = overridesRes?.data || []
   const amountFor = (expenseId: number, baseAmount: number) => {
@@ -163,7 +179,7 @@ export async function GET(request: Request) {
   if (isEveningRun) upcoming.length = 0
 
   const totalCount = overdue.length + today.length + upcoming.length
-  if (totalCount === 0) {
+  if (totalCount === 0 && maturing.length === 0) {
     // Don't spam if nothing due
     return NextResponse.json({ sent: false, reason: isEveningRun ? 'Bekleyen ödeme yok — akşam hatırlatması atlandı' : 'No payments due' })
   }
@@ -197,6 +213,17 @@ export async function GET(request: Request) {
     upcoming.forEach(p => parts.push(line(p) + `  <i>${p.daysFromToday} gün sonra</i>`))
   }
 
+  if (maturing.length) {
+    parts.push('')
+    parts.push(`🏦 <b>Mevduat Vadesi</b>`)
+    maturing.forEach((a: any) => {
+      const ne = a.days < 0 ? `${Math.abs(a.days)} gün önce doldu` : a.days === 0 ? 'bugün doluyor' : `${a.days} gün sonra doluyor`
+      const getiri = a.maturity_value ? ` · getiri <b>${fmt(a.maturity_value - a.balance, a.currency)}</b>` : ''
+      parts.push(`• ${escapeHtml(a.name)} — ${fmt(a.balance, a.currency)}${getiri}  <i>${ne}</i>`)
+    })
+    parts.push('<i>Yenileyince yeni vade ve tutarı uygulamadan güncelle.</i>')
+  }
+
   // Totals (TRY only for simplicity)
   const totalTry = [...overdue, ...today].filter(p => p.currency === 'TRY').reduce((s, p) => s + p.amount, 0)
   if (totalTry > 0) {
@@ -211,6 +238,7 @@ export async function GET(request: Request) {
   if (overdue.length) pushTitleBits.push(`${overdue.length} gecikmiş`)
   if (today.length) pushTitleBits.push(`${today.length} bugün`)
   if (upcoming.length) pushTitleBits.push(`${upcoming.length} yaklaşan`)
+  if (maturing.length) pushTitleBits.push(`${maturing.length} mevduat vadesi`)
   const pushLines = [...overdue, ...today, ...upcoming]
     .slice(0, 5)
     .map(p => {
@@ -218,6 +246,10 @@ export async function GET(request: Request) {
       return `${p.name}: ${fmt(p.amount, p.currency)} (${when})`
     })
   if (totalCount > 5) pushLines.push(`… ve ${totalCount - 5} ödeme daha`)
+  maturing.forEach((a: any) => {
+    const ne = a.days < 0 ? `${Math.abs(a.days)} gün önce doldu` : a.days === 0 ? 'bugün doluyor' : `${a.days} gün sonra doluyor`
+    pushLines.push(`🏦 ${a.name} vadesi ${ne} — yenileyip güncelle`)
+  })
 
   const results: Record<string, any> = {
     counts: { overdue: overdue.length, today: today.length, upcoming: upcoming.length },
@@ -242,9 +274,11 @@ export async function GET(request: Request) {
 
   if (pushConfigured) {
     results.push = await sendPushToAll({
-      title: isEveningRun
-        ? `⏰ Hâlâ ödenmemiş: ${pushTitleBits.join(', ')}`
-        : `💰 Ödeme hatırlatması: ${pushTitleBits.join(', ')}`,
+      title: totalCount === 0
+        ? `🏦 Mevduat vadesi: ${maturing.length} hesap`
+        : isEveningRun
+          ? `⏰ Hâlâ ödenmemiş: ${pushTitleBits.join(', ')}`
+          : `💰 Ödeme hatırlatması: ${pushTitleBits.join(', ')}`,
       body: pushLines.join('\n'),
       url: '/',
       tag: isEveningRun ? 'finans-evening' : 'finans-daily',
