@@ -389,6 +389,17 @@ export default function Dashboard() {
   // Nakit hangi ay tükeniyor (yoksa null)
   const depletionMonth = projection.find(r => r.cumulative < 0)?.m ?? null
 
+  // Projeksiyon tahmindir — kuruş göstermek hem yanıltıcı hem de dar ekranda
+  // sütunları taşırıyor. Tam tutar: ₺446.978 · kısa tutar: 447k / 4,1M
+  const projAmt = (n: number) => '₺' + Math.round(n).toLocaleString('tr-TR')
+  const projShort = (n: number) => {
+    const sign = n < 0 ? '−' : ''
+    const abs = Math.abs(n)
+    if (abs >= 1000000) return sign + '₺' + (abs / 1000000).toFixed(1).replace('.', ',') + 'M'
+    if (abs >= 1000) return sign + '₺' + Math.round(abs / 1000) + 'k'
+    return sign + '₺' + Math.round(abs)
+  }
+
   const unpaidPayments = payments.filter(p => !p.paid)
   const paidPayments = payments.filter(p => p.paid)
   const overduePayments = payments.filter(p => p.overdue)
@@ -910,7 +921,7 @@ export default function Dashboard() {
               <div className="text-[11px] font-semibold mt-0.5" style={{ color: depletionMonth ? '#e5484d' : '#30a46c' }}>
                 {depletionMonth ? `${monthLabel(depletionMonth)}: nakit biter` : '12 ay boyunca nakit yeterli'}
                 <span className="font-normal" style={{ color: 'var(--muted)' }}>
-                  {' · '}{projection.length ? fmt(projection[projection.length - 1].cumulative) : ''} kalır
+                  {' · '}{projection.length ? projAmt(projection[projection.length - 1].cumulative) : ''} kalır
                 </span>
               </div>
             </div>
@@ -929,11 +940,13 @@ export default function Dashboard() {
                 düşen alacaklar. Beklenen yeni iş geliri dahil değildir.
               </div>
 
+              {/* Dar ekranda Gelir/Gider sütunları gizlenir, ayın altında kısa
+                  satır olarak görünür — Net ve Kalan'a nefes alacak yer kalır */}
               <div className="flex items-center gap-2 pb-1.5 mb-1 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ width: 48 }}>Ay</div>
-                <div className="flex-1 text-right">Gelir</div>
-                <div className="flex-1 text-right">Gider</div>
+                <div className="shrink-0 w-16 sm:w-12">Ay</div>
+                <div className="flex-1 text-right hidden sm:block">Gelir</div>
+                <div className="flex-1 text-right hidden sm:block">Gider</div>
                 <div className="flex-1 text-right">Net</div>
                 <div className="flex-1 text-right">Kalan</div>
               </div>
@@ -945,22 +958,28 @@ export default function Dashboard() {
                   return (
                     <div key={`${r.m.year}-${r.m.month}`} className="flex items-center gap-2 py-1.5"
                       style={{ borderBottom: i < projection.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                      <div className="text-[11px] font-medium" style={{ width: 48 }}>
-                        {MONTH_NAMES[r.m.month - 1].substring(0, 3)} {String(r.m.year).slice(2)}
+                      <div className="shrink-0 w-16 sm:w-12">
+                        <div className="text-[11px] font-medium">
+                          {MONTH_NAMES[r.m.month - 1].substring(0, 3)} {String(r.m.year).slice(2)}
+                        </div>
+                        <div className="mono text-[9px] leading-tight sm:hidden" style={{ color: 'var(--muted)' }}>
+                          <span style={{ color: '#30a46c' }}>{projShort(r.income)}</span>
+                          {' / '}{projShort(r.out)}
+                        </div>
                       </div>
-                      <div className="flex-1 text-right mono text-[11px]" style={{ color: '#30a46c' }}>
-                        {fmt(r.income)}
+                      <div className="flex-1 text-right mono text-[11px] hidden sm:block" style={{ color: '#30a46c' }}>
+                        {projAmt(r.income)}
                       </div>
-                      <div className="flex-1 text-right mono text-[11px]" style={{ color: 'var(--muted)' }}>
-                        {fmt(r.out)}
+                      <div className="flex-1 text-right mono text-[11px] hidden sm:block" style={{ color: 'var(--muted)' }}>
+                        {projAmt(r.out)}
                       </div>
                       <div className="flex-1 text-right mono text-[11px] font-semibold"
                         style={{ color: r.net >= 0 ? '#30a46c' : '#e5484d' }}>
-                        {r.net >= 0 ? '+' : ''}{fmt(r.net)}
+                        {r.net >= 0 ? '+' : ''}{projAmt(r.net)}
                       </div>
                       <div className="flex-1 text-right mono text-[11px] font-bold"
                         style={{ color: negative ? '#e5484d' : tight ? '#e5a000' : 'var(--text)' }}>
-                        {fmt(r.cumulative)}
+                        {projAmt(r.cumulative)}
                       </div>
                     </div>
                   )
