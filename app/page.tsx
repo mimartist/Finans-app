@@ -395,6 +395,80 @@ export default function Dashboard() {
   // Nakit hangi ay tükeniyor (yoksa null)
   const depletionMonth = projection.find(r => r.cumulative < 0)?.m ?? null
 
+  // ── MEVDUAT SİMÜLASYONU ─────────────────────────────────────────────────
+  // 12 aylık projeksiyon parayı ölü kabul eder: sadece harcanır. Burada para
+  // vadede kalmaya devam eder, her ay faiz işler ve gerektiği kadarı çekilir.
+  // Simülasyonda mevduat faizi AYRICA gelir olarak sayılmaz (vade sonu getirisi
+  // burada aylık faiz olarak zaten modelleniyor) — yoksa çift sayılırdı.
+  const incomeExDeposit = useCallback((y: number, mo: number) =>
+    incomeItemsForMonth(y, mo)
+      .filter(i => i.kind !== 'mevduat')
+      .reduce((s, i) => s + toTry(i.amount, i.currency), 0)
+  , [incomeItemsForMonth]) // eslint-disable-line
+
+  // Varsayılan faiz: mevduatların bakiye ağırlıklı brüt oranı, stopaj sonrası
+  const grossDepositRate = useMemo(() => {
+    const deps = accounts.filter(a => a.type === 'vadeli' && a.interest_rate)
+    const total = deps.reduce((s, a) => s + toTry(a.balance, a.currency), 0)
+    if (!total) return 0
+    return deps.reduce((s, a) => s + toTry(a.balance, a.currency) * (a.interest_rate || 0), 0) / total
+  }, [accounts, eurTry, usdTry]) // eslint-disable-line
+
+  const [simOpen, setSimOpen] = useState(false)
+  const [simRate, setSimRate] = useState('')        // net yıllık faiz (%) — boş = varsayılan
+  const [simStopaj, setSimStopaj] = useState('15')  // stopaj (%)
+  const [simExtra, setSimExtra] = useState('0')     // aylık ek gelir (₺)
+  const [simInflation, setSimInflation] = useState('0') // yıllık gider artışı (%)
+
+  const num = (s: string) => { const v = parseFloat(s.replace(',', '.')); return isNaN(v) ? 0 : v }
+  const defaultNetRate = grossDepositRate * (1 - num(simStopaj) / 100)
+  const netRate = simRate === '' ? defaultNetRate : num(simRate)
+
+  const SIM_MAX_MONTHS = 360 // 30 yıl — bundan sonrası "tükenmiyor" sayılır
+
+  const runSim = useCallback((annualNetPct: number) => {
+    const monthlyRate = annualNetPct / 100 / 12
+    const infl = num(simInflation) / 100
+    const extra = num(simExtra)
+    let balance = cashTry
+    let interestTotal = 0
+    const marks: { m: MonthKey; balance: number; interestYear: number }[] = []
+    let interestYear = 0
+
+    for (let i = 0; i < SIM_MAX_MONTHS; i++) {
+      const m = monthOffset(currentMonth, i)
+      const growth = Math.pow(1 + infl, i / 12)
+      const out = (monthlyObligation(m.year, m.month) + oneTimeForMonth(m.year, m.month)) * growth
+      const income = incomeExDeposit(m.year, m.month) + extra
+      const interest = balance > 0 ? balance * monthlyRate : 0
+      interestTotal += interest
+      interestYear += interest
+      balance = balance + interest + income - out
+
+      if (balance <= 0) {
+        marks.push({ m, balance: 0, interestYear })
+        return { months: i + 1, endMonth: m, marks, interestTotal, finalBalance: 0 }
+      }
+      if ((i + 1) % 12 === 0) {
+        marks.push({ m, balance, interestYear })
+        interestYear = 0
+      }
+    }
+    return { months: null, endMonth: null, marks, interestTotal, finalBalance: balance }
+  }, [cashTry, currentMonth, monthlyObligation, oneTimeForMonth, incomeExDeposit, simInflation, simExtra]) // eslint-disable-line
+
+  const sim = useMemo(() => runSim(netRate), [runSim, netRate])
+  const simNoInterest = useMemo(() => runSim(0), [runSim])
+
+  // 34 → "2 yıl 10 ay"
+  const durationLabel = (months: number | null) => {
+    if (months === null) return '30+ yıl'
+    const y = Math.floor(months / 12), mo = months % 12
+    if (y === 0) return `${mo} ay`
+    if (mo === 0) return `${y} yıl`
+    return `${y} yıl ${mo} ay`
+  }
+
   // Projeksiyon tahmindir — kuruş göstermek hem yanıltıcı hem de dar ekranda
   // sütunları taşırıyor. Tam tutar: ₺446.978 · kısa tutar: 447k / 4,1M
   const projAmt = (n: number) => '₺' + Math.round(n).toLocaleString('tr-TR')
@@ -990,6 +1064,110 @@ export default function Dashboard() {
                     </div>
                   )
                 })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ===== MEVDUAT SİMÜLASYONU (açılır) ===== */}
+        <div className="mx-4 mt-3 glass overflow-hidden">
+          <button onClick={() => setSimOpen(o => !o)}
+            className="w-full flex items-center justify-between p-4 text-left"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <div>
+              <div className="text-xs font-bold" style={{ color: 'var(--text)' }}>Mevduat Simülasyonu</div>
+              <div className="text-[11px] font-semibold mt-0.5" style={{ color: sim.months === null ? '#30a46c' : '#e5a000' }}>
+                {sim.months === null
+                  ? 'Faiz gideri karşılıyor — para tükenmiyor'
+                  : `${durationLabel(sim.months)} dayanır · ${monthLabel(sim.endMonth!)}`}
+                <span className="font-normal" style={{ color: 'var(--muted)' }}>
+                  {' · faizsiz '}{durationLabel(simNoInterest.months)}
+                </span>
+              </div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: simOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          {simOpen && (
+            <div className="px-4 pb-4">
+              <div className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>
+                Tüm nakit ({projAmt(cashTry)}) vadede kalmaya devam eder, her ay faiz işler ve
+                giderler oradan karşılanır. 12 aylık projeksiyondan farkı: orada para yalnızca
+                erirken, burada çalışmaya devam eder. Vade sonu getirileri ayrıca gelir sayılmaz —
+                aylık faiz olarak zaten hesaba katılıyor.
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-3">
+                {[
+                  { label: 'Net yıllık faiz %', value: simRate === '' ? defaultNetRate.toFixed(1) : simRate, set: setSimRate,
+                    hint: `brüt %${grossDepositRate.toFixed(1)} · stopaj %${simStopaj}` },
+                  { label: 'Stopaj %', value: simStopaj, set: setSimStopaj, hint: 'TRY mevduatta yasal kesinti' },
+                  { label: 'Aylık ek gelir ₺', value: simExtra, set: setSimExtra, hint: 'beklenen yeni iş vb.' },
+                  { label: 'Yıllık gider artışı %', value: simInflation, set: setSimInflation, hint: 'enflasyon etkisi' },
+                ].map(f => (
+                  <div key={f.label} style={{ flex: '1 1 45%', minWidth: 130 }}>
+                    <label className="text-[10px] font-semibold block mb-1" style={{ color: 'var(--muted)' }}>{f.label}</label>
+                    <input value={f.value} onChange={e => f.set(e.target.value)} inputMode="decimal"
+                      className="w-full mono text-[13px] font-semibold px-2 py-1.5 rounded-lg"
+                      style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                    <div className="text-[9px] mt-0.5" style={{ color: 'var(--muted)' }}>{f.hint}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-xl p-3 mb-3" style={{ background: 'var(--bg4)' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Faiz işlerse</span>
+                  <span className="text-[13px] font-bold" style={{ color: sim.months === null ? '#30a46c' : 'var(--text)' }}>
+                    {durationLabel(sim.months)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Faiz işlemezse</span>
+                  <span className="text-[13px] font-semibold" style={{ color: 'var(--muted)' }}>
+                    {durationLabel(simNoInterest.months)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-1.5" style={{ borderTop: '1px solid var(--border)' }}>
+                  <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Toplam faiz getirisi</span>
+                  <span className="mono text-[13px] font-bold" style={{ color: '#30a46c' }}>
+                    {projAmt(sim.interestTotal)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pb-1.5 mb-1 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
+                <div className="shrink-0 w-16">Yıl sonu</div>
+                <div className="flex-1 text-right">Faiz geliri</div>
+                <div className="flex-1 text-right">Bakiye</div>
+              </div>
+              <div className="flex flex-col">
+                {sim.marks.slice(0, 10).map((mk, i, arr) => (
+                  <div key={`${mk.m.year}-${mk.m.month}`} className="flex items-center gap-2 py-1.5"
+                    style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <div className="shrink-0 w-16 text-[11px] font-medium">
+                      {MONTH_NAMES[mk.m.month - 1].substring(0, 3)} {String(mk.m.year).slice(2)}
+                    </div>
+                    <div className="flex-1 text-right mono text-[11px]" style={{ color: '#30a46c' }}>
+                      +{projAmt(mk.interestYear)}
+                    </div>
+                    <div className="flex-1 text-right mono text-[11px] font-bold"
+                      style={{ color: mk.balance <= 0 ? '#e5484d' : 'var(--text)' }}>
+                      {mk.balance <= 0 ? 'bitti' : projAmt(mk.balance)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-[9px] mt-2" style={{ color: 'var(--muted)' }}>
+                Faiz her ay bakiyeye eklenir (bileşik). Kredi taksitleri bitiş tarihlerinde,
+                düzenli giderler bitiş tarihi varsa o tarihte düşer. Yatırımlar ve alacaklar
+                başlangıç tutarına dahil değildir — yalnızca nakit ve mevduat.
               </div>
             </div>
           )}
