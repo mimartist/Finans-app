@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { supabase, fmt, isDemo, localDateStr } from '@/lib/supabase'
+import { supabase, fmt, isDemo, localDateStr, depositGain, daysToMaturity } from '@/lib/supabase'
 import type { Account, ExchangeRate, DebtRecord, Investment } from '@/lib/supabase'
 import { IconWallet, IconTrendUp, IconArrowsExchange, IconPlus } from '@/components/Icons'
 
@@ -19,7 +19,7 @@ type InvestmentWithSnapshot = Investment & {
 
 const emptyInvForm = { name: '', type: 'hisse', symbol: '', quantity: '', avg_cost: '', currency: 'TRY', platform: '', current_price: '' }
 const emptyDebtForm = { person_name: '', type: 'alacak' as 'alacak' | 'verecek', amount: '', currency: 'TRY', description: '', due_date: '' }
-const emptyAccForm = { name: '', bank: '', type: 'vadesiz', currency: 'TRY', balance: '' }
+const emptyAccForm = { name: '', bank: '', type: 'vadesiz', currency: 'TRY', balance: '', maturity_date: '', maturity_value: '', interest_rate: '' }
 
 // Mock data
 const MOCK_ACCOUNTS: Account[] = [
@@ -148,14 +148,28 @@ export default function AccountsPage() {
   function openAccAdd() { setEditAcc(null); setAccForm(emptyAccForm); setShowAccForm(true); setAccDeleteConfirm(false) }
   function openAccEdit(acc: Account) {
     setEditAcc(acc)
-    setAccForm({ name: acc.name, bank: acc.bank, type: acc.type, currency: acc.currency, balance: String(acc.balance) })
+    setAccForm({
+      name: acc.name, bank: acc.bank, type: acc.type, currency: acc.currency, balance: String(acc.balance),
+      maturity_date: acc.maturity_date || '',
+      maturity_value: acc.maturity_value != null ? String(acc.maturity_value) : '',
+      interest_rate: acc.interest_rate != null ? String(acc.interest_rate) : '',
+    })
     setShowAccForm(true); setAccDeleteConfirm(false)
   }
   function closeAccForm() { setShowAccForm(false); setEditAcc(null); setAccForm(emptyAccForm); setAccDeleteConfirm(false) }
   async function handleAccSave() {
     if (!accForm.name || !accForm.bank) return
     setAccSaving(true)
-    const payload = { name: accForm.name, bank: accForm.bank, type: accForm.type, currency: accForm.currency, balance: parseFloat(accForm.balance) || 0, is_active: true, ...(userId ? { user_id: userId } : {}) }
+    const isVadeli = accForm.type === 'vadeli'
+    const payload = {
+      name: accForm.name, bank: accForm.bank, type: accForm.type, currency: accForm.currency,
+      balance: parseFloat(accForm.balance) || 0, is_active: true,
+      // Vade bilgileri yalnızca vadeli hesapta anlamlı; tür değişirse temizlenir
+      maturity_date:  isVadeli && accForm.maturity_date  ? accForm.maturity_date : null,
+      maturity_value: isVadeli && accForm.maturity_value ? parseFloat(accForm.maturity_value) : null,
+      interest_rate:  isVadeli && accForm.interest_rate  ? parseFloat(accForm.interest_rate)  : null,
+      ...(userId ? { user_id: userId } : {}),
+    }
     if (!isDemo) {
       const { error } = editAcc
         ? await supabase.from('accounts').update(payload).eq('id', editAcc.id)
@@ -179,6 +193,10 @@ export default function AccountsPage() {
   const usdTry = rates?.usd_try || 0
   const toTry = (amount: number, currency: string) => currency === 'EUR' ? amount * eurTry : currency === 'USD' ? amount * usdTry : amount
   const totalBalance = accounts.reduce((s, a) => s + toTry(a.balance, a.currency), 0)
+  // Vadeli mevduatlar ve vade sonunda ele geçecek toplam faiz getirisi
+  const depositAccounts = accounts.filter(a => a.type === 'vadeli')
+  const totalDepositGain = depositAccounts.reduce((s, a) => s + toTry(depositGain(a) ?? 0, a.currency), 0)
+  const depositsMissingInfo = depositAccounts.filter(a => depositGain(a) === null).length
   const tryTotal = accounts.filter(a => a.currency === 'TRY').reduce((s, a) => s + a.balance, 0)
   const eurTotal = accounts.filter(a => a.currency === 'EUR').reduce((s, a) => s + a.balance, 0)
   const usdTotal = accounts.filter(a => a.currency === 'USD').reduce((s, a) => s + a.balance, 0)
@@ -392,6 +410,50 @@ export default function AccountsPage() {
               </div>
             </div>
 
+            {/* Vadeli mevduat getirisi */}
+            {depositAccounts.length > 0 && (
+              <div className="mx-4 mb-4 glass rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
+                    Vadeli Mevduat Getirisi
+                  </div>
+                  <div className="text-right">
+                    <div className="mono text-base font-extrabold" style={{ color: '#30a46c' }}>+{fmt(totalDepositGain)}</div>
+                    <div className="text-[9px]" style={{ color: 'var(--muted)' }}>vade sonunda</div>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {depositAccounts.map(a => {
+                    const gain = depositGain(a) ?? 0
+                    const kalan = daysToMaturity(a.maturity_date)
+                    return (
+                      <div key={a.id} className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: 'rgba(48,164,108,0.05)' }}>
+                        <div className="min-w-0">
+                          <div className="text-[12px] font-medium truncate">{a.name}</div>
+                          <div className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                            {fmt(a.balance, a.currency)}
+                            {a.interest_rate ? ` · %${a.interest_rate}` : ''}
+                            {kalan !== null ? (kalan < 0 ? ' · vade doldu' : kalan === 0 ? ' · vade bugün' : ` · ${kalan} gün kaldı`) : ''}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-3">
+                          <div className="mono text-[12px] font-bold" style={{ color: '#30a46c' }}>+{fmt(gain, a.currency)}</div>
+                          {a.maturity_value && (
+                            <div className="mono text-[9px]" style={{ color: 'var(--muted)' }}>→ {fmt(a.maturity_value, a.currency)}</div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {depositsMissingInfo > 0 && (
+                  <div className="text-[10px] mt-2 text-center" style={{ color: 'var(--muted)' }}>
+                    {depositsMissingInfo} vadeli hesapta vade/getiri bilgisi eksik — hesaba dokunup ekleyebilirsin
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Bank grouped accounts */}
             <div className="flex flex-col gap-3 mx-4">
               {bankTotals.map(({ bank, accounts: bankAccounts, total }) => {
@@ -440,12 +502,30 @@ export default function AccountsPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="text-[12px] font-medium truncate" style={{ color: 'var(--text)' }}>{a.name}</div>
-                              <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{a.type === 'vadeli' ? 'Vadeli' : 'Vadesiz'}</div>
+                              <div className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                                {a.type === 'vadeli' ? (() => {
+                                  // Vadeli hesapta vade tarihi, kalan gün ve faiz oranı
+                                  const kalan = daysToMaturity(a.maturity_date)
+                                  const parts: string[] = ['Vadeli']
+                                  if (a.maturity_date) {
+                                    const t = new Date(a.maturity_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })
+                                    parts.push(kalan === null ? t : kalan < 0 ? `${t} · vade doldu` : kalan === 0 ? `${t} · bugün` : `${t} · ${kalan} gün`)
+                                  }
+                                  if (a.interest_rate) parts.push(`%${a.interest_rate}`)
+                                  return parts.join(' · ')
+                                })() : 'Vadesiz'}
+                              </div>
                             </div>
                             <div className="text-right flex-shrink-0">
                               <div className="mono text-[12px] font-bold" style={{ color: 'var(--text)' }}>{fmt(a.balance, a.currency)}</div>
                               {a.currency !== 'TRY' && a.balance > 0 && (
                                 <div className="mono text-[9px]" style={{ color: 'var(--muted)' }}>{fmt(toTry(a.balance, a.currency))}</div>
+                              )}
+                              {/* Vade sonunda ele geçecek faiz getirisi */}
+                              {depositGain(a) !== null && (
+                                <div className="mono text-[9px] font-semibold" style={{ color: '#30a46c' }}>
+                                  +{fmt(depositGain(a)!, a.currency)}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -506,6 +586,32 @@ export default function AccountsPage() {
                     </select>
                   </div>
                 </div>
+
+                {/* Vadeli mevduat bilgileri — getiri buradan hesaplanır */}
+                {accForm.type === 'vadeli' && (
+                  <div className="p-3 rounded-xl flex flex-col gap-3" style={{ background: 'rgba(48,164,108,0.05)', border: '1px solid rgba(48,164,108,0.15)' }}>
+                    <div className="text-[11px] font-semibold" style={{ color: '#30a46c' }}>Vade Bilgileri</div>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Vade Tarihi</label>
+                        <input value={accForm.maturity_date} onChange={e => setAcc('maturity_date', e.target.value)} type="date" className="input" />
+                      </div>
+                      <div className="w-24">
+                        <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Faiz %</label>
+                        <input value={accForm.interest_rate} onChange={e => setAcc('interest_rate', e.target.value)} type="number" placeholder="40,75" className="input mono" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Vade Sonu Tutarı</label>
+                      <input value={accForm.maturity_value} onChange={e => setAcc('maturity_value', e.target.value)} type="number" placeholder="Bankanın bildirdiği tutar" className="input mono" />
+                      {accForm.maturity_value && accForm.balance && (
+                        <div className="text-[10px] mt-1 font-semibold" style={{ color: '#30a46c' }}>
+                          Getiri: +{fmt((parseFloat(accForm.maturity_value) || 0) - (parseFloat(accForm.balance) || 0), accForm.currency)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <button onClick={handleAccSave} disabled={accSaving || !accForm.name || !accForm.bank}
                 className="btn-primary w-full mt-4 py-3">{accSaving ? 'Kaydediliyor...' : editAcc ? 'Güncelle' : 'Ekle'}</button>

@@ -17,6 +17,28 @@ export type Account = {
   notes?: string
   is_active: boolean
   updated_at: string
+  // Vadeli mevduat alanları (type === 'vadeli')
+  maturity_date?: string | null
+  maturity_value?: number | null
+  interest_rate?: number | null
+}
+
+// Vadeli mevduat getirisi: bankanın bildirdiği vade sonu tutarı ile
+// anaparanın farkı. Vade sonu tutarı girilmemişse null döner.
+export function depositGain(a: Account): number | null {
+  if (a.type !== 'vadeli' || !a.maturity_value) return null
+  return a.maturity_value - a.balance
+}
+
+// Vadeye kalan gün (negatifse vade dolmuş)
+export function daysToMaturity(maturityDate?: string | null): number | null {
+  if (!maturityDate) return null
+  const d = new Date(maturityDate)
+  if (isNaN(d.getTime())) return null
+  const today = new Date()
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const t1 = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  return Math.round((t1.getTime() - t0.getTime()) / 86400000)
 }
 
 export type Loan = {
