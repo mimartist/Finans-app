@@ -1413,11 +1413,25 @@ export default function Dashboard() {
               )}
               {payMethod === 'kredi_karti' && (
                 <div className="mb-4">
-                  <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Hangi kart?</label>
-                  <select value={payCardId || ''} onChange={e => setPayCardId(Number(e.target.value))} className="input">
-                    <option value="">Kart seçin...</option>
-                    {creditCards.map(c => <option key={c.id} value={c.id}>{c.name} ({c.bank})</option>)}
-                  </select>
+                  {creditCards.length === 0 ? (
+                    // Kayıtlı kart yokken boş bir açılır menü göstermek "bozuk"
+                    // hissi veriyordu — ne olduğunu ve ne yapılacağını söyle
+                    <div className="p-3 rounded-xl text-[12px]" style={{ background: 'rgba(229,160,0,0.08)', color: '#e5a000' }}>
+                      <div className="font-semibold mb-1">Kayıtlı kredi kartın yok</div>
+                      <div style={{ color: 'var(--muted)' }}>
+                        Kartla ödeme yapabilmek için önce <a href="/loans" className="font-semibold" style={{ color: '#e5a000' }}>Krediler &rsaquo; Kartlar</a>{' '}
+                        bölümünden kart eklemelisin. Şimdilik <b>Nakit</b> veya <b>Hesaptan</b> seçebilirsin.
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>Hangi kart?</label>
+                      <select value={payCardId || ''} onChange={e => setPayCardId(Number(e.target.value))} className="input">
+                        <option value="">Kart seçin...</option>
+                        {creditCards.map(c => <option key={c.id} value={c.id}>{c.name} ({c.bank})</option>)}
+                      </select>
+                    </>
+                  )}
                 </div>
               )}
               {payMethod === 'nakit' && (
