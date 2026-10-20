@@ -8,6 +8,8 @@ import NotificationBell from '@/components/NotificationBell'
 import type { Account, Loan, RecurringExpense, ExchangeRate, DebtRecord, CreditCard } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
+type PayRecord = { id: number; amount: number; date?: string; notes?: string }
+
 type PaymentItem = {
   id: string
   name: string; amount: number; currency: string; day: number
@@ -18,6 +20,10 @@ type PaymentItem = {
   paidAccountId?: number
   periodYear?: number
   periodMonth?: number
+  // Kısmi ödeme: bir kaleme aynı ay içinde birden fazla ödeme yapılabilir.
+  // paidAmount o ana kadar ödenenin toplamı, payRecords tek tek kayıtlar.
+  paidAmount: number
+  payRecords: PayRecord[]
   // Aya özel tutar override'ı: baseAmount giderin normal tutarı,
   // overrideId doluysa bu ay için özel bir tutar girilmiş demektir
   baseAmount?: number
@@ -163,10 +169,19 @@ export default function Dashboard() {
     const isCurrentMonth = m.year === now.getFullYear() && m.month === now.getMonth() + 1
     const todayDay = isCurrentMonth ? now.getDate() : 32
 
+    // Bir kaleme aynı ay içinde birden fazla ödeme yapılmış olabilir (kısmi
+    // ödeme). Tamamı ödenmiş sayılması için toplamın tutarı karşılaması gerekir.
+    const toRecords = (rows: any[]): PayRecord[] => rows
+      .map(p => ({ id: p.id, amount: Number(p.amount) || 0, date: p.paid_date, notes: p.notes }))
+      .sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.id - b.id)
+    const sumOf = (recs: PayRecord[]) => recs.reduce((s, r) => s + r.amount, 0)
+    const isSettled = (recs: PayRecord[], amount: number) =>
+      recs.length > 0 && (amount > 0 ? sumOf(recs) >= amount - 0.01 : true)
+
     const loanItems: PaymentItem[] = lnsList.filter(l => l.payment_day && isActiveInMonth(l.start_date, l.end_date, m.year, m.month)).map(l => {
-      const paidRecord = paidList.find(p => isLoanPayment(p, l.id))
-      const isPaid = !!paidRecord
-      return { id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, type: 'kredi', source: 'loan' as const, sourceId: l.id, days: isCurrentMonth ? daysUntil(l.payment_day) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && l.payment_day < todayDay, paidRecordId: paidRecord?.id, paidNotes: paidRecord?.notes }
+      const recs = toRecords(paidList.filter(p => isLoanPayment(p, l.id)))
+      const isPaid = isSettled(recs, l.monthly_payment)
+      return { id: `loan_${l.id}`, name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day, type: 'kredi', source: 'loan' as const, sourceId: l.id, days: isCurrentMonth ? daysUntil(l.payment_day) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && l.payment_day < todayDay, paidRecordId: recs[0]?.id, paidNotes: recs[0]?.notes, paidAmount: sumOf(recs), payRecords: recs }
     })
 
     const expItems: PaymentItem[] = recList.filter(r => {
@@ -175,12 +190,12 @@ export default function Dashboard() {
       if (r.end_date) { const end = new Date(r.end_date); if (new Date(m.year, m.month - 1, 1) > end) return false }
       return true
     }).map(r => {
-      const paidRecord = paidList.find(p => p.expense_id === r.id)
-      const isPaid = !!paidRecord
+      const recs = toRecords(paidList.filter(p => p.expense_id === r.id))
       // Bu ay için özel tutar girilmişse onu kullan, yoksa giderin normal tutarı
       const ovr = overrideFor(r.id)
       const amount = ovr ? Number(ovr.amount) : r.amount
-      return { id: `exp_${r.id}`, name: r.name, amount, currency: r.currency, day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id, days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && r.payment_day! < todayDay, paidRecordId: paidRecord?.id, paidNotes: paidRecord?.notes, baseAmount: r.amount, overrideId: ovr?.id }
+      const isPaid = isSettled(recs, amount)
+      return { id: `exp_${r.id}`, name: r.name, amount, currency: r.currency, day: r.payment_day!, type: r.category, source: 'recurring' as const, sourceId: r.id, days: isCurrentMonth ? daysUntil(r.payment_day!) : 0, paid: isPaid, overdue: isCurrentMonth && !isPaid && r.payment_day! < todayDay, paidRecordId: recs[0]?.id, paidNotes: recs[0]?.notes, paidAmount: sumOf(recs), payRecords: recs, baseAmount: r.amount, overrideId: ovr?.id }
     })
 
     const ccItems: PaymentItem[] = ccCards.map((card: any) => {
@@ -188,17 +203,18 @@ export default function Dashboard() {
       const dueDay = card.due_day || 10
       const amount = stmt?.total_amount || 0
       const days = isCurrentMonth ? daysUntil(dueDay) : 0
-      const isPaid = stmt?.is_paid || paidList.some(p => p.notes === `cc_${card.id}`)
+      const recs = toRecords(paidList.filter(p => p.notes === `cc_${card.id}`))
+      const isPaid = stmt?.is_paid || isSettled(recs, amount)
       // Ekstresi girilmemiş / borcu olmayan kart ödeme listesinde yer kaplamasın
       if (amount === 0 && !isPaid) return null
-      const paidRecord = paidList.find(p => p.notes === `cc_${card.id}`)
       return {
         id: `cc_${card.id}`, name: card.name || 'Kredi Kartı', amount,
         currency: card.currency || 'TRY', day: dueDay, type: 'kredi_karti',
         source: 'recurring' as const, sourceId: card.id,
         days, paid: isPaid,
         overdue: isCurrentMonth && !isPaid && dueDay < todayDay && amount > 0,
-        paidRecordId: paidRecord?.id, paidNotes: paidRecord?.notes,
+        paidRecordId: recs[0]?.id, paidNotes: recs[0]?.notes,
+        paidAmount: sumOf(recs), payRecords: recs,
       }
     }).filter(Boolean) as PaymentItem[]
 
@@ -231,13 +247,14 @@ export default function Dashboard() {
         }
 
         lnsList.filter(l => l.payment_day && isActiveInMonth(l.start_date, l.end_date, pm.year, pm.month)).forEach(l => {
-          const wasPaid = pastPaidList.some(p => isLoanPayment(p, l.id))
-          if (!wasPaid) {
+          const recs = toRecords(pastPaidList.filter((p: any) => isLoanPayment(p, l.id)))
+          if (!isSettled(recs, l.monthly_payment)) {
             pastItems.push({
               id: `past_loan_${l.id}_${pm.year}_${pm.month}`,
               name: l.name, amount: l.monthly_payment, currency: l.currency, day: l.payment_day,
               type: 'kredi', source: 'loan', sourceId: l.id,
               days: 0, paid: false, overdue: true,
+              paidAmount: sumOf(recs), payRecords: recs,
               monthLabel: pmLabel, periodYear: pm.year, periodMonth: pm.month,
             })
           }
@@ -251,13 +268,14 @@ export default function Dashboard() {
           if (createdAt && createdAt > monthEnd) return false
           return true
         }).forEach(r => {
-          const wasPaid = pastPaidList.some(p => p.expense_id === r.id)
-          if (!wasPaid) {
+          const recs = toRecords(pastPaidList.filter((p: any) => p.expense_id === r.id))
+          if (!isSettled(recs, r.amount)) {
             pastItems.push({
               id: `past_exp_${r.id}_${pm.year}_${pm.month}`,
               name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!,
               type: r.category, source: 'recurring', sourceId: r.id,
               days: 0, paid: false, overdue: true,
+              paidAmount: sumOf(recs), payRecords: recs,
               monthLabel: pmLabel, periodYear: pm.year, periodMonth: pm.month,
             })
           }
@@ -484,9 +502,11 @@ export default function Dashboard() {
   const paidPayments = payments.filter(p => p.paid)
   const overduePayments = payments.filter(p => p.overdue)
   const totalObligation = payments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
-  const paidTotal = paidPayments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
-  const remainingTotal = unpaidPayments.reduce((s, p) => s + toTry(p.amount, p.currency), 0)
-  const paidPct = totalObligation > 0 ? Math.round((paidTotal / totalObligation) * 100) : 0
+  // Kısmi ödemeler de sayılır: ödenen = her kalemde o ana kadar ödenen toplam,
+  // kalan = tutar eksi ödenen (hiçbiri eksiye düşmez)
+  const paidTotal = payments.reduce((s, p) => s + toTry(p.paidAmount, p.currency), 0)
+  const remainingTotal = payments.reduce((s, p) => s + toTry(Math.max(0, p.amount - p.paidAmount), p.currency), 0)
+  const paidPct = totalObligation > 0 ? Math.min(100, Math.round((paidTotal / totalObligation) * 100)) : 0
 
   // Gerçek veri: son 6 ayın ödenen toplamları (demo/ilk yüklemede bu ayın yükümlülüğü gösterilir)
   const chartData = monthlySpend.length > 0
@@ -501,6 +521,9 @@ export default function Dashboard() {
   const [payModal, setPayModal] = useState<PaymentItem | null>(null)
   const [payAccountId, setPayAccountId] = useState<number | null>(null)
   const [payMethod, setPayMethod] = useState<'hesap' | 'kredi_karti' | 'nakit'>('hesap')
+  // Ödeme tutarı düzenlenebilir — kalan tutardan azı girilirse kısmi ödeme olur
+  const [payAmount, setPayAmount] = useState('')
+  const [deletingRecId, setDeletingRecId] = useState<number | null>(null)
   const [payCardId, setPayCardId] = useState<number | null>(null)
   const [paying, setPaying] = useState(false)
   const [undoConfirm, setUndoConfirm] = useState<PaymentItem | null>(null)
@@ -557,6 +580,12 @@ export default function Dashboard() {
     if (!payModal) return
     if (payMethod === 'hesap' && !payAccountId) return
     if (payMethod === 'kredi_karti' && !payCardId) return
+    // Kısmi ödeme: modalda girilen tutar esas alınır, boşsa kalan tutar
+    const payAmt = (() => {
+      const v = parseFloat(payAmount.replace(',', '.'))
+      return isNaN(v) || v <= 0 ? Math.max(0, payModal.amount - payModal.paidAmount) : v
+    })()
+    if (payAmt <= 0) return
     setPaying(true)
     if (!isDemo) {
       const year = payModal.periodYear ?? now.getFullYear()
@@ -571,9 +600,9 @@ export default function Dashboard() {
       if (payMethod === 'hesap' && payAccountId) {
         payAccount = accounts.find(a => a.id === payAccountId)
         if (payAccount) {
-          deduct = payModal.amount
+          deduct = payAmt
           if (payModal.currency !== payAccount.currency) {
-            const tryAmt = toTry(payModal.amount, payModal.currency)
+            const tryAmt = toTry(payAmt, payModal.currency)
             deduct = payAccount.currency === 'EUR' ? tryAmt / eurTry : payAccount.currency === 'USD' ? tryAmt / usdTry : tryAmt
           }
         }
@@ -599,7 +628,7 @@ export default function Dashboard() {
         const { error } = await insertPayment({
           expense_id: isCC ? null : payModal.sourceId,
           notes: isCC ? `cc_${payModal.sourceId}` : (paymentNotes || null),
-          period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today,
+          period_year: year, period_month: month, amount: payAmt, is_paid: true, paid_date: today,
           ...(userId ? { user_id: userId } : {})
         })
         if (error) { alert('Hata: ' + error.message); setPaying(false); return }
@@ -615,11 +644,11 @@ export default function Dashboard() {
         // Krediyle bağ HEM loan_id kolonuna HEM de notes'a ("loan_<id>|nakit")
         // yazılır. Yöntem bilgisi ikinci parçada durur; böylece nakit/kart ile
         // ödenen taksit de eşleşir ve kolon olmayan kurulumlarda kaybolmaz.
-        const { error } = await insertPayment({ expense_id: null, loan_id: payModal.sourceId, notes: loanNote(payModal.sourceId, paymentNotes), period_year: year, period_month: month, amount: payModal.amount, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) })
+        const { error } = await insertPayment({ expense_id: null, loan_id: payModal.sourceId, notes: loanNote(payModal.sourceId, paymentNotes), period_year: year, period_month: month, amount: payAmt, is_paid: true, paid_date: today, ...(userId ? { user_id: userId } : {}) })
         if (error) { alert('Hata: ' + error.message); setPaying(false); return }
         const loan = loans.find(l => l.id === payModal.sourceId)
         if (loan) {
-          const { error: loanErr } = await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payModal.amount) }).eq('id', payModal.sourceId)
+          const { error: loanErr } = await supabase.from('loans').update({ paid_installments: loan.paid_installments + 1, remaining_amount: Math.max(0, (loan.remaining_amount || 0) - payAmt) }).eq('id', payModal.sourceId)
           if (loanErr) alert('Uyarı: Kredi taksit bilgisi güncellenemedi: ' + loanErr.message)
         }
       }
@@ -635,11 +664,11 @@ export default function Dashboard() {
         const stmtMonth = month, stmtYear = year
         const { data: existingStmt } = await supabase.from('credit_card_statements').select('*').eq('card_id', payCardId).eq('period_year', stmtYear).eq('period_month', stmtMonth)
         if (existingStmt && existingStmt.length > 0) {
-          await supabase.from('credit_card_transactions').insert({ card_id: payCardId, statement_id: existingStmt[0].id, transaction_date: today, description: payModal.name, category: payModal.type, amount: payModal.amount, currency: payModal.currency, ...(userId ? { user_id: userId } : {}) })
-          await supabase.from('credit_card_statements').update({ total_amount: (existingStmt[0].total_amount || 0) + payModal.amount }).eq('id', existingStmt[0].id)
+          await supabase.from('credit_card_transactions').insert({ card_id: payCardId, statement_id: existingStmt[0].id, transaction_date: today, description: payModal.name, category: payModal.type, amount: payAmt, currency: payModal.currency, ...(userId ? { user_id: userId } : {}) })
+          await supabase.from('credit_card_statements').update({ total_amount: (existingStmt[0].total_amount || 0) + payAmt }).eq('id', existingStmt[0].id)
         } else {
-          const { data: newStmt } = await supabase.from('credit_card_statements').insert({ card_id: payCardId, period_year: stmtYear, period_month: stmtMonth, total_amount: payModal.amount, minimum_payment: 0, is_paid: false, ...(userId ? { user_id: userId } : {}) }).select().single()
-          if (newStmt) await supabase.from('credit_card_transactions').insert({ card_id: payCardId, statement_id: newStmt.id, transaction_date: today, description: payModal.name, category: payModal.type, amount: payModal.amount, currency: payModal.currency, ...(userId ? { user_id: userId } : {}) })
+          const { data: newStmt } = await supabase.from('credit_card_statements').insert({ card_id: payCardId, period_year: stmtYear, period_month: stmtMonth, total_amount: payAmt, minimum_payment: 0, is_paid: false, ...(userId ? { user_id: userId } : {}) }).select().single()
+          if (newStmt) await supabase.from('credit_card_transactions').insert({ card_id: payCardId, statement_id: newStmt.id, transaction_date: today, description: payModal.name, category: payModal.type, amount: payAmt, currency: payModal.currency, ...(userId ? { user_id: userId } : {}) })
         }
       }
       // nakit: no account deduction, just record the payment
@@ -648,10 +677,54 @@ export default function Dashboard() {
     // ödemesi mevcut ayın satırını yanlışlıkla "ödendi" yapmasın
     const isCurrentPeriod = !payModal.periodYear || (payModal.periodYear === now.getFullYear() && payModal.periodMonth === now.getMonth() + 1)
     if (isCurrentPeriod) {
-      setPayments(prev => prev.map(p => p.source === payModal.source && p.sourceId === payModal.sourceId ? { ...p, paid: true, overdue: false } : p))
+      setPayments(prev => prev.map(p => {
+        if (p.source !== payModal.source || p.sourceId !== payModal.sourceId) return p
+        // Kısmi ödemede satır "ödendi"ye atlamamalı — yalnızca ödenen artar
+        const paidAmount = p.paidAmount + payAmt
+        const paid = p.amount > 0 ? paidAmount >= p.amount - 0.01 : true
+        return { ...p, paidAmount, paid, overdue: paid ? false : p.overdue }
+      }))
     }
-    setPaying(false); setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null)
+    setPaying(false); setPayModal(null); setPayAmount(''); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null)
     if (!isDemo) reloadAll()
+  }
+
+  // notes alanındaki yöntem bilgisini okunur etikete çevirir
+  // ('nakit' · 'kk_3' · 'loan_5|nakit' · 'cc_2' · null)
+  function methodLabel(notes?: string | null): string {
+    const n = (notes || '').split('|').pop() || ''
+    if (n === 'nakit') return '· Nakit'
+    if (n.startsWith('kk_')) return '· Kredi kartı'
+    return ''
+  }
+
+  // Tek bir ödeme hareketini sil (kısmi ödemelerde tümünü geri almadan)
+  async function handleDeleteRecord(recordId: number) {
+    if (!payModal) return
+    setDeletingRecId(recordId)
+    const { data: rec } = await supabase.from('recurring_payments').select('*').eq('id', recordId).single()
+    if (rec) {
+      // Hesaptan ödenmişse tutarı iade et
+      if (rec.account_id && rec.account_amount) {
+        const { data: acc } = await supabase.from('accounts').select('id, balance').eq('id', rec.account_id).single()
+        if (acc) await supabase.from('accounts').update({ balance: (acc.balance || 0) + rec.account_amount }).eq('id', acc.id)
+      }
+      // Kredi taksidiyse ödenen taksit sayacını geri al
+      if (payModal.source === 'loan') {
+        const loan = loans.find(l => l.id === payModal.sourceId)
+        if (loan) {
+          await supabase.from('loans').update({
+            paid_installments: Math.max(0, loan.paid_installments - 1),
+            remaining_amount: (loan.remaining_amount || 0) + (rec.amount || 0),
+          }).eq('id', loan.id)
+        }
+      }
+      const { error } = await supabase.from('recurring_payments').delete().eq('id', recordId)
+      if (error) { alert('Hata: ' + error.message); setDeletingRecId(null); return }
+    }
+    setDeletingRecId(null)
+    setPayModal(null); setPayAmount('')
+    await reloadAll()
   }
 
   async function handleUndo() {
@@ -721,6 +794,8 @@ export default function Dashboard() {
 
     const isLoan = p.source === 'loan'
     const isCC = p.type === 'kredi_karti'
+    // Kısmi ödeme: bir şeyler ödenmiş ama tutar kapanmamış
+    const isPartial = !p.paid && p.paidAmount > 0
     // Tüm satırlar aynı biçimde: çerçeve/zemin farkı listeyi okunmaz yapıyordu.
     // Vurgu artık yalnızca ikon ve tutar renginden geliyor.
     const isHighlight = isLoan
@@ -732,9 +807,14 @@ export default function Dashboard() {
         </div>
         <div className="tx-info">
           <div className="tx-name" style={{ textDecoration: p.paid ? 'line-through' : 'none', fontWeight: isHighlight ? 700 : undefined }}>{p.name}</div>
-          <div className="tx-detail" style={{ color: statusColor }}>
+          <div className="tx-detail" style={{ color: isPartial ? '#e5a000' : statusColor }}>
             {p.paid ? 'Ödendi' : (() => {
               const dateStr = `${p.day} ${selMonthShort}`
+              // Kısmi ödeme: ne kadarı ödendi, ne kadarı kaldı
+              if (isPartial) {
+                const kalan = fmt(Math.max(0, p.amount - p.paidAmount), p.currency)
+                return `${fmt(p.paidAmount, p.currency)} ödendi · kalan ${kalan}`
+              }
               if (p.overdue) return `Gecikti · ${dateStr}`
               // "3 gün sonra / Bugün" yalnızca içinde olunan ay için anlamlı.
               // Başka bir aya bakarken days = 0 olduğundan her satır "Bugün"
@@ -763,7 +843,7 @@ export default function Dashboard() {
             </button>
           )}
           {isCurrent && !p.paid && (
-            <button onClick={() => { setPayModal(p); setPayAccountId(defaultAccountId()); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
+            <button onClick={() => { setPayModal(p); setPayAmount(String(Math.max(0, p.amount - p.paidAmount))); setPayAccountId(defaultAccountId()); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
               className="tx-badge" style={{ background: p.overdue ? 'rgba(229,160,0,0.08)' : 'rgba(43,45,110,0.06)', color: p.overdue ? '#e5a000' : '#2b2d6e', border: 'none', cursor: 'pointer' }}>
               {p.overdue ? 'Onayla' : 'Öde'}
             </button>
@@ -1277,7 +1357,7 @@ export default function Dashboard() {
                             </div>
                             <div className="tx-amount">
                               <div className="tx-value" style={{ color: '#dc2626' }}>{fmt(p.amount, p.currency)}</div>
-                              <button onClick={() => { setPayModal(p); setPayAccountId(defaultAccountId()); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
+                              <button onClick={() => { setPayModal(p); setPayAmount(String(Math.max(0, p.amount - p.paidAmount))); setPayAccountId(defaultAccountId()); setPayMethod('hesap'); setPayCardId(creditCards[0]?.id || null) }}
                                 className="tx-badge" style={{ background: 'rgba(229,160,0,0.12)', color: '#e5a000', border: 'none', cursor: 'pointer' }}>
                                 Öde
                               </button>
@@ -1378,12 +1458,62 @@ export default function Dashboard() {
         {/* ===== PAY MODAL ===== */}
         {payModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(30,31,84,0.5)' }}
-            onClick={e => { if (e.target === e.currentTarget) { setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) } }}>
+            onClick={e => { if (e.target === e.currentTarget) { setPayModal(null); setPayAmount(''); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) } }}>
             <div className="glass p-6 w-full max-w-sm scale-in">
               <div className="text-base font-bold mb-1">{payModal.overdue ? 'Geçmiş Ödemeyi Onayla' : 'Ödeme Yap'}</div>
               <div className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text)' }}>{payModal.name}</span>
                 <span className="mono ml-2 font-bold">{fmt(payModal.amount, payModal.currency)}</span>
+                {payModal.paidAmount > 0 && (
+                  <span className="mono ml-2 text-[12px]" style={{ color: '#e5a000' }}>
+                    · {fmt(payModal.paidAmount, payModal.currency)} ödendi
+                  </span>
+                )}
+              </div>
+
+              {/* O aya ait ödeme hareketleri — muhasebe defteri gibi */}
+              {payModal.payRecords.length > 0 && (
+                <div className="mb-4 rounded-xl p-3" style={{ background: 'var(--bg4)' }}>
+                  <div className="text-[10px] uppercase tracking-wide font-semibold mb-2" style={{ color: 'var(--muted)' }}>
+                    Bu ayki ödemeler
+                  </div>
+                  {payModal.payRecords.map(rec => (
+                    <div key={rec.id} className="flex items-center gap-2 py-1">
+                      <span className="text-[11px] flex-1" style={{ color: 'var(--muted)' }}>
+                        {rec.date ? new Date(rec.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }) : '—'}
+                        {rec.notes && <span className="ml-1.5">{methodLabel(rec.notes)}</span>}
+                      </span>
+                      <span className="mono text-[12px] font-semibold" style={{ color: '#30a46c' }}>
+                        {fmt(rec.amount, payModal.currency)}
+                      </span>
+                      <button onClick={() => handleDeleteRecord(rec.id)} disabled={deletingRecId === rec.id}
+                        aria-label="Bu ödemeyi sil"
+                        className="flex items-center justify-center" style={{ width: 20, height: 20, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 0 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                          <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between pt-1.5 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--muted)' }}>Kalan</span>
+                    <span className="mono text-[12px] font-bold" style={{ color: '#e5484d' }}>
+                      {fmt(Math.max(0, payModal.amount - payModal.paidAmount), payModal.currency)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Tutar — kalandan azı girilirse kısmi ödeme olarak kaydedilir */}
+              <div className="mb-4">
+                <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>
+                  Ödenen tutar
+                </label>
+                <input value={payAmount} onChange={e => setPayAmount(e.target.value)} inputMode="decimal"
+                  className="input mono font-semibold" />
+                <div className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>
+                  Kalandan az girersen kısmi ödeme olarak kaydedilir, kalem listede kalmaya devam eder.
+                </div>
               </div>
 
               {/* Payment method tabs */}
@@ -1441,7 +1571,7 @@ export default function Dashboard() {
               )}
 
               <div className="flex gap-3">
-                <button onClick={() => { setPayModal(null); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) }} className="btn-outline flex-1 py-3 text-sm">İptal</button>
+                <button onClick={() => { setPayModal(null); setPayAmount(''); setPayAccountId(null); setPayMethod('hesap'); setPayCardId(null) }} className="btn-outline flex-1 py-3 text-sm">İptal</button>
                 <button onClick={handlePay}
                   disabled={paying || (payMethod === 'hesap' && !payAccountId) || (payMethod === 'kredi_karti' && !payCardId)}
                   className="btn-primary flex-1 py-3 text-sm">{paying ? 'Kaydediliyor...' : 'Onayla'}</button>
