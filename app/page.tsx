@@ -316,6 +316,21 @@ export default function Dashboard() {
 
   const cashTry = accounts.reduce((s, a) => s + toTry(a.balance, a.currency), 0)
   const alacakTry = allAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+
+  // Vadesi geçmiş ya da 14 gün içinde dolacak tek seferlik alacaklar.
+  // Giderlerdeki "Geçmiş Ödenmemiş" bölümünün alacak tarafındaki karşılığı.
+  const alacakAlerts = useMemo(() => {
+    const bugun = new Date(); bugun.setHours(0, 0, 0, 0)
+    return allAlacak
+      .filter(d => !d.is_recurring && d.due_date && !d.is_settled)
+      .map(d => {
+        const vade = new Date(d.due_date!); vade.setHours(0, 0, 0, 0)
+        const fark = Math.round((vade.getTime() - bugun.getTime()) / 86400000)
+        return { ...d, gecikti: fark < 0, gunFarki: Math.abs(fark), siraFark: fark }
+      })
+      .filter(d => d.siraFark <= 14)
+      .sort((a, b) => a.siraFark - b.siraFark)
+  }, [allAlacak])
   const allInvestTry = hisseTry + fonTry + kriptoTry
   const totalAssetsTry = cashTry + (allInvestTry > 0 ? allInvestTry : investTotalTry) + alacakTry
   const tryTotal = accounts.filter(a => a.currency === 'TRY').reduce((s, a) => s + a.balance, 0)
@@ -524,6 +539,23 @@ export default function Dashboard() {
   // Ödeme tutarı düzenlenebilir — kalan tutardan azı girilirse kısmi ödeme olur
   const [payAmount, setPayAmount] = useState('')
   const [deletingRecId, setDeletingRecId] = useState<number | null>(null)
+  // Alacak erteleme: vade tarihini ileri taşır, eski vadeyi nota yazar
+  const [erteleModal, setErteleModal] = useState<any | null>(null)
+  const [erteleDate, setErteleDate] = useState('')
+  const [erteleSaving, setErteleSaving] = useState(false)
+
+  async function handleErtele() {
+    if (!erteleModal || !erteleDate) return
+    setErteleSaving(true)
+    const eski = erteleModal.due_date
+    const not = `${erteleModal.notes ? erteleModal.notes + ' · ' : ''}${eski} tarihinden ${erteleDate}'e ertelendi`
+    const { error } = await supabase.from('debt_records')
+      .update({ due_date: erteleDate, notes: not }).eq('id', erteleModal.id)
+    setErteleSaving(false)
+    if (error) { alert('Hata: ' + error.message); return }
+    setErteleModal(null); setErteleDate('')
+    await reloadAll()
+  }
   const [payCardId, setPayCardId] = useState<number | null>(null)
   const [paying, setPaying] = useState(false)
   const [undoConfirm, setUndoConfirm] = useState<PaymentItem | null>(null)
@@ -1321,6 +1353,50 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* ===== BEKLEYEN ALACAKLAR (vadesi geçmiş / yaklaşan) ===== */}
+        {isCurrent && alacakAlerts.length > 0 && (
+          <div className="mx-4 mb-3 mt-1">
+            <div className="flex items-center gap-2 mb-2.5 px-1">
+              <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #30a46c, #6366f1)' }} />
+              <span className="text-xs font-bold px-2" style={{ color: '#30a46c', whiteSpace: 'nowrap' }}>Bekleyen Alacaklar</span>
+              <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #6366f1, #30a46c)' }} />
+            </div>
+            <div className="tx-list">
+              {alacakAlerts.map(a => (
+                <div key={a.id} className="tx-item"
+                  style={{ borderLeft: `3px solid ${a.gecikti ? '#dc2626' : '#30a46c'}` }}>
+                  <div className="tx-icon">
+                    {getCatIcon('alacak', { color: a.gecikti ? '#dc2626' : '#30a46c', size: 20 })}
+                  </div>
+                  <div className="tx-info">
+                    <div className="tx-name">{a.person_name}</div>
+                    <div className="tx-detail" style={{ color: a.gecikti ? '#dc2626' : '#30a46c' }}>
+                      {a.gecikti ? `${a.gunFarki} gün gecikti` : daysUntilLabel(a.gunFarki)}
+                      {a.description ? ` · ${a.description}` : ''}
+                    </div>
+                  </div>
+                  <div className="tx-amount">
+                    <div className="tx-value" style={{ color: a.gecikti ? '#dc2626' : '#30a46c' }}>
+                      {fmt(a.amount, a.currency)}
+                    </div>
+                    <div className="flex gap-1 justify-end mt-0.5">
+                      <button onClick={() => setErteleModal(a)}
+                        className="tx-badge" style={{ background: 'rgba(229,160,0,0.12)', color: '#e5a000', border: 'none', cursor: 'pointer' }}>
+                        Ertele
+                      </button>
+                      <a href="/debts" className="tx-badge"
+                        style={{ background: 'rgba(48,164,108,0.12)', color: '#30a46c', textDecoration: 'none' }}>
+                        Tahsil
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mx-1 mt-3" style={{ height: 1, background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
+          </div>
+        )}
+
         {/* ===== PAYMENT LIST ===== */}
         <div style={{ opacity: monthLoading ? 0.5 : 1 }}>
           {/* Past Unpaid Payments (only shown for current month) */}
@@ -1454,6 +1530,36 @@ export default function Dashboard() {
             )
           })()}
         </div>
+
+        {/* ===== ALACAK ERTELEME MODALI ===== */}
+        {erteleModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(30,31,84,0.5)' }}
+            onClick={e => { if (e.target === e.currentTarget) { setErteleModal(null); setErteleDate('') } }}>
+            <div className="glass p-6 w-full max-w-sm scale-in">
+              <div className="text-base font-bold mb-1">Alacağı Ertele</div>
+              <div className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text)' }}>{erteleModal.person_name}</span>
+                <span className="mono ml-2 font-bold">{fmt(erteleModal.amount, erteleModal.currency)}</span>
+                <div className="text-[11px] mt-1">
+                  Mevcut vade: {new Date(erteleModal.due_date).toLocaleDateString('tr-TR')}
+                </div>
+              </div>
+              <label className="text-[11px] uppercase tracking-wide mb-1.5 block font-medium" style={{ color: 'var(--muted)' }}>
+                Yeni vade
+              </label>
+              <input type="date" value={erteleDate} onChange={e => setErteleDate(e.target.value)} className="input mb-2" />
+              <div className="text-[10px] mb-4" style={{ color: 'var(--muted)' }}>
+                Eski vade nota yazılır, böylece kaç kez ertelendiği kayıtta kalır.
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => { setErteleModal(null); setErteleDate('') }} className="btn-outline flex-1 py-3 text-sm">İptal</button>
+                <button onClick={handleErtele} disabled={erteleSaving || !erteleDate} className="btn-primary flex-1 py-3 text-sm">
+                  {erteleSaving ? 'Kaydediliyor...' : 'Ertele'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ===== PAY MODAL ===== */}
         {payModal && (
