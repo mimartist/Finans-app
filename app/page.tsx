@@ -90,6 +90,9 @@ export default function Dashboard() {
   // Son 6 ayın gerçekleşen (ödenen) gider toplamları — grafik için
   const [monthlySpend, setMonthlySpend] = useState<{ name: string; tutar: number }[]>([])
   const [allAlacak, setAllAlacak] = useState<DebtRecord[]>([])
+  // Gerçekleşen tahsilatlar (debt_transactions) — yalnızca gösterim için;
+  // projeksiyona girmez, o para zaten hesap bakiyesinde
+  const [tahsilatlar, setTahsilatlar] = useState<any[]>([])
   const [kriptoTry, setKriptoTry] = useState(0)
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(currentMonth)
   const [monthLoading, setMonthLoading] = useState(false)
@@ -111,7 +114,7 @@ export default function Dashboard() {
       setAllAlacak([]); setRates(MOCK_RATES); setInvestTotalTry(85000); setHisseTry(52000); setFonTry(33000); setKriptoTry(22000)
       return { accs: MOCK_ACCOUNTS, lnsList: MOCK_LOANS, recList: MOCK_RECURRING }
     }
-    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: recAlacak }, { data: cryptoSnaps }, { data: crds }, { data: invs }] = await Promise.all([
+    const [{ data: acc }, { data: lns }, { data: rec }, { data: rt }, { data: snaps }, { data: recAlacak }, { data: cryptoSnaps }, { data: crds }, { data: invs }, tahs] = await Promise.all([
       supabase.from('accounts').select('*').eq('is_active', true),
       supabase.from('loans').select('*').eq('is_active', true),
       supabase.from('recurring_expenses').select('*').eq('is_active', true).order('payment_day'),
@@ -121,9 +124,12 @@ export default function Dashboard() {
       supabase.from('investment_snapshots').select('*, investments!inner(platform, type, is_active)').eq('investments.is_active', true).in('investments.platform', ['Binance']).order('snapshot_date', { ascending: false }),
       supabase.from('credit_cards').select('*').eq('is_active', true),
       supabase.from('investments').select('*').eq('is_active', true),
+      // Gerçekleşen tahsilatlar — beklenen gelirden ayrı gösterilir
+      supabase.from('debt_transactions').select('*, debt_records(person_name, description)').eq('type', 'tahsilat'),
     ])
     const ratesData = rt?.[0] || null
     setAccounts(acc || []); setLoans(lns || []); setRecurring(rec || []); setAllAlacak(recAlacak || []); setRates(ratesData); setCreditCards(crds || [])
+    setTahsilatlar(tahs?.data || [])
     const seen = new Set<number>()
     const latestSnaps = (snaps || []).filter((sn: any) => { if (seen.has(sn.investment_id)) return false; seen.add(sn.investment_id); return true })
     const snapMap = new Map<number, number>()
@@ -1523,7 +1529,15 @@ export default function Dashboard() {
           {/* ===== BU AYIN GELİRLERİ ===== */}
           {(() => {
             const incomes = incomeItemsForMonth(selectedMonth.year, selectedMonth.month)
-            if (incomes.length === 0) return null
+            // Seçili ayda GERÇEKLEŞEN tahsilatlar. Beklenen gelirden ayrı tutulur:
+            // bu para hesaba girdi, projeksiyona gelir olarak eklenmez.
+            const gelenler = tahsilatlar.filter(t => {
+              if (!t.transaction_date) return false
+              const d = new Date(t.transaction_date)
+              return d.getFullYear() === selectedMonth.year && d.getMonth() + 1 === selectedMonth.month
+            })
+            const totalGelen = gelenler.reduce((s, t) => s + toTry(t.amount || 0, t.currency || 'TRY'), 0)
+            if (incomes.length === 0 && gelenler.length === 0) return null
             const totalIncome = incomes.reduce((s, i) => s + toTry(i.amount, i.currency), 0)
             const monthOut = monthlyObligation(selectedMonth.year, selectedMonth.month)
               + oneTimeForMonth(selectedMonth.year, selectedMonth.month)
@@ -1537,6 +1551,50 @@ export default function Dashboard() {
                   <span className="text-xs font-bold" style={{ color: '#30a46c' }}>Gelirler</span>
                   <span className="mono text-[11px] font-bold" style={{ color: '#30a46c' }}>+{fmt(totalIncome)}</span>
                 </div>
+                {/* Gerçekleşen tahsilatlar — hesaba fiilen giren para */}
+                {gelenler.length > 0 && (
+                  <>
+                    <div className="flex items-center justify-between mx-5 mb-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+                        Tahsil edildi
+                      </span>
+                      <span className="mono text-[10px] font-bold" style={{ color: '#30a46c' }}>+{fmt(totalGelen)}</span>
+                    </div>
+                    <div className="tx-list mx-4 mb-3">
+                      {gelenler.map(t => (
+                        <div key={`th_${t.id}`} className="tx-item">
+                          <div className="tx-icon" style={{ background: 'rgba(48,164,108,0.08)' }}>
+                            <IconCheck color="#30a46c" size={18} strokeWidth={2.5} />
+                          </div>
+                          <div className="tx-info">
+                            <div className="tx-name">
+                              {t.debt_records?.person_name || 'Tahsilat'}
+                              {t.debt_records?.description ? ` · ${t.debt_records.description}` : ''}
+                            </div>
+                            <div className="tx-detail" style={{ color: '#30a46c' }}>
+                              Tahsil edildi · {new Date(t.transaction_date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
+                              {t.notes ? ` · ${t.notes}` : ''}
+                            </div>
+                          </div>
+                          <div className="tx-amount">
+                            <div className="tx-value" style={{ color: '#30a46c' }}>+{fmt(t.amount, t.currency || 'TRY')}</div>
+                            {(t.currency || 'TRY') !== 'TRY' && (
+                              <div className="mono text-[10px]" style={{ color: 'var(--muted)' }}>{fmt(toTry(t.amount, t.currency))}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {incomes.length > 0 && (
+                  <div className="flex items-center justify-between mx-5 mb-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+                      Beklenen
+                    </span>
+                  </div>
+                )}
                 <div className="tx-list mx-4 mb-3">
                   {incomes.map(inc => (
                     <div key={inc.id} className="tx-item">
