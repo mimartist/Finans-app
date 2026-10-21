@@ -452,6 +452,8 @@ export default function Dashboard() {
   const [simStopaj, setSimStopaj] = useState('15')  // stopaj (%)
   const [simExtra, setSimExtra] = useState('0')     // aylık ek gelir (₺)
   const [simInflation, setSimInflation] = useState('0') // yıllık gider artışı (%)
+  // Hisse ve fonlar da gerektiğinde bozulabilir — varsayılan olarak dahil
+  const [simWithInvest, setSimWithInvest] = useState(true)
 
   const num = (s: string) => { const v = parseFloat(s.replace(',', '.')); return isNaN(v) ? 0 : v }
   const defaultNetRate = grossDepositRate * (1 - num(simStopaj) / 100)
@@ -459,11 +461,20 @@ export default function Dashboard() {
 
   const SIM_MAX_MONTHS = 360 // 30 yıl — bundan sonrası "tükenmiyor" sayılır
 
+  // Vadeli hesaplardaki tutar faiz işler; vadesiz TL/döviz ve yatırımlar işlemez.
+  // Harcama sırası: önce faiz getirmeyenler, mevduat en son kırılır.
+  const depositTry = useMemo(() =>
+    accounts.filter(a => a.type === 'vadeli').reduce((s, a) => s + toTry(a.balance, a.currency), 0)
+  , [accounts, eurTry, usdTry]) // eslint-disable-line
+  const investTry = allInvestTry > 0 ? allInvestTry : investTotalTry
+
   const runSim = useCallback((annualNetPct: number) => {
     const monthlyRate = annualNetPct / 100 / 12
     const infl = num(simInflation) / 100
     const extra = num(simExtra)
-    let balance = cashTry
+    // Faiz işlemeyen kova: vadesiz hesaplar (+ istenirse hisse/fon)
+    let idle = Math.max(0, cashTry - depositTry) + (simWithInvest ? investTry : 0)
+    let deposit = depositTry
     let interestTotal = 0
     const marks: { m: MonthKey; balance: number; interestYear: number }[] = []
     let interestYear = 0
@@ -473,10 +484,20 @@ export default function Dashboard() {
       const growth = Math.pow(1 + infl, i / 12)
       const out = (monthlyObligation(m.year, m.month) + oneTimeForMonth(m.year, m.month)) * growth
       const income = incomeExDeposit(m.year, m.month) + extra
-      const interest = balance > 0 ? balance * monthlyRate : 0
+      const interest = deposit > 0 ? deposit * monthlyRate : 0
+      deposit += interest
       interestTotal += interest
       interestYear += interest
-      balance = balance + interest + income - out
+
+      const net = income - out
+      if (net >= 0) idle += net
+      else {
+        let need = -net
+        const fromIdle = Math.min(idle, need)
+        idle -= fromIdle; need -= fromIdle
+        deposit -= need            // nakit bitince mevduat kırılır
+      }
+      const balance = idle + deposit
 
       if (balance <= 0) {
         marks.push({ m, balance: 0, interestYear })
@@ -487,8 +508,8 @@ export default function Dashboard() {
         interestYear = 0
       }
     }
-    return { months: null, endMonth: null, marks, interestTotal, finalBalance: balance }
-  }, [cashTry, currentMonth, monthlyObligation, oneTimeForMonth, incomeExDeposit, simInflation, simExtra]) // eslint-disable-line
+    return { months: null, endMonth: null, marks, interestTotal, finalBalance: idle + deposit }
+  }, [cashTry, depositTry, investTry, simWithInvest, currentMonth, monthlyObligation, oneTimeForMonth, incomeExDeposit, simInflation, simExtra]) // eslint-disable-line
 
   const sim = useMemo(() => runSim(netRate), [runSim, netRate])
   const simNoInterest = useMemo(() => runSim(0), [runSim])
@@ -1207,10 +1228,27 @@ export default function Dashboard() {
           {simOpen && (
             <div className="px-4 pb-4">
               <div className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>
-                Tüm nakit ({projAmt(cashTry)}) vadede kalmaya devam eder, her ay faiz işler ve
-                giderler oradan karşılanır. 12 aylık projeksiyondan farkı: orada para yalnızca
-                erirken, burada çalışmaya devam eder. Vade sonu getirileri ayrıca gelir sayılmaz —
-                aylık faiz olarak zaten hesaba katılıyor.
+                Mevduattaki para ({projAmt(depositTry)}) faiz işlemeye devam eder; vadesiz
+                hesaplar ({projAmt(Math.max(0, cashTry - depositTry))}) ve varsa yatırımlar önce
+                harcanır, mevduat en son kırılır. 12 aylık projeksiyondan farkı: orada para
+                yalnızca erirken, burada çalışmaya devam eder. Vade sonu getirileri ayrıca
+                gelir sayılmaz — aylık faiz olarak zaten hesaba katılıyor.
+              </div>
+
+              {/* Hisse ve fonlar da gerektiğinde nakde çevrilebilir */}
+              <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                <input type="checkbox" checked={simWithInvest} onChange={e => setSimWithInvest(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: 'var(--primary)' }} />
+                <span className="text-[11px] font-semibold" style={{ color: 'var(--text)' }}>
+                  Yatırımları da dahil et
+                </span>
+                <span className="mono text-[11px]" style={{ color: 'var(--muted)' }}>
+                  +{projAmt(investTry)} hisse &amp; fon
+                </span>
+              </label>
+
+              <div className="text-[10px] mb-3 mono" style={{ color: 'var(--muted)' }}>
+                Başlangıç: {projAmt(cashTry + (simWithInvest ? investTry : 0))}
               </div>
 
               <div className="flex flex-wrap gap-2 mb-3">
