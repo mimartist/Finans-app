@@ -449,7 +449,9 @@ export default function Dashboard() {
 
   const [simOpen, setSimOpen] = useState(false)
   const [simRate, setSimRate] = useState('')        // net yıllık faiz (%) — boş = varsayılan
-  const [simStopaj, setSimStopaj] = useState('15')  // stopaj (%)
+  // Stopaj %17,5 — bankanın verdiği vade sonu rakamlarından doğrulandı
+  // (üç mevduatın üçü de 32 gün · 365 gün bazı · 0,825 net çarpanı)
+  const [simStopaj, setSimStopaj] = useState('17.5')
   const [simExtra, setSimExtra] = useState('0')     // aylık ek gelir (₺)
   const [simInflation, setSimInflation] = useState('0') // yıllık gider artışı (%)
   // Hisse ve fonlar da gerektiğinde bozulabilir — varsayılan olarak dahil
@@ -1255,7 +1257,7 @@ export default function Dashboard() {
                 {[
                   { label: 'Net yıllık faiz %', value: simRate === '' ? defaultNetRate.toFixed(1) : simRate, set: setSimRate,
                     hint: `brüt %${grossDepositRate.toFixed(1)} · stopaj %${simStopaj}` },
-                  { label: 'Stopaj %', value: simStopaj, set: setSimStopaj, hint: 'TRY mevduatta yasal kesinti' },
+                  { label: 'Stopaj %', value: simStopaj, set: setSimStopaj, hint: 'banka rakamlarından doğrulandı' },
                   { label: 'Aylık ek gelir ₺', value: simExtra, set: setSimExtra, hint: 'beklenen yeni iş vb.' },
                   { label: 'Yıllık gider artışı %', value: simInflation, set: setSimInflation, hint: 'enflasyon etkisi' },
                 ].map(f => (
