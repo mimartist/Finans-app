@@ -315,7 +315,13 @@ export default function Dashboard() {
   const toTry = (amount: number, currency: string) => currency === 'EUR' ? amount * eurTry : currency === 'USD' ? amount * usdTry : amount
 
   const cashTry = accounts.reduce((s, a) => s + toTry(a.balance, a.currency), 0)
-  const alacakTry = allAlacak.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+  // Varlık toplamına yalnızca TEK SEFERLİK alacaklar girer. Tekrarlayan
+  // alacaklar (maaş, kira yardımı) aylık gelirdir; bir aylık tutarlarını
+  // varlık saymak, para hesaba geçtiği anda aynı parayı iki kez saymak olur —
+  // gelir tarafında zaten projeksiyona ve simülasyona giriyorlar.
+  const alacakTry = allAlacak
+    .filter(d => !d.is_recurring)
+    .reduce((s, d) => s + toTry(d.amount, d.currency), 0)
 
   // Vadesi geçmiş ya da 14 gün içinde dolacak tek seferlik alacaklar.
   // Giderlerdeki "Geçmiş Ödenmemiş" bölümünün alacak tarafındaki karşılığı.
