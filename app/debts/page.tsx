@@ -10,6 +10,7 @@ const emptyForm = {
   person_name: '', type: 'alacak' as 'alacak' | 'verecek', amount: '', currency: 'TRY',
   description: '', transaction_date: '', due_date: '', notes: '',
   is_recurring: false, frequency: 'aylik', expected_day: '', total_amount: '', paid_amount: '',
+  vat_included: false,
 }
 
 function daysOverdue(due: string): number {
@@ -106,6 +107,7 @@ export default function DebtsPage() {
       expected_day: String(d.expected_day || ''),
       total_amount: String(d.total_amount || ''),
       paid_amount: String(d.paid_amount || ''),
+      vat_included: (d as any).vat_rate > 0,
     })
     setShowForm(true)
   }
@@ -124,6 +126,7 @@ export default function DebtsPage() {
       due_date: form.is_recurring ? null : (form.due_date || null),
       notes: form.notes || null,
       is_settled: false,
+      vat_rate: form.vat_included ? 20 : 0,
       is_recurring: form.is_recurring || false,
       frequency: form.is_recurring ? form.frequency : null,
       expected_day: form.is_recurring ? (parseInt(form.expected_day) || null) : null,
@@ -683,6 +686,13 @@ export default function DebtsPage() {
                   <label className="text-[11px] uppercase tracking-wide mb-1 block" style={{ color: 'var(--muted)' }}>Tutar (kalan)</label>
                   <input value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0" type="number" className="input mono" />
                 </div>
+
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={form.vat_included} onChange={e => set('vat_included', e.target.checked)} className="w-4 h-4 rounded accent-[#0d9488]" />
+                  <span style={{ color: 'var(--muted)' }}>
+                    Tutara KDV dahil <span className="text-[11px]">(%20)</span>
+                  </span>
+                </label>
 
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={form.is_recurring} onChange={e => set('is_recurring', e.target.checked)} className="w-4 h-4 rounded accent-[#0d9488]" />

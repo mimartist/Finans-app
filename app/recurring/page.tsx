@@ -8,7 +8,7 @@ import { getCatIcon } from '@/components/Icons'
 
 const emptyForm = {
   name: '', category: 'fatura', subcategory: '', amount: '', currency: 'TRY',
-  payment_day: '', is_variable: false, remind_days_before: '3',
+  payment_day: '', is_variable: false, vat_included: false, remind_days_before: '3',
   expense_type: 'recurring' as 'recurring' | 'one_time',
   expense_date: '', end_date: '',
 }
@@ -69,6 +69,7 @@ export default function RecurringPage() {
       name: e.name, category: e.category, subcategory: e.subcategory || '',
       amount: String(e.amount), currency: e.currency,
       payment_day: String(e.payment_day || ''), is_variable: e.is_variable,
+      vat_included: (e as any).vat_rate > 0,
       remind_days_before: String(e.remind_days_before || '3'),
       expense_type: e.expense_type || 'recurring',
       expense_date: e.expense_date || '',
@@ -85,6 +86,8 @@ export default function RecurringPage() {
       name: form.name, category: form.category, subcategory: form.subcategory || null,
       amount: parseFloat(form.amount) || 0, currency: form.currency,
       is_variable: form.is_variable, is_active: true,
+      // KDV'li işaretliyse tutar KDV dahil kabul edilir; kâr hesabında ayrıştırılır
+      vat_rate: form.vat_included ? 20 : 0,
       expense_type: form.expense_type,
       remind_days_before: parseInt(form.remind_days_before) || 3,
       ...(userId ? { user_id: userId } : {}),
@@ -388,6 +391,17 @@ export default function RecurringPage() {
                   <input type="checkbox" checked={form.is_variable} onChange={e => set('is_variable', e.target.checked)} className="w-4 h-4 rounded accent-[#0d9488]" />
                   <span style={{ color: 'var(--muted)' }}>Degisken tutar</span>
                 </label>
+
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={form.vat_included} onChange={e => set('vat_included', e.target.checked)} className="w-4 h-4 rounded accent-[#0d9488]" />
+                  <span style={{ color: 'var(--muted)' }}>
+                    Tutara KDV dahil <span className="text-[11px]">(%20)</span>
+                  </span>
+                </label>
+                <div className="text-[10px] -mt-1" style={{ color: 'var(--muted)' }}>
+                  Maaş, SGK, vergi gibi KDV'siz kalemlerde işaretleme. Proje kârı
+                  hesaplanırken KDV bu bilgiye göre ayrıştırılır.
+                </div>
               </div>
               {saveError && (
                 <div className="mt-3 p-2.5 rounded-lg text-[12px]" style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>{saveError}</div>

@@ -93,6 +93,10 @@ export default function ProjectsPage() {
           const marj = contractExcl > 0 ? (kar / contractExcl) * 100 : 0
           const tahsilPct = contractIncl > 0 ? Math.min(100, (p.collected / contractIncl) * 100) : 0
           const nakitDurum = p.collected - maliyetOdenen
+          // KDV: tahsil edilen üzerinden hesaplanan, faturalı maliyetlerden indirilecek
+          const kdvHesaplanan = contractIncl - contractExcl
+          const kdvIndirilecek = maliyetToplam - maliyetHaric
+          const kdvNet = kdvHesaplanan - kdvIndirilecek
 
           const rows: Row[] = [
             ...(p.collected > 0
@@ -156,17 +160,40 @@ export default function ProjectsPage() {
                   <div className="rounded-xl p-3 mb-3" style={{ background: 'var(--bg4)' }}>
                     {[
                       ['Sözleşme (KDV hariç)', fmt(Math.round(contractExcl)), 'var(--text)'],
-                      ['Tahsil edilen (dahil)', fmt(Math.round(p.collected)), '#30a46c'],
-                      ['Kalan alacak', fmt(Math.round(kalanAlacak)), '#e5a000'],
-                      ['Maliyet — ödenen', fmt(Math.round(maliyetOdenen)), '#e5484d'],
-                      ['Maliyet — bekleyen', fmt(Math.round(maliyetBekleyen)), 'var(--muted)'],
-                      ['Nakit durum', fmt(Math.round(nakitDurum)), nakitDurum >= 0 ? '#30a46c' : '#e5484d'],
+                      ['Maliyet (KDV hariç)', fmt(Math.round(maliyetHaric)), 'var(--text)'],
+                      ['Kâr (KDV hariç)', `${fmt(Math.round(kar))} · %${marj.toFixed(1)}`, kar >= 0 ? '#30a46c' : '#e5484d'],
                     ].map(([label, val, color]) => (
                       <div key={label} className="flex justify-between py-0.5">
                         <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{label}</span>
-                        <span className="mono text-[12px] font-semibold" style={{ color }}>{val}</span>
+                        <span className="mono text-[12px] font-bold" style={{ color }}>{val}</span>
                       </div>
                     ))}
+                    <div className="mt-1.5 pt-1.5" style={{ borderTop: '1px solid var(--border)' }}>
+                      {[
+                        ['Tahsil edilen (dahil)', fmt(Math.round(p.collected)), '#30a46c'],
+                        ['Kalan alacak', fmt(Math.round(kalanAlacak)), '#e5a000'],
+                        ['Maliyet — ödenen', fmt(Math.round(maliyetOdenen)), '#e5484d'],
+                        ['Maliyet — bekleyen', fmt(Math.round(maliyetBekleyen)), 'var(--muted)'],
+                        ['Nakit durum', fmt(Math.round(nakitDurum)), nakitDurum >= 0 ? '#30a46c' : '#e5484d'],
+                      ].map(([label, val, color]) => (
+                        <div key={label} className="flex justify-between py-0.5">
+                          <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{label}</span>
+                          <span className="mono text-[12px] font-semibold" style={{ color }}>{val}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-1.5 pt-1.5" style={{ borderTop: '1px solid var(--border)' }}>
+                      {[
+                        ['Hesaplanan KDV', fmt(Math.round(kdvHesaplanan))],
+                        ['İndirilecek KDV', fmt(Math.round(kdvIndirilecek))],
+                        ['Net ödenecek KDV', fmt(Math.round(kdvNet))],
+                      ].map(([label, val]) => (
+                        <div key={label} className="flex justify-between py-0.5">
+                          <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{label}</span>
+                          <span className="mono text-[11px]" style={{ color: 'var(--muted)' }}>{val}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="text-[10px] uppercase tracking-wide font-semibold mb-1.5" style={{ color: 'var(--muted)' }}>
