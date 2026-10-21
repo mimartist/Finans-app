@@ -713,7 +713,14 @@ export default function AccountsPage() {
 
         {/* ===== TAB: ALACAK / BORC ===== */}
         {tab === 'alacak' && (() => {
-          const totalAlacak = alacaklar.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+          // Varlık toplamına yalnızca tek seferlik alacaklar girer. Tekrarlayan
+          // alacaklar (maaş, kira yardımı) aylık gelirdir — bir aylık tutarını
+          // varlık saymak, para hesaba geçtiği anda aynı parayı iki kez saymak
+          // olur. Ana sayfa da aynı ayrımı yapıyor.
+          const tekSeferlik = alacaklar.filter(d => !d.is_recurring)
+          const tekrarlayan = alacaklar.filter(d => d.is_recurring)
+          const totalAlacak = tekSeferlik.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
+          const aylikGelir = tekrarlayan.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
           const totalVerecek = verecekler.reduce((s, d) => s + toTry(d.amount, d.currency), 0)
           const netBalance = totalAlacak - totalVerecek
           const overdueAlacak = alacaklar.filter(d => d.due_date && new Date(d.due_date) < new Date()).length
@@ -731,7 +738,7 @@ export default function AccountsPage() {
                   style={{ border: '1px solid rgba(134,239,172,0.25)', background: 'rgba(134,239,172,0.08)' }}>
                   <div className="text-[9px] font-medium" style={{ color: 'rgba(134,239,172,0.7)' }}>ALACAK</div>
                   <div className="mono text-[12px] font-bold mt-0.5" style={{ color: '#86efac' }}>{fmt(totalAlacak)}</div>
-                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{alacaklar.length} kişi</div>
+                  <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{tekSeferlik.length} kalem</div>
                 </div>
                 <div className="flex-1 rounded-2xl py-2.5 px-3 text-center"
                   style={{ border: '1px solid rgba(255,138,138,0.25)', background: 'rgba(255,138,138,0.08)' }}>
@@ -740,11 +747,18 @@ export default function AccountsPage() {
                   <div className="text-[8px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{verecekler.length} kişi</div>
                 </div>
               </div>
-              {(overdueAlacak > 0 || upcomingAlacak > 0) && (
+              {(overdueAlacak > 0 || upcomingAlacak > 0 || aylikGelir > 0) && (
                 <div className="text-[10px] mt-3 text-center" style={{ color: 'rgba(255,255,255,0.35)', position: 'relative', zIndex: 2 }}>
                   {overdueAlacak > 0 && <span style={{ color: 'rgba(255,138,138,0.7)' }}>{overdueAlacak} gecikmiş</span>}
                   {overdueAlacak > 0 && upcomingAlacak > 0 && ' · '}
                   {upcomingAlacak > 0 && <span>{upcomingAlacak} yaklaşan</span>}
+                  {/* Tekrarlayanlar varlık değil gelir — ayrı gösterilir */}
+                  {aylikGelir > 0 && (
+                    <>
+                      {(overdueAlacak > 0 || upcomingAlacak > 0) && ' · '}
+                      <span>ayrıca {fmt(aylikGelir)}/ay düzenli gelir</span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
