@@ -41,7 +41,7 @@ function NavBtn({ href, Icon, active }: { href: string; Icon: any; active: boole
 export default function BottomNav() {
   const pathname = usePathname()
   const [showQuickAdd, setShowQuickAdd] = useState(false)
-  const isAccountsActive = pathname === '/accounts' || pathname === '/investments' || pathname === '/debts'
+  const isAccountsActive = pathname === '/accounts' || pathname === '/investments' || pathname === '/debts' || pathname === '/projects'
 
   return (
     <>

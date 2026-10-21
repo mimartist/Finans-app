@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import { supabase, fmt, isDemo, localDateStr, depositGain, daysToMaturity } from '@/lib/supabase'
 import type { Account, ExchangeRate, DebtRecord, Investment } from '@/lib/supabase'
-import { IconWallet, IconTrendUp, IconArrowsExchange, IconPlus } from '@/components/Icons'
+import { IconWallet, IconTrendUp, IconArrowsExchange, IconPlus, IconBriefcase } from '@/components/Icons'
 
 type Tab = 'hesaplar' | 'yatırımlar' | 'alacak'
 
@@ -381,6 +381,13 @@ export default function AccountsPage() {
                 {t.label}
               </button>
             ))}
+            {/* Projeler ayrı sayfa — sekme satırında dursun ki akışta kaybolmasın */}
+            <a href="/projects"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[11px] font-semibold"
+              style={{ background: 'transparent', color: 'var(--muted)', textDecoration: 'none' }}>
+              <IconBriefcase color="var(--muted)" size={13} />
+              Projeler
+            </a>
           </div>
         </div>
 
