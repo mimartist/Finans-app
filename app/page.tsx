@@ -591,6 +591,18 @@ export default function Dashboard() {
   const remainingTotal = payments.reduce((s, p) => s + toTry(Math.max(0, p.amount - p.paidAmount), p.currency), 0)
   const paidPct = totalObligation > 0 ? Math.min(100, Math.round((paidTotal / totalObligation) * 100)) : 0
 
+  // Seçili ayın kasaya giren parası: beklenen gelirler + o ay fiilen yapılan
+  // tahsilatlar. Net, ayın kasada artıya mı eksiye mi kapandığını gösterir.
+  const ayTahsilat = tahsilatlar
+    .filter(t => {
+      if (!t.transaction_date) return false
+      const d = new Date(t.transaction_date)
+      return d.getFullYear() === selectedMonth.year && d.getMonth() + 1 === selectedMonth.month
+    })
+    .reduce((s2, t) => s2 + toTry(t.amount || 0, t.currency || 'TRY'), 0)
+  const ayGelir = incomeForMonth(selectedMonth.year, selectedMonth.month) + ayTahsilat
+  const ayNet = ayGelir - totalObligation
+
   // Gerçek veri: son 6 ayın ödenen toplamları (demo/ilk yüklemede bu ayın yükümlülüğü gösterilir)
   const chartData = monthlySpend.length > 0
     ? monthlySpend
@@ -1431,6 +1443,28 @@ export default function Dashboard() {
             <div className="flex-1" style={{ background: 'var(--glass-fill-soft)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Ödenen</div>
               <div className="mono text-lg font-extrabold mt-1 amt-green" style={{ letterSpacing: '-0.03em' }}>{fmt(paidTotal)}</div>
+            </div>
+          </div>
+
+          {/* Giren para ve ayın net durumu */}
+          <div className="flex gap-2.5 mb-2.5">
+            <div className="flex-1" style={{ background: 'var(--glass-fill-soft)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
+              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#30a46c' }}>Giren</div>
+              <div className="mono text-lg font-extrabold mt-1 amt-green" style={{ letterSpacing: '-0.03em' }}>{fmt(ayGelir)}</div>
+              {ayTahsilat > 0 && (
+                <div className="text-[9px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                  {fmt(ayTahsilat)} tahsil edildi
+                </div>
+              )}
+            </div>
+            <div className="flex-1" style={{ background: 'var(--glass-fill-soft)', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-xs)' }}>
+              <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: ayNet >= 0 ? '#30a46c' : '#e5484d' }}>Ay Net</div>
+              <div className="mono text-lg font-extrabold mt-1" style={{ color: ayNet >= 0 ? '#30a46c' : '#e5484d', letterSpacing: '-0.03em' }}>
+                {ayNet >= 0 ? '+' : ''}{fmt(ayNet)}
+              </div>
+              <div className="text-[9px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                {ayNet >= 0 ? 'kasa artıda' : 'kasadan çıkıyor'}
+              </div>
             </div>
           </div>
 
