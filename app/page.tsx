@@ -238,8 +238,18 @@ export default function Dashboard() {
       const spendHistory: { name: string; tutar: number }[] = []
       for (let i = 1; i <= 6; i++) {
         const pm = monthOffset(m, -i)
-        const { data: pastPaid } = await supabase.from('recurring_payments').select('*').eq('period_year', pm.year).eq('period_month', pm.month).eq('is_paid', true)
+        const [{ data: pastPaid }, pastOvr] = await Promise.all([
+          supabase.from('recurring_payments').select('*').eq('period_year', pm.year).eq('period_month', pm.month).eq('is_paid', true),
+          // O aya özel tutarlar — bu liste de baz tutarı değil girilen tutarı
+          // esas almalı, yoksa tutarı düşürülmüş bir ay hiç kapanmaz
+          supabase.from('recurring_expense_overrides').select('*').eq('period_year', pm.year).eq('period_month', pm.month),
+        ])
         const pastPaidList = pastPaid || []
+        const pastOvrList = pastOvr?.data || []
+        const pastAmountFor = (r: any) => {
+          const o = pastOvrList.find((x: any) => x.expense_id === r.id)
+          return o ? Number(o.amount) : r.amount
+        }
         const pmLabel = `${MONTH_NAMES[pm.month - 1]} ${pm.year}`
         // Kayıt bu aydan sonra başladıysa o ay için "ödenmemiş" sayma
         const monthEnd = new Date(pm.year, pm.month, 0)
@@ -275,13 +285,16 @@ export default function Dashboard() {
           return true
         }).forEach(r => {
           const recs = toRecords(pastPaidList.filter((p: any) => p.expense_id === r.id))
-          if (!isSettled(recs, r.amount)) {
+          const tutar = pastAmountFor(r)
+          if (!isSettled(recs, tutar)) {
             pastItems.push({
               id: `past_exp_${r.id}_${pm.year}_${pm.month}`,
-              name: r.name, amount: r.amount, currency: r.currency, day: r.payment_day!,
+              name: r.name, amount: tutar, currency: r.currency, day: r.payment_day!,
               type: r.category, source: 'recurring', sourceId: r.id,
               days: 0, paid: false, overdue: true,
               paidAmount: sumOf(recs), payRecords: recs,
+              baseAmount: r.amount,
+              overrideId: pastOvrList.find((x: any) => x.expense_id === r.id)?.id,
               monthLabel: pmLabel, periodYear: pm.year, periodMonth: pm.month,
             })
           }
