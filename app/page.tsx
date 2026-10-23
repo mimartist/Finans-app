@@ -433,32 +433,6 @@ export default function Dashboard() {
   const runwayMonths = netMonthly > 0 ? (totalAssetsTry / netMonthly).toFixed(1) : '∞'
   const runwayPct = Math.min(100, (parseFloat(runwayMonths as string) / 24) * 100)
 
-  // ── 12 AYLIK PROJEKSİYON ────────────────────────────────────────────────
-  // Her ay için: yükümlülük (taksit + düzenli gider + o aya düşen tek seferlik)
-  // eksi düzenli gelir; nakitten başlayarak kümülatif bakiye.
-  // İçinde olunan ayda zaten ödenmiş tutar. Nakit bakiyesi bu ödemeleri
-  // yansıttığı için, ilk ayın yükümlülüğünden düşülmezse aynı para iki kez
-  // sayılır ve projeksiyon olduğundan karamsar çıkar.
-  const currentPaidTotal = currentPayments.reduce((s, p) => s + toTry(p.paidAmount, p.currency), 0)
-
-  const projection = useMemo(() => {
-    const rows: { m: MonthKey; out: number; income: number; net: number; cumulative: number }[] = []
-    let cumulative = cashTry
-    for (let i = 0; i < 12; i++) {
-      const m = monthOffset(currentMonth, i)
-      let out = monthlyObligation(m.year, m.month) + oneTimeForMonth(m.year, m.month)
-      if (i === 0) out = Math.max(0, out - currentPaidTotal)
-      const income = incomeForMonth(m.year, m.month)
-      const net = income - out
-      cumulative += net
-      rows.push({ m, out, income, net, cumulative })
-    }
-    return rows
-  }, [cashTry, currentPaidTotal, incomeForMonth, monthlyObligation, oneTimeForMonth]) // eslint-disable-line
-
-  // Nakit hangi ay tükeniyor (yoksa null)
-  const depletionMonth = projection.find(r => r.cumulative < 0)?.m ?? null
-
   // ── MEVDUAT SİMÜLASYONU ─────────────────────────────────────────────────
   // 12 aylık projeksiyon parayı ölü kabul eder: sadece harcanır. Burada para
   // vadede kalmaya devam eder, her ay faiz işler ve gerektiği kadarı çekilir.
@@ -501,10 +475,10 @@ export default function Dashboard() {
   , [accounts, eurTry, usdTry]) // eslint-disable-line
   const investTry = allInvestTry > 0 ? allInvestTry : investTotalTry
 
-  const runSim = useCallback((annualNetPct: number) => {
+  const runSim = useCallback((annualNetPct: number, isGeliri?: number) => {
     const monthlyRate = annualNetPct / 100 / 12
     const infl = num(simInflation) / 100
-    const extra = num(simExtra)
+    const extra = isGeliri ?? num(simExtra)
     // Faiz işlemeyen kova: vadesiz hesaplar (+ istenirse hisse/fon)
     let idle = Math.max(0, cashTry - depositTry) + (simWithInvest ? investTry : 0)
     let deposit = depositTry
@@ -544,8 +518,48 @@ export default function Dashboard() {
     return { months: null, endMonth: null, marks, interestTotal, finalBalance: idle + deposit }
   }, [cashTry, depositTry, investTry, simWithInvest, currentMonth, monthlyObligation, oneTimeForMonth, incomeExDeposit, simInflation, simExtra]) // eslint-disable-line
 
+  // ── 12 AYLIK PROJEKSİYON ────────────────────────────────────────────────
+  // Her ay için: yükümlülük (taksit + düzenli gider + o aya düşen tek seferlik)
+  // eksi düzenli gelir; nakitten başlayarak kümülatif bakiye.
+  // İçinde olunan ayda zaten ödenmiş tutar. Nakit bakiyesi bu ödemeleri
+  // yansıttığı için, ilk ayın yükümlülüğünden düşülmezse aynı para iki kez
+  // sayılır ve projeksiyon olduğundan karamsar çıkar.
+  const currentPaidTotal = currentPayments.reduce((s, p) => s + toTry(p.paidAmount, p.currency), 0)
+
+  const projection = useMemo(() => {
+    const rows: { m: MonthKey; out: number; income: number; faiz: number; net: number; cumulative: number }[] = []
+    // İki kova: mevduat faiz işler, vadesiz/döviz işlemez. Harcama önce faiz
+    // getirmeyenden karşılanır, mevduat en son kırılır — faiz de bakiye
+    // azaldıkça kendiliğinden azalır.
+    let mevduat = depositTry
+    let bos = Math.max(0, cashTry - depositTry)
+    const aylikFaiz = netRate / 100 / 12
+    for (let i = 0; i < 12; i++) {
+      const m = monthOffset(currentMonth, i)
+      let out = monthlyObligation(m.year, m.month) + oneTimeForMonth(m.year, m.month)
+      if (i === 0) out = Math.max(0, out - currentPaidTotal)
+      // Vade sonu getirisi ayrıca gelir sayılmaz — aylık faiz zaten onu modelliyor
+      const income = incomeExDeposit(m.year, m.month)
+      const faiz = mevduat > 0 ? mevduat * aylikFaiz : 0
+      mevduat += faiz
+      const net = income + faiz - out
+      const akis = income - out
+      if (akis >= 0) bos += akis
+      else {
+        let ihtiyac = -akis
+        const a = Math.min(bos, ihtiyac); bos -= a; ihtiyac -= a
+        mevduat -= ihtiyac
+      }
+      const cumulative = bos + mevduat
+      rows.push({ m, out, income, faiz, net, cumulative })
+    }
+    return rows
+  }, [cashTry, depositTry, netRate, currentPaidTotal, incomeExDeposit, monthlyObligation, oneTimeForMonth]) // eslint-disable-line
+
+  // Nakit hangi ay tükeniyor (yoksa null)
+  const depletionMonth = projection.find(r => r.cumulative < 0)?.m ?? null
+
   const sim = useMemo(() => runSim(netRate), [runSim, netRate])
-  const simNoInterest = useMemo(() => runSim(0), [runSim])
 
   // 34 → "2 yıl 10 ay"
   const durationLabel = (months: number | null) => {
@@ -1181,13 +1195,11 @@ export default function Dashboard() {
           {projOpen && (
             <div className="px-4 pb-4">
               <div className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>
-                Yalnızca <b>nakitten</b> başlar; hisse ve fonlar dahil değildir. Gider: taksit +
-                düzenli gider + o aya düşen tek seferlikler (bu ay zaten ödenenler düşülür).
-                Gelir: düzenli gelirler + vadesi o ay dolan mevduat faizi + vade tarihi o aya
-                düşen alacaklar. Beklenen yeni iş geliri dahil değildir.
-                <br /><b>Mevduatın aylık faizi bu tabloda yok</b> — para burada yalnızca erir.
-                Faizin ve yatırımların etkisi için aşağıdaki Mevduat Simülasyonu'na bak;
-                aradaki fark 12 ayda milyonları bulur.
+                Nakitten başlar (hisse ve fonlar hariç). Mevduat her ay faiz işler; bakiye
+                azaldıkça faiz de azalır. Gider: taksit + düzenli gider + o aya düşen tek
+                seferlikler — bu ay zaten ödenenler düşülür. Gelir: düzenli gelirler + vade
+                tarihi o aya düşen alacaklar; beklenen yeni iş geliri dahil değildir.
+                <br />Yeni iş alırsan ne olacağını görmek için aşağıdaki simülasyona bak.
               </div>
 
               {/* Dar ekranda Gelir/Gider sütunları gizlenir, ayın altında kısa
@@ -1196,6 +1208,7 @@ export default function Dashboard() {
                 style={{ color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
                 <div className="shrink-0 w-16 sm:w-12">Ay</div>
                 <div className="flex-1 text-right hidden sm:block">Gelir</div>
+                <div className="flex-1 text-right hidden sm:block">Faiz</div>
                 <div className="flex-1 text-right hidden sm:block">Gider</div>
                 <div className="flex-1 text-right">Net</div>
                 <div className="flex-1 text-right">Kalan</div>
@@ -1213,12 +1226,15 @@ export default function Dashboard() {
                           {MONTH_NAMES[r.m.month - 1].substring(0, 3)} {String(r.m.year).slice(2)}
                         </div>
                         <div className="mono text-[9px] leading-tight sm:hidden" style={{ color: 'var(--muted)' }}>
-                          <span style={{ color: '#30a46c' }}>{projShort(r.income)}</span>
+                          <span style={{ color: '#30a46c' }}>{projShort(r.income + r.faiz)}</span>
                           {' / '}{projShort(r.out)}
                         </div>
                       </div>
                       <div className="flex-1 text-right mono text-[11px] hidden sm:block" style={{ color: '#30a46c' }}>
                         {projAmt(r.income)}
+                      </div>
+                      <div className="flex-1 text-right mono text-[11px] hidden sm:block" style={{ color: '#30a46c' }}>
+                        +{projAmt(r.faiz)}
                       </div>
                       <div className="flex-1 text-right mono text-[11px] hidden sm:block" style={{ color: 'var(--muted)' }}>
                         {projAmt(r.out)}
@@ -1248,10 +1264,10 @@ export default function Dashboard() {
               <div className="text-xs font-bold" style={{ color: 'var(--text)' }}>Mevduat Simülasyonu</div>
               <div className="text-[11px] font-semibold mt-0.5" style={{ color: sim.months === null ? '#30a46c' : '#e5a000' }}>
                 {sim.months === null
-                  ? 'Faiz gideri karşılıyor — para tükenmiyor'
+                  ? 'Para tükenmiyor'
                   : `${durationLabel(sim.months)} dayanır · ${monthLabel(sim.endMonth!)}`}
                 <span className="font-normal" style={{ color: 'var(--muted)' }}>
-                  {' · faizsiz '}{durationLabel(simNoInterest.months)}
+                  {num(simExtra) > 0 ? ` · ayda ${projAmt(num(simExtra))} iş geliriyle` : ' · yeni iş almazsan'}
                 </span>
               </div>
             </div>
@@ -1265,11 +1281,11 @@ export default function Dashboard() {
           {simOpen && (
             <div className="px-4 pb-4">
               <div className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>
-                Mevduattaki para ({projAmt(depositTry)}) faiz işlemeye devam eder; vadesiz
-                hesaplar ({projAmt(Math.max(0, cashTry - depositTry))}) ve varsa yatırımlar önce
-                harcanır, mevduat en son kırılır. 12 aylık projeksiyondan farkı: orada para
-                yalnızca erirken, burada çalışmaya devam eder. Vade sonu getirileri ayrıca
-                gelir sayılmaz — aylık faiz olarak zaten hesaba katılıyor.
+                "Ne kadar dayanırım?" sorusunun cevabı. 12 aylık projeksiyon sabit bir ufka
+                bakar; bu tablo parayı tükenene kadar takip eder ve beklediğin aylık iş
+                gelirini de hesaba katar. Mevduat ({projAmt(depositTry)}) faiz işler; vadesiz
+                hesaplar ({projAmt(Math.max(0, cashTry - depositTry))}) ve yatırımlar önce
+                harcanır, mevduat en son kırılır.
               </div>
 
               {/* Hisse ve fonlar da gerektiğinde nakde çevrilebilir */}
@@ -1293,7 +1309,7 @@ export default function Dashboard() {
                   { label: 'Net yıllık faiz %', value: simRate === '' ? defaultNetRate.toFixed(1) : simRate, set: setSimRate,
                     hint: `brüt %${grossDepositRate.toFixed(1)} · stopaj %${simStopaj}` },
                   { label: 'Stopaj %', value: simStopaj, set: setSimStopaj, hint: 'banka rakamlarından doğrulandı' },
-                  { label: 'Aylık ek gelir ₺', value: simExtra, set: setSimExtra, hint: 'beklenen yeni iş vb.' },
+                  { label: 'Ortalama aylık iş geliri ₺', value: simExtra, set: setSimExtra, hint: 'yeni işlerden beklenen net kâr' },
                   { label: 'Yıllık gider artışı %', value: simInflation, set: setSimInflation, hint: 'enflasyon etkisi' },
                 ].map(f => (
                   <div key={f.label} style={{ flex: '1 1 45%', minWidth: 130 }}>
@@ -1306,22 +1322,30 @@ export default function Dashboard() {
                 ))}
               </div>
 
+              {/* Aylık iş geliri arttıkça ne kadar dayandığı — asıl soru bu */}
               <div className="rounded-xl p-3 mb-3" style={{ background: 'var(--bg4)' }}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Faiz işlerse</span>
-                  <span className="text-[13px] font-bold" style={{ color: sim.months === null ? '#30a46c' : 'var(--text)' }}>
-                    {durationLabel(sim.months)}
-                  </span>
+                <div className="text-[10px] uppercase tracking-wide font-semibold mb-2" style={{ color: 'var(--muted)' }}>
+                  Ayda ne kadar iş alırsam, ne kadar dayanırım
                 </div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Faiz işlemezse</span>
-                  <span className="text-[13px] font-semibold" style={{ color: 'var(--muted)' }}>
-                    {durationLabel(simNoInterest.months)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-1.5" style={{ borderTop: '1px solid var(--border)' }}>
+                {[0, 50000, 100000, 150000, 200000].map(k => {
+                  const r = runSim(netRate, k)
+                  const secili = Math.abs(num(simExtra) - k) < 1
+                  return (
+                    <div key={k} className="flex items-center justify-between py-1"
+                      style={{ borderBottom: '1px solid var(--border)' }}>
+                      <span className="mono text-[11px]" style={{ color: secili ? 'var(--text)' : 'var(--muted)', fontWeight: secili ? 700 : 400 }}>
+                        {k === 0 ? 'hiç iş yok' : projAmt(k) + '/ay'}
+                      </span>
+                      <span className="text-[12px] font-semibold"
+                        style={{ color: r.months === null ? '#30a46c' : r.months >= 24 ? 'var(--text)' : '#e5a000' }}>
+                        {durationLabel(r.months)}
+                      </span>
+                    </div>
+                  )
+                })}
+                <div className="flex items-center justify-between pt-1.5 mt-1">
                   <span className="text-[11px]" style={{ color: 'var(--muted)' }}>Toplam faiz getirisi</span>
-                  <span className="mono text-[13px] font-bold" style={{ color: '#30a46c' }}>
+                  <span className="mono text-[12px] font-bold" style={{ color: '#30a46c' }}>
                     {projAmt(sim.interestTotal)}
                   </span>
                 </div>
