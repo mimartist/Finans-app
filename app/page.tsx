@@ -436,19 +436,25 @@ export default function Dashboard() {
   // ── 12 AYLIK PROJEKSİYON ────────────────────────────────────────────────
   // Her ay için: yükümlülük (taksit + düzenli gider + o aya düşen tek seferlik)
   // eksi düzenli gelir; nakitten başlayarak kümülatif bakiye.
+  // İçinde olunan ayda zaten ödenmiş tutar. Nakit bakiyesi bu ödemeleri
+  // yansıttığı için, ilk ayın yükümlülüğünden düşülmezse aynı para iki kez
+  // sayılır ve projeksiyon olduğundan karamsar çıkar.
+  const currentPaidTotal = currentPayments.reduce((s, p) => s + toTry(p.paidAmount, p.currency), 0)
+
   const projection = useMemo(() => {
     const rows: { m: MonthKey; out: number; income: number; net: number; cumulative: number }[] = []
     let cumulative = cashTry
     for (let i = 0; i < 12; i++) {
       const m = monthOffset(currentMonth, i)
-      const out = monthlyObligation(m.year, m.month) + oneTimeForMonth(m.year, m.month)
+      let out = monthlyObligation(m.year, m.month) + oneTimeForMonth(m.year, m.month)
+      if (i === 0) out = Math.max(0, out - currentPaidTotal)
       const income = incomeForMonth(m.year, m.month)
       const net = income - out
       cumulative += net
       rows.push({ m, out, income, net, cumulative })
     }
     return rows
-  }, [cashTry, incomeForMonth, monthlyObligation, oneTimeForMonth]) // eslint-disable-line
+  }, [cashTry, currentPaidTotal, incomeForMonth, monthlyObligation, oneTimeForMonth]) // eslint-disable-line
 
   // Nakit hangi ay tükeniyor (yoksa null)
   const depletionMonth = projection.find(r => r.cumulative < 0)?.m ?? null
@@ -1175,9 +1181,13 @@ export default function Dashboard() {
           {projOpen && (
             <div className="px-4 pb-4">
               <div className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>
-                Nakitten başlar. Gider: taksit + düzenli gider + o aya düşen tek seferlikler.
+                Yalnızca <b>nakitten</b> başlar; hisse ve fonlar dahil değildir. Gider: taksit +
+                düzenli gider + o aya düşen tek seferlikler (bu ay zaten ödenenler düşülür).
                 Gelir: düzenli gelirler + vadesi o ay dolan mevduat faizi + vade tarihi o aya
                 düşen alacaklar. Beklenen yeni iş geliri dahil değildir.
+                <br /><b>Mevduatın aylık faizi bu tabloda yok</b> — para burada yalnızca erir.
+                Faizin ve yatırımların etkisi için aşağıdaki Mevduat Simülasyonu'na bak;
+                aradaki fark 12 ayda milyonları bulur.
               </div>
 
               {/* Dar ekranda Gelir/Gider sütunları gizlenir, ayın altında kısa
