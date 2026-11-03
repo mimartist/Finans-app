@@ -394,12 +394,12 @@ export default function Dashboard() {
   //   2) vadesi o ay dolan mevduatların faiz getirisi
   //   3) vade tarihi o aya düşen tek seferlik alacaklar (Zanzibar, araç güvence…)
   const incomeItemsForMonth = useCallback((y: number, mo: number) => {
-    const items: { id: string; name: string; amount: number; currency: string; kind: 'duzenli' | 'mevduat' | 'alacak'; day?: number }[] = []
+    const items: { id: string; name: string; amount: number; currency: string; kind: 'duzenli' | 'mevduat' | 'alacak'; day?: number; debtId?: number }[] = []
 
     allAlacak.filter(d => d.is_recurring).forEach(d => items.push({
       id: `inc_rec_${d.id}`,
       name: d.person_name, amount: d.amount, currency: d.currency,
-      kind: 'duzenli', day: d.expected_day,
+      kind: 'duzenli', day: d.expected_day, debtId: d.id,
     }))
 
     accounts.filter(a => a.type === 'vadeli' && a.maturity_date).forEach(a => {
@@ -419,7 +419,7 @@ export default function Dashboard() {
       items.push({
         id: `inc_one_${d.id}`,
         name: d.person_name + (d.description ? ` · ${d.description}` : ''),
-        amount: d.amount, currency: d.currency, kind: 'alacak', day: dt.getDate(),
+        amount: d.amount, currency: d.currency, kind: 'alacak', day: dt.getDate(), debtId: d.id,
       })
     })
 
@@ -836,6 +836,34 @@ export default function Dashboard() {
     }
     setDeletingRecId(null)
     setPayModal(null); setPayAmount('')
+    await reloadAll()
+  }
+
+  // Beklenen bir geliri "tahsil edildi" olarak işaretle.
+  // Tekrarlayan alacaklarda (maaş, kira yardımı) yalnızca hareket yazılır —
+  // tutar aylık gelirdir, azaltılmaz. Tek seferliklerde kalan da düşülür.
+  const [tahsilEden, setTahsilEden] = useState<string | null>(null)
+  async function handleTahsilEt(inc: { id: string; amount: number; currency: string; kind: string; debtId?: number }) {
+    if (!inc.debtId || isDemo) return
+    setTahsilEden(inc.id)
+    const d = allAlacak.find(x => x.id === inc.debtId)
+    const { error } = await supabase.from('debt_transactions').insert({
+      debt_id: inc.debtId, type: 'tahsilat', amount: inc.amount,
+      currency: inc.currency, transaction_date: localDateStr(now),
+      ...(userId ? { user_id: userId } : {}),
+    })
+    if (error) { alert('Hata: ' + error.message); setTahsilEden(null); return }
+    if (inc.kind === 'alacak' && d) {
+      const kalan = Math.max(0, d.amount - inc.amount)
+      const { error: e2 } = await supabase.from('debt_records').update({
+        amount: kalan,
+        paid_amount: (d.paid_amount || 0) + inc.amount,
+        total_amount: d.total_amount || d.amount,
+        is_settled: kalan <= 0.01,
+      }).eq('id', d.id)
+      if (e2) alert('Uyarı: Alacak bakiyesi güncellenemedi: ' + e2.message)
+    }
+    setTahsilEden(null)
     await reloadAll()
   }
 
@@ -1618,8 +1646,11 @@ export default function Dashboard() {
               return d.getFullYear() === selectedMonth.year && d.getMonth() + 1 === selectedMonth.month
             })
             const totalGelen = gelenler.reduce((s, t) => s + toTry(t.amount || 0, t.currency || 'TRY'), 0)
-            if (incomes.length === 0 && gelenler.length === 0) return null
-            const totalIncome = incomes.reduce((s, i) => s + toTry(i.amount, i.currency), 0)
+            // Bu ay zaten tahsil edilmiş bir alacağı tekrar "beklenen" diye gösterme
+            const tahsilEdilmisIds = new Set(gelenler.map(t => t.debt_id))
+            const bekleyen = incomes.filter(i => !i.debtId || !tahsilEdilmisIds.has(i.debtId))
+            if (bekleyen.length === 0 && gelenler.length === 0) return null
+            const totalIncome = bekleyen.reduce((s, i) => s + toTry(i.amount, i.currency), 0)
             const monthOut = monthlyObligation(selectedMonth.year, selectedMonth.month)
               + oneTimeForMonth(selectedMonth.year, selectedMonth.month)
             const net = totalIncome - monthOut
@@ -1669,7 +1700,7 @@ export default function Dashboard() {
                   </>
                 )}
 
-                {incomes.length > 0 && (
+                {bekleyen.length > 0 && (
                   <div className="flex items-center justify-between mx-5 mb-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
                       Beklenen
@@ -1677,7 +1708,7 @@ export default function Dashboard() {
                   </div>
                 )}
                 <div className="tx-list mx-4 mb-3">
-                  {incomes.map(inc => (
+                  {bekleyen.map(inc => (
                     <div key={inc.id} className="tx-item">
                       <div className="tx-icon" style={{ background: 'rgba(48,164,108,0.08)' }}>
                         <IconTrendUp color="#30a46c" size={18} strokeWidth={2.2} />
@@ -1692,6 +1723,13 @@ export default function Dashboard() {
                         <div className="tx-value" style={{ color: '#30a46c' }}>+{fmt(inc.amount, inc.currency)}</div>
                         {inc.currency !== 'TRY' && (
                           <div className="mono text-[10px]" style={{ color: 'var(--muted)' }}>{fmt(toTry(inc.amount, inc.currency))}</div>
+                        )}
+                        {inc.debtId && (
+                          <button onClick={() => handleTahsilEt(inc)} disabled={tahsilEden === inc.id}
+                            className="tx-badge mt-0.5"
+                            style={{ background: 'rgba(48,164,108,0.12)', color: '#30a46c', border: 'none', cursor: 'pointer' }}>
+                            {tahsilEden === inc.id ? '...' : 'Tahsil edildi'}
+                          </button>
                         )}
                       </div>
                     </div>
