@@ -99,6 +99,9 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(currentMonth)
   const [monthLoading, setMonthLoading] = useState(false)
   const [heroExpanded, setHeroExpanded] = useState(false)
+  // Üç aylık nakit kontrol noktaları (checkpoints tablosu)
+  const [checkpoints, setCheckpoints] = useState<{ id: number; check_date: string; target_amount: number; actual_amount: number | null; actual_date: string | null; note: string | null }[]>([])
+  const [cpOpen, setCpOpen] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [authUser, setAuthUser] = useState<{ name: string; avatarUrl: string } | null>(null)
 
@@ -132,6 +135,9 @@ export default function Dashboard() {
     const ratesData = rt?.[0] || null
     setAccounts(acc || []); setLoans(lns || []); setRecurring(rec || []); setAllAlacak(recAlacak || []); setRates(ratesData); setCreditCards(crds || [])
     setTahsilatlar(tahs?.data || [])
+    // Tablo henüz kurulmadıysa hata döner; kart gizli kalır
+    const { data: cps } = await supabase.from('checkpoints').select('*').order('check_date')
+    setCheckpoints((cps || []).map((c: any) => ({ ...c, target_amount: Number(c.target_amount) || 0, actual_amount: c.actual_amount == null ? null : Number(c.actual_amount) })))
     const oneTimeIds = (rec || []).filter((r: any) => r.expense_type === 'one_time').map((r: any) => r.id)
     if (oneTimeIds.length > 0) {
       const { data: otp } = await supabase.from('recurring_payments').select('expense_id, amount').in('expense_id', oneTimeIds)
@@ -1551,6 +1557,84 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* ===== KONTROL NOKTALARI (3 aylık nakit hedefleri) ===== */}
+        {isCurrent && checkpoints.length > 0 && (() => {
+          const likit = cashTry + (allInvestTry > 0 ? allInvestTry : investTotalTry)
+          const bugunStr = new Date().toISOString().slice(0, 10)
+          const siradaki = checkpoints.find(c => c.check_date >= bugunStr)
+          const gunKaldi = siradaki ? Math.ceil((new Date(siradaki.check_date).getTime() - Date.now()) / 86400000) : 0
+          const ayLabel = (d: string) => new Date(d).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })
+          const kaydet = async (id: number) => {
+            await supabase.from('checkpoints').update({ actual_amount: Math.round(likit), actual_date: bugunStr }).eq('id', id)
+            setCheckpoints(cs => cs.map(c => c.id === id ? { ...c, actual_amount: Math.round(likit), actual_date: bugunStr } : c))
+          }
+          const durum = (deger: number, hedef: number) => deger >= hedef ? { renk: '#30a46c', yazi: 'Hedefin üstünde' } : { renk: '#dc2626', yazi: 'Hedefin altında' }
+          return (
+            <div className="mx-4 mb-3 mt-1">
+              <div className="flex items-center gap-2 mb-2.5 px-1">
+                <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #6366f1, #30a46c)' }} />
+                <span className="text-xs font-bold px-2" style={{ color: '#6366f1', whiteSpace: 'nowrap' }}>Kontrol Noktaları</span>
+                <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #30a46c, #6366f1)' }} />
+              </div>
+              <div className="card p-4" style={{ cursor: 'pointer' }} onClick={() => setCpOpen(o => !o)}>
+                {siradaki ? (() => {
+                  const d = durum(likit, siradaki.target_amount)
+                  return (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div className="text-[12px] font-semibold">Sıradaki: {ayLabel(siradaki.check_date)}</div>
+                        <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{gunKaldi} gün kaldı</div>
+                      </div>
+                      <div className="flex items-end justify-between mt-2">
+                        <div>
+                          <div className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>Şu an likit (nakit + fon + hisse)</div>
+                          <div className="mono text-lg font-extrabold">{fmt(likit)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>Hedef (en az)</div>
+                          <div className="mono text-sm font-bold">{fmt(siradaki.target_amount)}</div>
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-semibold mt-1.5" style={{ color: d.renk }}>
+                        {d.yazi} · {likit >= siradaki.target_amount ? '+' : '−'}{fmt(Math.abs(likit - siradaki.target_amount))}
+                      </div>
+                      {siradaki.note && <div className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>{siradaki.note}</div>}
+                    </>
+                  )
+                })() : <div className="text-[12px]">Tüm kontrol noktaları geçti.</div>}
+                <div className="text-[10px] mt-2" style={{ color: 'var(--text-secondary)' }}>{cpOpen ? 'Gizle ↑' : 'Tüm takvim ↓'}</div>
+                {cpOpen && (
+                  <div className="mt-2" onClick={e => e.stopPropagation()}>
+                    {checkpoints.map(c => {
+                      const gecti = c.check_date < bugunStr
+                      const d = c.actual_amount != null ? durum(c.actual_amount, c.target_amount) : null
+                      return (
+                        <div key={c.id} className="flex items-center justify-between py-2" style={{ borderTop: '1px solid var(--border)' }}>
+                          <div>
+                            <div className="text-[12px] font-semibold">{ayLabel(c.check_date)}</div>
+                            {c.note && <div className="text-[10px]" style={{ color: 'var(--text-secondary)', maxWidth: 190 }}>{c.note}</div>}
+                          </div>
+                          <div className="text-right">
+                            <div className="mono text-[12px]">hedef {fmt(c.target_amount)}</div>
+                            {c.actual_amount != null ? (
+                              <div className="mono text-[11px] font-bold" style={{ color: d!.renk }}>gerçek {fmt(c.actual_amount)}</div>
+                            ) : gecti ? (
+                              <button onClick={() => kaydet(c.id)} className="tx-badge mt-0.5"
+                                style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1', border: 'none', cursor: 'pointer' }}>
+                                Bugünkü değeri kaydet
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ===== BEKLEYEN ALACAKLAR (vadesi geçmiş / yaklaşan) ===== */}
         {isCurrent && alacakAlerts.length > 0 && (
