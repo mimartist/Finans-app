@@ -93,6 +93,8 @@ export default function Dashboard() {
   // Gerçekleşen tahsilatlar (debt_transactions) — yalnızca gösterim için;
   // projeksiyona girmez, o para zaten hesap bakiyesinde
   const [tahsilatlar, setTahsilatlar] = useState<any[]>([])
+  // Tek seferlik giderlere yapılmış ödemeler — firmalara kalan borcu bulmak için
+  const [oneTimePays, setOneTimePays] = useState<{ expense_id: number; amount: number }[]>([])
   const [kriptoTry, setKriptoTry] = useState(0)
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(currentMonth)
   const [monthLoading, setMonthLoading] = useState(false)
@@ -130,6 +132,11 @@ export default function Dashboard() {
     const ratesData = rt?.[0] || null
     setAccounts(acc || []); setLoans(lns || []); setRecurring(rec || []); setAllAlacak(recAlacak || []); setRates(ratesData); setCreditCards(crds || [])
     setTahsilatlar(tahs?.data || [])
+    const oneTimeIds = (rec || []).filter((r: any) => r.expense_type === 'one_time').map((r: any) => r.id)
+    if (oneTimeIds.length > 0) {
+      const { data: otp } = await supabase.from('recurring_payments').select('expense_id, amount').in('expense_id', oneTimeIds)
+      setOneTimePays((otp || []).map((p: any) => ({ expense_id: p.expense_id, amount: Number(p.amount) || 0 })))
+    } else setOneTimePays([])
     const seen = new Set<number>()
     const latestSnaps = (snaps || []).filter((sn: any) => { if (seen.has(sn.investment_id)) return false; seen.add(sn.investment_id); return true })
     const snapMap = new Map<number, number>()
@@ -356,6 +363,25 @@ export default function Dashboard() {
       .filter(d => d.siraFark <= 14)
       .sort((a, b) => a.siraFark - b.siraFark)
   }, [allAlacak])
+  // Firmalara / tedarikçilere yapılacak ödemeler: bu aydan itibaren vadesi
+  // gelen, tamamı ödenmemiş tek seferlik giderler. Alacakların karşılığı —
+  // alacak varlığa giriyorsa bu da borç tarafına girmeli.
+  const odenecekler = useMemo(() => {
+    const ayBasi = `${currentMonth.year}-${String(currentMonth.month).padStart(2, '0')}-01`
+    const bugun = new Date(); bugun.setHours(0, 0, 0, 0)
+    return recurring
+      .filter(r => r.expense_type === 'one_time' && r.expense_date && r.expense_date >= ayBasi)
+      .map(r => {
+        const odenen = oneTimePays.filter(p => p.expense_id === r.id).reduce((s, p) => s + p.amount, 0)
+        const kalan = r.amount - odenen
+        const vade = new Date(r.expense_date!); vade.setHours(0, 0, 0, 0)
+        const fark = Math.round((vade.getTime() - bugun.getTime()) / 86400000)
+        return { id: r.id, name: r.name, currency: r.currency, kalan, odenen, date: r.expense_date!, fark }
+      })
+      .filter(o => o.kalan > 0.01)
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [recurring, oneTimePays]) // eslint-disable-line
+  const odenecekTry = odenecekler.reduce((s, o) => s + toTry(o.kalan, o.currency), 0)
   const allInvestTry = hisseTry + fonTry + kriptoTry
   const totalAssetsTry = cashTry + (allInvestTry > 0 ? allInvestTry : investTotalTry) + alacakTry
   const tryTotal = accounts.filter(a => a.currency === 'TRY').reduce((s, a) => s + a.balance, 0)
@@ -1046,6 +1072,12 @@ export default function Dashboard() {
             <IconWallet color="rgba(255,255,255,0.55)" size={20} />
           </div>
           <div className="mono text-3xl font-extrabold mb-1" style={{ position: 'relative', zIndex: 2 }}>{fmt(totalAssetsTry)}</div>
+          {odenecekTry > 0 && (
+            <div className="text-[11px] mb-1" style={{ position: 'relative', zIndex: 2, color: 'rgba(255,255,255,0.8)' }}>
+              Firmalara ödenecek <span className="mono font-bold" style={{ color: '#ffb4b4' }}>−{fmt(odenecekTry)}</span>
+              {' · '}kalan <span className="mono font-bold">{fmt(totalAssetsTry - odenecekTry)}</span>
+            </div>
+          )}
           <div className="text-[10px] mb-4" style={{ position: 'relative', zIndex: 2, color: 'rgba(255,255,255,0.72)' }}>
             {heroExpanded ? 'Gizlemek için dokun ↑' : 'Detaylar için dokun ↓'}
           </div>
@@ -1108,10 +1140,16 @@ export default function Dashboard() {
                   <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.6)' }}>Toplam Borç</span>
                   <span className="mono text-[11px] font-bold" style={{ color: '#ff8a8a' }}>{fmt(totalDebtTry)}</span>
                 </div>
+                {odenecekTry > 0 && (
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.6)' }}>Firmalara Ödenecek</span>
+                    <span className="mono text-[11px] font-bold" style={{ color: '#ff8a8a' }}>{fmt(odenecekTry)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-[10px] font-semibold" style={{ color: 'rgba(255,255,255,0.8)' }}>Net Varlık</span>
-                  <span className="mono text-[13px] font-extrabold" style={{ color: totalAssetsTry - totalDebtTry >= 0 ? '#86efac' : '#ff8a8a' }}>
-                    {fmt(totalAssetsTry - totalDebtTry)}
+                  <span className="mono text-[13px] font-extrabold" style={{ color: totalAssetsTry - totalDebtTry - odenecekTry >= 0 ? '#86efac' : '#ff8a8a' }}>
+                    {fmt(totalAssetsTry - totalDebtTry - odenecekTry)}
                   </span>
                 </div>
               </div>
@@ -1553,6 +1591,42 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="mx-1 mt-3" style={{ height: 1, background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
+          </div>
+        )}
+
+        {/* ===== FİRMALARA ÖDENECEKLER (tek seferlik, vadesi bu aydan sonra) ===== */}
+        {isCurrent && odenecekler.length > 0 && (
+          <div className="mx-4 mb-3 mt-1">
+            <div className="flex items-center gap-2 mb-2.5 px-1">
+              <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #dc2626, #6366f1)' }} />
+              <span className="text-xs font-bold px-2" style={{ color: '#dc2626', whiteSpace: 'nowrap' }}>
+                Firmalara Ödenecek · {fmt(odenecekTry)}
+              </span>
+              <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #6366f1, #dc2626)' }} />
+            </div>
+            <div className="tx-list">
+              {odenecekler.map(o => {
+                const gecti = o.fark < 0
+                const renk = gecti ? '#dc2626' : o.fark <= 7 ? '#e5a000' : 'var(--text-secondary)'
+                return (
+                  <div key={o.id} className="tx-item" style={{ borderLeft: `3px solid ${gecti ? '#dc2626' : o.fark <= 7 ? '#e5a000' : '#94a3b8'}` }}>
+                    <div className="tx-icon">{getCatIcon('tamir_tadilat', { color: renk, size: 20 })}</div>
+                    <div className="tx-info">
+                      <div className="tx-name">{o.name.replace(/^İnfosec — /, '')}</div>
+                      <div className="tx-detail" style={{ color: renk }}>
+                        {new Date(o.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                        {' · '}{gecti ? `${-o.fark} gün gecikti` : o.fark === 0 ? 'bugün' : `${o.fark} gün kaldı`}
+                        {o.odenen > 0 ? ` · ${fmt(o.odenen, o.currency)} ödendi` : ''}
+                      </div>
+                    </div>
+                    <div className="tx-amount">
+                      <div className="tx-value" style={{ color: '#dc2626' }}>{fmt(o.kalan, o.currency)}</div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             <div className="mx-1 mt-3" style={{ height: 1, background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
           </div>
